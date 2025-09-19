@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'login.dart';
+import 'profile.dart';
 
 class HomeWithLogin extends StatefulWidget {
   const HomeWithLogin({super.key});
@@ -61,7 +62,15 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
                   Image.asset("assets/logo.png", height: 40),
                   GestureDetector(
                     onTap: () {
-                      // 👉 later this opens Profile Edit Page (UI #3)
+                      if (_user != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                ProfilePage(user: _user!), // ✅ Pass user
+                          ),
+                        );
+                      }
                     },
                     child: CircleAvatar(
                       radius: 20,
