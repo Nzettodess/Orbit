@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginOverlay extends StatelessWidget {
   final VoidCallback onSignedIn;
@@ -10,10 +11,14 @@ class LoginOverlay extends StatelessWidget {
 
   Future<void> _signInWithGoogle(BuildContext context) async {
     try {
+      UserCredential userCredential;
+
       if (kIsWeb) {
         // ✅ Web login
         GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        await FirebaseAuth.instance.signInWithPopup(googleProvider);
+        userCredential = await FirebaseAuth.instance.signInWithPopup(
+          googleProvider,
+        );
       } else {
         // ✅ Mobile login
         final googleUser = await GoogleSignIn().signIn();
@@ -24,8 +29,22 @@ class LoginOverlay extends StatelessWidget {
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
-        await FirebaseAuth.instance.signInWithCredential(credential);
+        userCredential = await FirebaseAuth.instance.signInWithCredential(
+          credential,
+        );
       }
+
+      final user = userCredential.user;
+      if (user != null) {
+        // ✅ Save or update profile info in Firestore
+        await FirebaseFirestore.instance.collection("users").doc(user.uid).set({
+          "name": user.displayName,
+          "email": user.email,
+          "photoURL": user.photoURL, // currently direct Google URL
+          "lastLogin": DateTime.now(),
+        }, SetOptions(merge: true));
+      }
+
       onSignedIn(); // Notify home that login succeeded
     } catch (e) {
       debugPrint("Google sign-in failed: $e");
@@ -39,9 +58,7 @@ class LoginOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withValues(
-          alpha: 0.3,
-        ), // Semi-transparent background
+        color: Colors.black.withOpacity(0.3), // Semi-transparent overlay
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 320),

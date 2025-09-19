@@ -1,6 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'login.dart'; // We’ll show LoginOverlay from here
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:syncfusion_flutter_calendar/calendar.dart';
+import 'login.dart';
 
 class HomeWithLogin extends StatefulWidget {
   const HomeWithLogin({super.key});
@@ -11,42 +14,84 @@ class HomeWithLogin extends StatefulWidget {
 
 class _HomeWithLoginState extends State<HomeWithLogin> {
   User? _user = FirebaseAuth.instance.currentUser;
+  String? _photoUrl; // ✅ Avatar URL from Firestore
 
-  void _handleLoginSuccess() {
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  void _handleLoginSuccess() async {
     setState(() {
       _user = FirebaseAuth.instance.currentUser;
     });
+    await _loadUserProfile();
   }
 
-  Future<void> _signOut() async {
-    await FirebaseAuth.instance.signOut();
-    setState(() {
-      _user = null;
-    });
+  Future<void> _loadUserProfile() async {
+    if (_user == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(_user!.uid)
+        .get();
+
+    if (doc.exists) {
+      setState(() {
+        _photoUrl = doc.data()?['photoURL'];
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Scaffold(
-          appBar: AppBar(
-            title: const Text("Team Calendar"),
-            actions: [
-              if (_user != null)
-                IconButton(icon: const Icon(Icons.logout), onPressed: _signOut),
-            ],
-          ),
-          body: Center(
-            child: _user == null
-                ? const Text("Please sign in")
-                : Text("Welcome, ${_user?.displayName ?? 'User'}"),
-          ),
-        ),
+    final loggedIn = _user != null;
 
-        // Overlay login if user is not signed in
-        if (_user == null) LoginOverlay(onSignedIn: _handleLoginSuccess),
-      ],
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+
+        // ✅ Header changes depending on login state
+        title: loggedIn
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Image.asset("assets/logo.png", height: 40),
+                  GestureDetector(
+                    onTap: () {
+                      // 👉 later this opens Profile Edit Page (UI #3)
+                    },
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundImage: _photoUrl != null
+                          ? NetworkImage(_photoUrl!)
+                          : const AssetImage("assets/default_avatar.png")
+                                as ImageProvider,
+                    ),
+                  ),
+                ],
+              )
+            : Center(child: Image.asset("assets/logo.png", height: 40)),
+      ),
+      body: Stack(
+        children: [
+          // ✅ Calendar is always there
+          SfCalendar(view: CalendarView.month),
+
+          // ✅ Login overlay
+          if (!loggedIn) ...[
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                child: Container(color: Colors.black.withOpacity(0.2)),
+              ),
+            ),
+            LoginOverlay(onSignedIn: _handleLoginSuccess),
+          ],
+        ],
+      ),
     );
   }
 }
