@@ -38,7 +38,7 @@ class LoginOverlay extends StatelessWidget {
       if (user != null) {
         // ✅ Save or update profile info in Firestore
         await FirebaseFirestore.instance.collection("users").doc(user.uid).set({
-          "name": user.displayName,
+          "displayName": user.displayName,
           "email": user.email,
           "photoURL": user.photoURL, // currently direct Google URL
           "lastLogin": DateTime.now(),
