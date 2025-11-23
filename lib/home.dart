@@ -35,7 +35,6 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
   List<GroupEvent> _events = [];
   List<Holiday> _holidays = [];
   List<String> _religiousCalendars = []; // Enabled religious calendars
-  bool _showLunarOnCalendar = true;
   
   String _currentMonthTitle = "Calendar";
   List<Map<String, dynamic>> _allUsers = [];
@@ -100,7 +99,6 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
         if (religious != null && religious is List) {
           setState(() {
             _religiousCalendars = List<String>.from(religious);
-            _showLunarOnCalendar = data?['showLunarOnCalendar'] ?? true;
           });
         }
         
@@ -234,17 +232,12 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
     });
   }
 
-  void _fetchHolidays(List<String> calendarIds) async {
-    final currentYear = DateTime.now().year;
-    // Fetch for current year and next year to ensure future holidays are visible
-    final thisYearHolidays = await _googleCalendarService.fetchMultipleCalendars(calendarIds, currentYear);
-    final nextYearHolidays = await _googleCalendarService.fetchMultipleCalendars(calendarIds, currentYear + 1);
-    
-    if (mounted) {
+  void _fetchHolidays(List<String> calendarIds) {
+    _googleCalendarService.fetchMultipleCalendars(calendarIds, DateTime.now().year).then((holidays) {
       setState(() {
-        _holidays = [...thisYearHolidays, ...nextYearHolidays];
+        _holidays = holidays;
       });
-    }
+    });
   }
 
   // Helper to get effective locations for a date
@@ -566,9 +559,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
                           h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
                         
                         // Get religious calendar dates for this day
-                        final religiousDates = _showLunarOnCalendar 
-                            ? ReligiousCalendarHelper.getReligiousDates(date, _religiousCalendars)
-                            : <String>[];
+                        final religiousDates = ReligiousCalendarHelper.getReligiousDates(date, _religiousCalendars);
                         
                         return Container(
                           decoration: BoxDecoration(
@@ -576,64 +567,50 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
                           ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.only(left: 4.0, top: 4.0),
-                                child: Text(
-                                  date.day.toString(), 
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16) // Larger font
-                                ),
-                              ),
+                              Text(date.day.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
                               // Show religious calendar dates
                               if (religiousDates.isNotEmpty)
-                                ...religiousDates.map((rd) => Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                                  child: Text(
-                                    rd,
-                                    style: const TextStyle(fontSize: 9, color: Colors.grey),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                ...religiousDates.map((rd) => Text(
+                                  rd,
+                                  style: const TextStyle(fontSize: 7, color: Colors.grey),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 )),
                               const Spacer(),
                               if (dayHolidays.isNotEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.only(left: 4.0),
-                                  child: Icon(Icons.star, color: Colors.red, size: 12),
-                                ),
+                                const Icon(Icons.star, color: Colors.red, size: 10),
                               if (dayLocations.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.all(1.0),
-                                  child: SizedBox(
-                                    height: 16, // Fixed height for avatars
-                                    child: ListView.builder(
-                                      scrollDirection: Axis.horizontal,
-                                      itemCount: dayLocations.length,
-                                      itemBuilder: (context, index) {
-                                        final l = dayLocations[index];
-                                        final user = _allUsers.firstWhere((u) => u['uid'] == l.userId, orElse: () => {});
-                                        final name = user['displayName'] ?? user['email'] ?? "User";
-                                        final photoUrl = user['photoURL'];
-                                        return Padding(
-                                          padding: const EdgeInsets.only(right: 2.0),
-                                          child: CircleAvatar(
-                                            radius: 8,
-                                            backgroundColor: Colors.grey[200],
-                                            child: ClipOval(
-                                              child: Image.network(
-                                                photoUrl != null && photoUrl.isNotEmpty ? photoUrl : "https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&size=24",
-                                                width: 16,
-                                                height: 16,
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  children: dayLocations.take(3).map((l) {
+                                    final user = _allUsers.firstWhere((u) => u['uid'] == l.userId, orElse: () => {});
+                                    final name = user['displayName'] ?? user['email'] ?? "User";
+                                    final photoUrl = user['photoURL'];
+                                    return Padding(
+                                      padding: const EdgeInsets.all(1.0),
+                                      child: CircleAvatar(
+                                        radius: 6,
+                                        backgroundColor: Colors.grey[200],
+                                        child: ClipOval(
+                                          child: Image.network(
+                                            photoUrl != null && photoUrl.isNotEmpty ? photoUrl : "https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&size=24",
+                                            width: 12,
+                                            height: 12,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Image.network(
+                                                "https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&size=24",
+                                                width: 12,
+                                                height: 12,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey),
-                                              ),
-                                            ),
+                                              );
+                                            },
                                           ),
-                                        );
-                                      },
-                                    ),
-                                  ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
                                 ),
                               const SizedBox(height: 2),
                             ],

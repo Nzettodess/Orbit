@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'firebase_options.dart';
-import 'home.dart';
+import 'home.dart'; // Only home.dart, login is imported inside home
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   
   // Disable persistence to avoid "Unexpected state" errors from corrupted cache
   FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
@@ -26,11 +23,10 @@ class MyApp extends StatelessWidget {
       title: 'Whereabouts',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
-        // textTheme: GoogleFonts.notoSansScTextTheme(), // Use Noto Sans SC for Chinese support
       ),
-      home: const HomeWithLogin(),
+      home: const HomeWithLogin(), // Wrapper for home + login
     );
   }
 }

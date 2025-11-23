@@ -24,9 +24,7 @@ class _AddEventModalState extends State<AddEventModal> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
   
-  TimeOfDay _selectedTime = TimeOfDay.now();
-  late DateTime _selectedDate;
-  bool _isAllDay = false;
+  DateTime _selectedDate = DateTime.now();
   String? _selectedGroupId;
   List<Group> _userGroups = [];
 
@@ -50,12 +48,29 @@ class _AddEventModalState extends State<AddEventModal> {
     });
   }
 
+  void _saveEvent() async {
+    if (_formKey.currentState!.validate() && _selectedGroupId != null) {
+      final event = GroupEvent(
+        id: const Uuid().v4(),
+        groupId: _selectedGroupId!,
+        creatorId: widget.currentUserId,
+        title: _titleController.text,
+        description: _descController.text,
+        date: _selectedDate,
+        rsvps: {widget.currentUserId: 'Yes'}, // Creator automatically RSVPs Yes
+      );
+
+      await _firestoreService.createEvent(event);
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) {
       setState(() {
@@ -64,66 +79,17 @@ class _AddEventModalState extends State<AddEventModal> {
     }
   }
 
-  Future<void> _selectTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime,
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedTime = picked;
-      });
-    }
-  }
-
-  void _saveEvent() async {
-    if (_formKey.currentState!.validate() && _selectedGroupId != null) {
-      DateTime eventDateTime = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _isAllDay ? 0 : _selectedTime.hour,
-        _isAllDay ? 0 : _selectedTime.minute,
-      );
-
-      final event = GroupEvent(
-        id: const Uuid().v4(),
-        groupId: _selectedGroupId!,
-        creatorId: widget.currentUserId,
-        title: _titleController.text,
-        description: _descController.text,
-        date: eventDateTime,
-        isAllDay: _isAllDay,
-        rsvps: {widget.currentUserId: 'Yes'},
-      );
-
-      await _firestoreService.createEvent(event);
-      if (mounted) Navigator.pop(context);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        left: 20,
-        right: 20,
-        top: 20,
-      ),
+      padding: const EdgeInsets.all(16),
       child: Form(
         key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text("Schedule Event", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-              ],
-            ),
-            const SizedBox(height: 20),
+            const Text("Schedule Event", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _titleController,
               decoration: const InputDecoration(labelText: "Event Title"),
@@ -134,7 +100,7 @@ class _AddEventModalState extends State<AddEventModal> {
               decoration: const InputDecoration(labelText: "Description"),
               maxLines: 3,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Row(
               children: [
                 const Text("Date: "),
@@ -144,25 +110,6 @@ class _AddEventModalState extends State<AddEventModal> {
                 ),
               ],
             ),
-            SwitchListTile(
-              title: const Text("All Day"),
-              value: _isAllDay,
-              onChanged: (bool value) {
-                setState(() {
-                  _isAllDay = value;
-                });
-              },
-            ),
-            if (!_isAllDay)
-              Row(
-                children: [
-                  const Text("Time: "),
-                  TextButton(
-                    onPressed: () => _selectTime(context),
-                    child: Text(_selectedTime.format(context)),
-                  ),
-                ],
-              ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: _selectedGroupId,
@@ -179,12 +126,9 @@ class _AddEventModalState extends State<AddEventModal> {
               validator: (value) => value == null ? "Select a group" : null,
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saveEvent,
-                child: const Text("Create Event"),
-              ),
+            ElevatedButton(
+              onPressed: _saveEvent,
+              child: const Text("Create Event"),
             ),
           ],
         ),

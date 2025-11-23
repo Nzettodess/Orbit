@@ -170,22 +170,20 @@ class AppNotification {
 class GroupEvent {
   final String id;
   final String groupId;
+  final String creatorId;
   final String title;
   final String description;
   final DateTime date;
-  final String creatorId;
-  final bool isAllDay;
-  final Map<String, String> rsvps;
+  final Map<String, String> rsvps; // userId -> status ('Yes', 'No', 'Maybe')
 
   GroupEvent({
     required this.id,
     required this.groupId,
+    required this.creatorId,
     required this.title,
     required this.description,
     required this.date,
-    required this.creatorId,
-    this.isAllDay = false,
-    this.rsvps = const {},
+    required this.rsvps,
   });
 
   factory GroupEvent.fromFirestore(DocumentSnapshot doc) {
@@ -193,11 +191,10 @@ class GroupEvent {
     return GroupEvent(
       id: doc.id,
       groupId: data['groupId'] ?? '',
+      creatorId: data['creatorId'] ?? '',
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       date: (data['date'] as Timestamp).toDate(),
-      creatorId: data['createdBy'] ?? '',
-      isAllDay: data['isAllDay'] ?? false,
       rsvps: Map<String, String>.from(data['rsvps'] ?? {}),
     );
   }
@@ -205,11 +202,10 @@ class GroupEvent {
   Map<String, dynamic> toMap() {
     return {
       'groupId': groupId,
+      'creatorId': creatorId,
       'title': title,
       'description': description,
       'date': Timestamp.fromDate(date),
-      'createdBy': creatorId,
-      'isAllDay': isAllDay,
       'rsvps': rsvps,
     };
   }

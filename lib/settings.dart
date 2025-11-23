@@ -13,7 +13,6 @@ class SettingsDialog extends StatefulWidget {
 class _SettingsDialogState extends State<SettingsDialog> {
   List<String> _holidayCountries = [];
   List<String> _religiousCalendars = [];
-  bool _showLunarOnCalendar = true; // Default to true
 
   final Map<String, String> _countryMap = {
     "US": "United States",
@@ -97,9 +96,19 @@ class _SettingsDialogState extends State<SettingsDialog> {
         } else {
           _religiousCalendars = [];
         }
-        
-        _showLunarOnCalendar = data?['showLunarOnCalendar'] ?? true;
       });
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    await FirebaseFirestore.instance.collection('users').doc(widget.currentUserId).update({
+      'additionalHolidayCountry': _holidayCountries.isNotEmpty ? _holidayCountries[0] : null,
+      'religiousCalendars': _religiousCalendars,
+    });
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Settings Saved")));
+      Navigator.pop(context);
     }
   }
 
@@ -183,7 +192,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           const SizedBox(height: 10),
                         ] else ...[
                           const Text("⚠️ Set your default location in Profile to enable holidays", 
-                              style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500)),
+                            style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500)),
                           const SizedBox(height: 10),
                         ],
                       ],
@@ -229,6 +238,34 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 const Text("Religious Calendars (Optional)", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 5),
                 const Text("Select religious calendars to include holidays like Ramadan, Chinese New Year, etc."),
+                const SizedBox(height: 10),
+                
+                // Religious calendar checkboxes
+                ..._religiousCalendarMap.entries.map((entry) {
+                  final isSelected = _religiousCalendars.contains(entry.key);
+                  return CheckboxListTile(
+                    title: Text(entry.value),
+                    value: isSelected,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        if (value == true) {
+                          _religiousCalendars.add(entry.key);
+                        } else {
+                          _religiousCalendars.remove(entry.key);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _saveSettings,
+                    child: const Text("Save Settings"),
+                  ),
+                ),
               ],
             ),
           ),

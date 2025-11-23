@@ -130,7 +130,18 @@ class FirestoreService {
       final locations = snapshot.docs
           .map((doc) => UserLocation.fromFirestore(doc.data()))
           .toList();
-      return locations;
+      return locations.where((loc) => memberIds.contains(loc.userId)).toList();
+    });
+  }
+
+  // --- Notifications ---
+
+  Future<void> sendNotification(String userId, String message) async {
+    await _db.collection('notifications').add({
+      'userId': userId,
+      'message': message,
+      'timestamp': FieldValue.serverTimestamp(),
+      'read': false,
     });
   }
 
@@ -147,15 +158,6 @@ class FirestoreService {
 
   Future<void> markNotificationRead(String notificationId) async {
     await _db.collection('notifications').doc(notificationId).update({'read': true});
-  }
-
-  Future<void> sendNotification(String userId, String message) async {
-    await _db.collection('notifications').add({
-      'userId': userId,
-      'message': message,
-      'timestamp': FieldValue.serverTimestamp(),
-      'read': false,
-    });
   }
 
   // --- Events ---
@@ -176,21 +178,6 @@ class FirestoreService {
   }
 
   Future<void> rsvpEvent(String eventId, String userId, String status) async {
-    await _db.collection('events').doc(eventId).update({
-      'rsvps.$userId': status,
-    });
-  }
-
-  Future<void> updateEvent(String eventId, String title, String description, DateTime date, bool isAllDay) async {
-    await _db.collection('events').doc(eventId).update({
-      'title': title,
-      'description': description,
-      'date': Timestamp.fromDate(date),
-      'isAllDay': isAllDay,
-    });
-  }
-
-  Future<void> updateEventRsvp(String eventId, String userId, String status) async {
     await _db.collection('events').doc(eventId).update({
       'rsvps.$userId': status,
     });
