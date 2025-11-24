@@ -25,7 +25,7 @@ class ReligiousCalendarHelper {
   static String getChineseLunarDate(DateTime gregorianDate) {
     try {
       final lunar = Lunar.fromDate(gregorianDate);
-      return '🏮 ${lunar.getMonthInChinese()}${lunar.getDayInChinese()}';
+      return '🏮 ${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}';
     } catch (e) {
       return '';
     }
