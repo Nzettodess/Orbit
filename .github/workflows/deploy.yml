@@ -40,7 +40,6 @@ jobs:
         run: |
           flutter build web \
             --release \
-            --web-renderer canvaskit \
             --base-href "/whereabouts/" \
             --dart-define=CALENDARIFIC_API_KEY=$CALENDARIFIC_API_KEY \
             --dart-define=FESTIVO_API_KEY=$FESTIVO_API_KEY \
