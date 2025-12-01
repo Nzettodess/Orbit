@@ -369,9 +369,9 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
             IconButton(
               icon: const Icon(Icons.notifications, color: Colors.black),
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => NotificationCenter(currentUserId: _user!.uid)),
+                showDialog(
+                  context: context,
+                  builder: (context) => NotificationCenter(currentUserId: _user!.uid),
                 );
               },
             ),
@@ -426,12 +426,10 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
                 );
               },
               onRSVPManagementTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => RSVPManagementScreen(
-                      currentUserId: _user!.uid,
-                    ),
+                showDialog(
+                  context: context,
+                  builder: (context) => RSVPManagementDialog(
+                    currentUserId: _user!.uid,
                   ),
                 );
               },

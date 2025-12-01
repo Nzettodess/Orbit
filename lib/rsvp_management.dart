@@ -8,119 +8,138 @@ import 'detail_modal.dart';
 
 enum EventFilter { all, upcoming, past }
 
-class RSVPManagementScreen extends StatefulWidget {
+class RSVPManagementDialog extends StatefulWidget {
   final String currentUserId;
 
-  const RSVPManagementScreen({
+  const RSVPManagementDialog({
     super.key,
     required this.currentUserId,
   });
 
   @override
-  State<RSVPManagementScreen> createState() => _RSVPManagementScreenState();
+  State<RSVPManagementDialog> createState() => _RSVPManagementDialogState();
 }
 
-class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
+class _RSVPManagementDialogState extends State<RSVPManagementDialog> {
   final FirestoreService _firestoreService = FirestoreService();
   EventFilter _currentFilter = EventFilter.upcoming;
-  Map<String, bool> _expandedEvents = {};
-  Map<String, Map<String, dynamic>> _eventStats = {};
-  Map<String, Map<String, Map<String, dynamic>>> _eventAttendees = {};
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        title: const Text(
-          'RSVP Management',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: 600, // Constrained width
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
         ),
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),
-      body: Column(
-        children: [
-          // Filter Chips
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                _buildFilterChip('All', EventFilter.all),
-                const SizedBox(width: 8),
-                _buildFilterChip('Upcoming', EventFilter.upcoming),
-                const SizedBox(width: 8),
-                _buildFilterChip('Past', EventFilter.past),
-              ],
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'RSVP Management',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
+            const Divider(height: 1),
 
-          // Events List
-          Expanded(
-            child: StreamBuilder<List<GroupEvent>>(
-              stream: _firestoreService.getAllUserEvents(widget.currentUserId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            // Filter Chips
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  _buildFilterChip('All', EventFilter.all),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Upcoming', EventFilter.upcoming),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Past', EventFilter.past),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
 
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No events found',
-                          style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Create an event to get started',
-                          style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final allEvents = snapshot.data!;
-                final now = DateTime.now();
-                final filteredEvents = allEvents.where((event) {
-                  switch (_currentFilter) {
-                    case EventFilter.upcoming:
-                      return event.date.isAfter(now);
-                    case EventFilter.past:
-                      return event.date.isBefore(now);
-                    case EventFilter.all:
-                      return true;
+            // Events List
+            Expanded(
+              child: StreamBuilder<List<GroupEvent>>(
+                stream: _firestoreService.getAllUserEvents(widget.currentUserId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
                   }
-                }).toList();
 
-                if (filteredEvents.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No ${_currentFilter.name} events',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                    ),
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No events found',
+                            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Create an event to get started',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final allEvents = snapshot.data!;
+                  final now = DateTime.now();
+                  final filteredEvents = allEvents.where((event) {
+                    switch (_currentFilter) {
+                      case EventFilter.upcoming:
+                        return event.date.isAfter(now);
+                      case EventFilter.past:
+                        return event.date.isBefore(now);
+                      case EventFilter.all:
+                        return true;
+                    }
+                  }).toList();
+
+                  if (filteredEvents.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No ${_currentFilter.name} events',
+                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredEvents.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final event = filteredEvents[index];
+                      return EventCard(
+                        key: ValueKey(event.id),
+                        event: event,
+                        currentUserId: widget.currentUserId,
+                        firestoreService: _firestoreService,
+                      );
+                    },
                   );
-                }
-
-                return ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filteredEvents.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final event = filteredEvents[index];
-                    return _buildEventCard(event);
-                  },
-                );
-              },
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -139,14 +158,51 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
       checkmarkColor: Colors.blue[800],
     );
   }
+}
 
-  Widget _buildEventCard(GroupEvent event) {
-    final isExpanded = _expandedEvents[event.id] ?? false;
-    final isCreator = event.creatorId == widget.currentUserId;
-    final isPastEvent = event.date.isBefore(DateTime.now());
+class EventCard extends StatefulWidget {
+  final GroupEvent event;
+  final String currentUserId;
+  final FirestoreService firestoreService;
+
+  const EventCard({
+    super.key,
+    required this.event,
+    required this.currentUserId,
+    required this.firestoreService,
+  });
+
+  @override
+  State<EventCard> createState() => _EventCardState();
+}
+
+class _EventCardState extends State<EventCard> {
+  bool _isExpanded = false;
+  late Future<Map<String, dynamic>> _statsFuture;
+  Future<Map<String, Map<String, dynamic>>>? _attendeesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _statsFuture = widget.firestoreService.getEventRSVPStats(widget.event, widget.event.groupId);
+  }
+
+  void _toggleExpand() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isExpanded && _attendeesFuture == null) {
+        _attendeesFuture = widget.firestoreService.getEventAttendees(widget.event.id, widget.event.groupId);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isCreator = widget.event.creatorId == widget.currentUserId;
+    final isPastEvent = widget.event.date.isBefore(DateTime.now());
 
     return FutureBuilder<Map<String, dynamic>>(
-      future: _loadEventStats(event),
+      future: _statsFuture,
       builder: (context, statsSnapshot) {
         if (!statsSnapshot.hasData) {
           return const Card(
@@ -173,11 +229,7 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
           child: Column(
             children: [
               InkWell(
-                onTap: () {
-                  setState(() {
-                    _expandedEvents[event.id] = !isExpanded;
-                  });
-                },
+                onTap: _toggleExpand,
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -193,7 +245,7 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  event.title,
+                                  widget.event.title,
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -205,14 +257,14 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
                                     Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
                                     const SizedBox(width: 4),
                                     Text(
-                                      event.hasTime
-                                          ? DateFormat('MMM dd, yyyy • hh:mm a').format(event.date)
-                                          : DateFormat('MMM dd, yyyy').format(event.date),
+                                      widget.event.hasTime
+                                          ? DateFormat('MMM dd, yyyy • hh:mm a').format(widget.event.date)
+                                          : DateFormat('MMM dd, yyyy').format(widget.event.date),
                                       style: TextStyle(color: Colors.grey[600], fontSize: 13),
                                     ),
                                   ],
                                 ),
-                                if (event.venue != null && event.venue!.isNotEmpty) ...[
+                                if (widget.event.venue != null && widget.event.venue!.isNotEmpty) ...[
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
@@ -220,7 +272,7 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
                                       const SizedBox(width: 4),
                                       Expanded(
                                         child: Text(
-                                          event.venue!,
+                                          widget.event.venue!,
                                           style: TextStyle(color: Colors.grey[600], fontSize: 13),
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -232,7 +284,7 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
                             ),
                           ),
                           Icon(
-                            isExpanded ? Icons.expand_less : Icons.expand_more,
+                            _isExpanded ? Icons.expand_less : Icons.expand_more,
                             color: Colors.grey[600],
                           ),
                         ],
@@ -313,7 +365,7 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: () => _sendReminders(event, stats['noResponseUserIds']),
+                            onPressed: () => _sendReminders(widget.event, stats['noResponseUserIds']),
                             icon: const Icon(Icons.notifications_active, size: 18),
                             label: Text('Send Reminder to $noResponse ${noResponse == 1 ? 'Person' : 'People'}'),
                             style: OutlinedButton.styleFrom(
@@ -328,9 +380,9 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
               ),
 
               // Expanded Attendee List
-              if (isExpanded) ...[
+              if (_isExpanded) ...[
                 const Divider(height: 1),
-                _buildAttendeesList(event, stats),
+                _buildAttendeesList(widget.event, stats),
               ],
             ],
           ),
@@ -376,7 +428,7 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
 
   Widget _buildAttendeesList(GroupEvent event, Map<String, dynamic> stats) {
     return FutureBuilder<Map<String, Map<String, dynamic>>>(
-      future: _loadAttendees(event),
+      future: _attendeesFuture,
       builder: (context, attendeesSnapshot) {
         if (!attendeesSnapshot.hasData) {
           return const Padding(
@@ -479,33 +531,9 @@ class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
     );
   }
 
-  Future<Map<String, dynamic>> _loadEventStats(GroupEvent event) async {
-    if (_eventStats.containsKey(event.id)) {
-      return _eventStats[event.id]!;
-    }
-
-    final stats = await _firestoreService.getEventRSVPStats(event, event.groupId);
-    setState(() {
-      _eventStats[event.id] = stats;
-    });
-    return stats;
-  }
-
-  Future<Map<String, Map<String, dynamic>>> _loadAttendees(GroupEvent event) async {
-    if (_eventAttendees.containsKey(event.id)) {
-      return _eventAttendees[event.id]!;
-    }
-
-    final attendees = await _firestoreService.getEventAttendees(event.id, event.groupId);
-    setState(() {
-      _eventAttendees[event.id] = attendees;
-    });
-    return attendees;
-  }
-
   Future<void> _sendReminders(GroupEvent event, List<String> userIds) async {
     try {
-      await _firestoreService.sendRSVPReminder(
+      await widget.firestoreService.sendRSVPReminder(
         event.id,
         event.title,
         userIds,

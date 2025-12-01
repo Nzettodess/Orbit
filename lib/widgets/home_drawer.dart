@@ -74,7 +74,7 @@ class HomeDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.event_available),
-            title: const Text("RSVP Management"),
+            title: const Text("RSVP"),
             onTap: () {
               Navigator.pop(context);
               onRSVPManagementTap();
