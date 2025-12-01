@@ -303,6 +303,115 @@ class FirestoreService {
             snapshot.docs.map((doc) => GroupEvent.fromFirestore(doc)).toList());
   }
 
+  /// Get all events user has access to (from groups they're a member of)
+  Stream<List<GroupEvent>> getAllUserEvents(String userId) async* {
+    // First get all groups the user is a member of
+    final groupsSnapshot = await _db
+        .collection('groups')
+        .where('members', arrayContains: userId)
+        .get();
+    
+    final groupIds = groupsSnapshot.docs.map((doc) => doc.id).toList();
+    
+    if (groupIds.isEmpty) {
+      yield [];
+      return;
+    }
+    
+    // Listen to events from all user's groups
+    // Note: Firestore 'in' queries are limited to 10 items
+    // If user is in more than 10 groups, we need to batch the queries
+    const batchSize = 10;
+    final allEvents = <GroupEvent>[];
+    
+    for (var i = 0; i < groupIds.length; i += batchSize) {
+      final batch = groupIds.skip(i).take(batchSize).toList();
+      
+      await for (final snapshot in _db
+          .collection('events')
+          .where('groupId', whereIn: batch)
+          .snapshots()) {
+        final events = snapshot.docs
+            .map((doc) => GroupEvent.fromFirestore(doc))
+            .toList();
+        
+        // Merge with existing events (avoid duplicates)
+        for (final event in events) {
+          if (!allEvents.any((e) => e.id == event.id)) {
+            allEvents.add(event);
+          }
+        }
+        
+        // Sort by date (most recent first)
+        allEvents.sort((a, b) => b.date.compareTo(a.date));
+        yield List.from(allEvents);
+      }
+    }
+  }
+
+  /// Get event attendees with their details
+  Future<Map<String, Map<String, dynamic>>> getEventAttendees(
+      String eventId, String groupId) async {
+    // Get group members
+    final groupDoc = await _db.collection('groups').doc(groupId).get();
+    if (!groupDoc.exists) return {};
+    
+    final group = Group.fromFirestore(groupDoc);
+    final attendees = <String, Map<String, dynamic>>{};
+    
+    // Fetch user details for all members
+    for (final memberId in group.members) {
+      final userDoc = await _db.collection('users').doc(memberId).get();
+      if (userDoc.exists) {
+        attendees[memberId] = userDoc.data() as Map<String, dynamic>;
+      }
+    }
+    
+    return attendees;
+  }
+
+  /// Send RSVP reminder to users who haven't responded
+  Future<void> sendRSVPReminder(
+      String eventId, String eventTitle, List<String> userIds) async {
+    for (final userId in userIds) {
+      await sendNotification(
+        userId,
+        "Reminder: Please RSVP for '$eventTitle'",
+      );
+    }
+  }
+
+  /// Calculate RSVP statistics for an event
+  Future<Map<String, dynamic>> getEventRSVPStats(
+      GroupEvent event, String groupId) async {
+    // Get all group members
+    final groupDoc = await _db.collection('groups').doc(groupId).get();
+    if (!groupDoc.exists) {
+      return {
+        'totalMembers': 0,
+        'accepted': 0,
+        'declined': 0,
+        'maybe': 0,
+        'noResponse': 0,
+        'responseRate': 0.0,
+      };
+    }
+    
+    final group = Group.fromFirestore(groupDoc);
+    final totalMembers = group.members.length;
+    final noResponseUsers = event.getUsersWithNoResponse(group.members);
+    
+    return {
+      'totalMembers': totalMembers,
+      'accepted': event.acceptedCount,
+      'declined': event.declinedCount,
+      'maybe': event.maybeCount,
+      'noResponse': noResponseUsers.length,
+      'responseRate': event.getResponseRate(totalMembers),
+      'noResponseUserIds': noResponseUsers,
+    };
+  }
+
   // --- Birthdays ---
 
   Future<void> updateUserBirthday(String userId, DateTime? birthday) async {

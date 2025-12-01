@@ -1,0 +1,533 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'models.dart';
+import 'firestore_service.dart';
+import 'widgets/user_avatar.dart';
+import 'detail_modal.dart';
+
+enum EventFilter { all, upcoming, past }
+
+class RSVPManagementScreen extends StatefulWidget {
+  final String currentUserId;
+
+  const RSVPManagementScreen({
+    super.key,
+    required this.currentUserId,
+  });
+
+  @override
+  State<RSVPManagementScreen> createState() => _RSVPManagementScreenState();
+}
+
+class _RSVPManagementScreenState extends State<RSVPManagementScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+  EventFilter _currentFilter = EventFilter.upcoming;
+  Map<String, bool> _expandedEvents = {};
+  Map<String, Map<String, dynamic>> _eventStats = {};
+  Map<String, Map<String, Map<String, dynamic>>> _eventAttendees = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
+        title: const Text(
+          'RSVP Management',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
+      body: Column(
+        children: [
+          // Filter Chips
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                _buildFilterChip('All', EventFilter.all),
+                const SizedBox(width: 8),
+                _buildFilterChip('Upcoming', EventFilter.upcoming),
+                const SizedBox(width: 8),
+                _buildFilterChip('Past', EventFilter.past),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // Events List
+          Expanded(
+            child: StreamBuilder<List<GroupEvent>>(
+              stream: _firestoreService.getAllUserEvents(widget.currentUserId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No events found',
+                          style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Create an event to get started',
+                          style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final allEvents = snapshot.data!;
+                final now = DateTime.now();
+                final filteredEvents = allEvents.where((event) {
+                  switch (_currentFilter) {
+                    case EventFilter.upcoming:
+                      return event.date.isAfter(now);
+                    case EventFilter.past:
+                      return event.date.isBefore(now);
+                    case EventFilter.all:
+                      return true;
+                  }
+                }).toList();
+
+                if (filteredEvents.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No ${_currentFilter.name} events',
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredEvents.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final event = filteredEvents[index];
+                    return _buildEventCard(event);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, EventFilter filter) {
+    final isSelected = _currentFilter == filter;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          _currentFilter = filter;
+        });
+      },
+      selectedColor: Colors.blue[100],
+      checkmarkColor: Colors.blue[800],
+    );
+  }
+
+  Widget _buildEventCard(GroupEvent event) {
+    final isExpanded = _expandedEvents[event.id] ?? false;
+    final isCreator = event.creatorId == widget.currentUserId;
+    final isPastEvent = event.date.isBefore(DateTime.now());
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _loadEventStats(event),
+      builder: (context, statsSnapshot) {
+        if (!statsSnapshot.hasData) {
+          return const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        final stats = statsSnapshot.data!;
+        final totalMembers = stats['totalMembers'] as int;
+        final accepted = stats['accepted'] as int;
+        final declined = stats['declined'] as int;
+        final maybe = stats['maybe'] as int;
+        final noResponse = stats['noResponse'] as int;
+        final responseRate = stats['responseRate'] as double;
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _expandedEvents[event.id] = !isExpanded;
+                  });
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Event Title & Date
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  event.title,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      event.hasTime
+                                          ? DateFormat('MMM dd, yyyy • hh:mm a').format(event.date)
+                                          : DateFormat('MMM dd, yyyy').format(event.date),
+                                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                                if (event.venue != null && event.venue!.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          event.venue!,
+                                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            isExpanded ? Icons.expand_less : Icons.expand_more,
+                            color: Colors.grey[600],
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // RSVP Stats Summary
+                      Row(
+                        children: [
+                          _buildStatChip(
+                            icon: Icons.check_circle,
+                            color: Colors.green,
+                            label: 'Yes',
+                            count: accepted,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildStatChip(
+                            icon: Icons.cancel,
+                            color: Colors.red,
+                            label: 'No',
+                            count: declined,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildStatChip(
+                            icon: Icons.help_outline,
+                            color: Colors.orange,
+                            label: 'Maybe',
+                            count: maybe,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildStatChip(
+                            icon: Icons.circle_outlined,
+                            color: Colors.grey,
+                            label: 'Pending',
+                            count: noResponse,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Response Rate Progress Bar
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Response Rate',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
+                              Text(
+                                '${responseRate.toStringAsFixed(0)}% (${stats['accepted'] + stats['declined'] + stats['maybe']}/$totalMembers)',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: responseRate / 100,
+                              minHeight: 8,
+                              backgroundColor: Colors.grey[200],
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                responseRate > 75 ? Colors.green : responseRate > 50 ? Colors.blue : Colors.orange,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Action buttons for creator
+                      if (isCreator && noResponse > 0 && !isPastEvent) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _sendReminders(event, stats['noResponseUserIds']),
+                            icon: const Icon(Icons.notifications_active, size: 18),
+                            label: Text('Send Reminder to $noResponse ${noResponse == 1 ? 'Person' : 'People'}'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              // Expanded Attendee List
+              if (isExpanded) ...[
+                const Divider(height: 1),
+                _buildAttendeesList(event, stats),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatChip({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required int count,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 4),
+            Text(
+              '$count',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(fontSize: 10, color: Colors.grey[700]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendeesList(GroupEvent event, Map<String, dynamic> stats) {
+    return FutureBuilder<Map<String, Map<String, dynamic>>>(
+      future: _loadAttendees(event),
+      builder: (context, attendeesSnapshot) {
+        if (!attendeesSnapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final attendees = attendeesSnapshot.data!;
+        final accepted = event.getUsersWithStatus('Yes');
+        final declined = event.getUsersWithStatus('No');
+        final maybe = event.getUsersWithStatus('Maybe');
+        final noResponse = stats['noResponseUserIds'] as List<String>;
+
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (accepted.isNotEmpty) ...[
+                _buildAttendeeCategory(
+                  title: '✓ Accepted (${accepted.length})',
+                  color: Colors.green,
+                  userIds: accepted,
+                  attendees: attendees,
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (maybe.isNotEmpty) ...[
+                _buildAttendeeCategory(
+                  title: '? Maybe (${maybe.length})',
+                  color: Colors.orange,
+                  userIds: maybe,
+                  attendees: attendees,
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (declined.isNotEmpty) ...[
+                _buildAttendeeCategory(
+                  title: '✗ Declined (${declined.length})',
+                  color: Colors.red,
+                  userIds: declined,
+                  attendees: attendees,
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (noResponse.isNotEmpty) ...[
+                _buildAttendeeCategory(
+                  title: '○ No Response (${noResponse.length})',
+                  color: Colors.grey,
+                  userIds: noResponse,
+                  attendees: attendees,
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAttendeeCategory({
+    required String title,
+    required Color color,
+    required List<String> userIds,
+    required Map<String, Map<String, dynamic>> attendees,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: userIds.map((userId) {
+            final user = attendees[userId];
+            final name = user?['displayName'] ?? user?['email'] ?? 'Unknown';
+            final photoUrl = user?['photoURL'];
+
+            return Chip(
+              avatar: UserAvatar(
+                photoUrl: photoUrl,
+                name: name,
+                radius: 16,
+              ),
+              label: Text(name, style: const TextStyle(fontSize: 12)),
+              visualDensity: VisualDensity.compact,
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Future<Map<String, dynamic>> _loadEventStats(GroupEvent event) async {
+    if (_eventStats.containsKey(event.id)) {
+      return _eventStats[event.id]!;
+    }
+
+    final stats = await _firestoreService.getEventRSVPStats(event, event.groupId);
+    setState(() {
+      _eventStats[event.id] = stats;
+    });
+    return stats;
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _loadAttendees(GroupEvent event) async {
+    if (_eventAttendees.containsKey(event.id)) {
+      return _eventAttendees[event.id]!;
+    }
+
+    final attendees = await _firestoreService.getEventAttendees(event.id, event.groupId);
+    setState(() {
+      _eventAttendees[event.id] = attendees;
+    });
+    return attendees;
+  }
+
+  Future<void> _sendReminders(GroupEvent event, List<String> userIds) async {
+    try {
+      await _firestoreService.sendRSVPReminder(
+        event.id,
+        event.title,
+        userIds,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reminders sent to ${userIds.length} ${userIds.length == 1 ? 'person' : 'people'}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sending reminders: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+}

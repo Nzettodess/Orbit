@@ -218,6 +218,46 @@ class GroupEvent {
       'rsvps': rsvps,
     };
   }
+
+  // RSVP Helper Methods
+  
+  /// Get count of users with specific RSVP status
+  int getRSVPCount(String status) {
+    return rsvps.values.where((s) => s == status).length;
+  }
+
+  /// Get list of user IDs with specific RSVP status
+  List<String> getUsersWithStatus(String status) {
+    return rsvps.entries
+        .where((entry) => entry.value == status)
+        .map((entry) => entry.key)
+        .toList();
+  }
+
+  /// Get list of users who haven't responded yet
+  List<String> getUsersWithNoResponse(List<String> allMembers) {
+    return allMembers.where((userId) => !rsvps.containsKey(userId)).toList();
+  }
+
+  /// Get total number of responses (excluding no response)
+  int getTotalResponses() {
+    return rsvps.length;
+  }
+
+  /// Calculate response rate as percentage
+  double getResponseRate(int totalMembers) {
+    if (totalMembers == 0) return 0.0;
+    return (rsvps.length / totalMembers) * 100;
+  }
+
+  /// Get accepted count
+  int get acceptedCount => getRSVPCount('Yes');
+
+  /// Get declined count
+  int get declinedCount => getRSVPCount('No');
+
+  /// Get maybe count
+  int get maybeCount => getRSVPCount('Maybe');
 }
 
 class Birthday {

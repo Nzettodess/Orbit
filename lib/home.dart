@@ -14,6 +14,7 @@ import 'google_calendar_service.dart';
 import 'add_event_modal.dart';
 import 'notification_center.dart';
 import 'settings.dart';
+import 'rsvp_management.dart';
 import 'widgets/home_calendar.dart';
 import 'widgets/home_drawer.dart';
 
@@ -422,6 +423,16 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
                 showDialog(
                   context: context,
                   builder: (context) => const GroupManagementDialog(),
+                );
+              },
+              onRSVPManagementTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RSVPManagementScreen(
+                      currentUserId: _user!.uid,
+                    ),
+                  ),
                 );
               },
               onSettingsTap: () {
