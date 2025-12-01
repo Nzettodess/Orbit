@@ -8,6 +8,7 @@ import 'religious_calendar_helper.dart';
 import 'location_picker.dart';
 import 'add_event_modal.dart';
 import 'widgets/user_avatar.dart';
+import 'rsvp_management.dart';
 
 class DetailModal extends StatefulWidget {
   final DateTime date;
@@ -240,6 +241,19 @@ class _DetailModalState extends State<DetailModal> {
                          },
                        ),
                      ],
+                     IconButton(
+                        icon: const Icon(Icons.bar_chart, color: Colors.deepPurple),
+                        tooltip: 'RSVP Stats',
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => RSVPManagementDialog(
+                              currentUserId: widget.currentUserId,
+                            ),
+                          );
+                        },
+                      ),
+                     const SizedBox(width: 8),
                      ElevatedButton(
                        onPressed: () => _showRSVPDialog(e),
                        child: const Text("RSVP"),

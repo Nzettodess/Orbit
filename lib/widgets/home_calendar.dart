@@ -172,11 +172,9 @@ class _HomeCalendarState extends State<HomeCalendar> {
 
           return Container(
             decoration: BoxDecoration(
-              border: isToday 
-                ? Border.all(color: Colors.deepPurple, width: 2.5)
-                : Border.all(color: Colors.grey.withOpacity(0.1)),
+              border: Border.all(color: Colors.grey.withOpacity(0.1)),
               color: isToday 
-                ? Colors.deepPurple.withOpacity(0.05) 
+                ? Colors.deepPurple.withOpacity(0.2) 
                 : (isCurrentMonth ? null : Colors.grey[50]),
             ),
             child: Padding(
