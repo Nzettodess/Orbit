@@ -302,4 +302,19 @@ class FirestoreService {
         .map((snapshot) =>
             snapshot.docs.map((doc) => GroupEvent.fromFirestore(doc)).toList());
   }
+
+  // --- Birthdays ---
+
+  Future<void> updateUserBirthday(String userId, DateTime? birthday) async {
+    if (birthday != null) {
+      await _db.collection('users').doc(userId).update({
+        'birthday': Timestamp.fromDate(birthday),
+      });
+    } else {
+      // Clear birthday
+      await _db.collection('users').doc(userId).update({
+        'birthday': FieldValue.delete(),
+      });
+    }
+  }
 }

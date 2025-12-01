@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lunar/lunar.dart';
 
 class Group {
   final String id;
@@ -173,6 +174,7 @@ class GroupEvent {
   final String creatorId;
   final String title;
   final String description;
+  final String? venue; // Optional venue field
   final DateTime date;
   final bool hasTime;
   final Map<String, String> rsvps; // userId -> status ('Yes', 'No', 'Maybe')
@@ -183,6 +185,7 @@ class GroupEvent {
     required this.creatorId,
     required this.title,
     required this.description,
+    this.venue,
     required this.date,
     this.hasTime = false,
     required this.rsvps,
@@ -196,6 +199,7 @@ class GroupEvent {
       creatorId: data['creatorId'] ?? '',
       title: data['title'] ?? '',
       description: data['description'] ?? '',
+      venue: data['venue'],
       date: (data['date'] as Timestamp).toDate(),
       hasTime: data['hasTime'] ?? false,
       rsvps: Map<String, String>.from(data['rsvps'] ?? {}),
@@ -208,9 +212,70 @@ class GroupEvent {
       'creatorId': creatorId,
       'title': title,
       'description': description,
+      'venue': venue,
       'date': Timestamp.fromDate(date),
       'hasTime': hasTime,
       'rsvps': rsvps,
     };
+  }
+}
+
+class Birthday {
+  final String userId;
+  final String displayName;
+  final DateTime birthDate; // Original birth date with year
+  final DateTime occurrenceDate; // This year's occurrence
+  final int age;
+  final bool isLunar; // Whether this is a lunar calendar birthday
+
+  Birthday({
+    required this.userId,
+    required this.displayName,
+    required this.birthDate,
+    required this.occurrenceDate,
+    required this.age,
+    this.isLunar = false,
+  });
+
+  // Helper to calculate birthday occurrence for a given year
+  static Birthday? fromUserData(Map<String, dynamic> userData, int year) {
+    final birthday = userData['birthday'];
+    final isLunarBirthday = userData['isLunarBirthday'] ?? false;
+    
+    if (birthday == null) return null;
+
+    final birthDate = (birthday as Timestamp).toDate();
+    final userId = userData['uid'] ?? '';
+    final displayName = userData['displayName'] ?? userData['email'] ?? 'User';
+
+    DateTime occurrenceDate;
+    int age = year - birthDate.year;
+
+    if (isLunarBirthday) {
+      // Convert lunar birth date to solar date for this year
+      try {
+        // Import lunar package at top of file
+        final lunar = Lunar.fromDate(birthDate);
+        // Find solar date for this lunar date in target year
+        final solarDate = Solar.fromYmd(year, lunar.getMonth(), lunar.getDay());
+        occurrenceDate = DateTime(year, solarDate.getMonth(), solarDate.getDay());
+      } catch (e) {
+        print('Error converting lunar birthday: $e');
+        // Fallback to solar calendar
+        occurrenceDate = DateTime(year, birthDate.month, birthDate.day);
+      }
+    } else {
+      // Regular solar calendar birthday
+      occurrenceDate = DateTime(year, birthDate.month, birthDate.day);
+    }
+
+    return Birthday(
+      userId: userId,
+      displayName: displayName,
+      birthDate: birthDate,
+      occurrenceDate: occurrenceDate,
+      age: age,
+      isLunar: isLunarBirthday,
+    );
   }
 }

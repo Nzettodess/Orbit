@@ -14,6 +14,7 @@ class DetailModal extends StatefulWidget {
   final List<UserLocation> locations;
   final List<GroupEvent> events;
   final List<Holiday> holidays;
+  final List<Birthday> birthdays;
   final String currentUserId;
 
   const DetailModal({
@@ -22,6 +23,7 @@ class DetailModal extends StatefulWidget {
     required this.locations,
     required this.events,
     required this.holidays,
+    required this.birthdays,
     required this.currentUserId,
   });
 
@@ -156,13 +158,24 @@ class _DetailModalState extends State<DetailModal> {
             const Divider(),
           ],
 
+          // Birthdays
+          if (widget.birthdays.isNotEmpty) ...[
+            const Text("Birthdays 🎂", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+            ...widget.birthdays.map((b) => ListTile(
+              leading: const Icon(Icons.cake, color: Colors.green),
+              title: Text(b.displayName),
+              subtitle: Text("Turning ${b.age} years old"),
+            )),
+            const Divider(),
+          ],
+
           // Events
           if (widget.events.isNotEmpty) ...[
-             const Text("Events", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+             const Text("Events", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
              ...widget.events.map((e) {
                final isOwner = e.creatorId == widget.currentUserId;
                return ListTile(
-                 leading: const Icon(Icons.event, color: Colors.green),
+                 leading: const Icon(Icons.event, color: Colors.blue),
                  title: Text("${e.title} (${e.hasTime ? DateFormat('yyyy-MM-dd HH:mm').format(e.date) : DateFormat('yyyy-MM-dd').format(e.date)})"),
                  subtitle: Column(
                    crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,6 +186,20 @@ class _DetailModalState extends State<DetailModal> {
                          softWrap: true,
                          maxLines: 3,
                          overflow: TextOverflow.ellipsis,
+                       ),
+                     if (e.venue != null && e.venue!.isNotEmpty)
+                       Row(
+                         children: [
+                           const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                           const SizedBox(width: 4),
+                           Expanded(
+                             child: Text(
+                               e.venue!,
+                               style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Colors.grey),
+                               overflow: TextOverflow.ellipsis,
+                             ),
+                           ),
+                         ],
                        ),
                      FutureBuilder<DocumentSnapshot>(
                        future: FirebaseFirestore.instance.collection('users').doc(e.creatorId).get(),

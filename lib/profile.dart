@@ -63,40 +63,55 @@ class _ProfileDialogState extends State<ProfileDialog> {
                   ],
                 ),
                 const Divider(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 10),
                 ClipOval(
-                  child: CachedNetworkImage(
-                    imageUrl: (photoUrl != null && photoUrl.isNotEmpty) 
-                      ? photoUrl 
-                      : "https://ui-avatars.com/api/?name=${Uri.encodeComponent(data?['displayName'] ?? widget.user.email ?? 'User')}&size=200",
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      width: 100,
-                      height: 100,
-                      color: Colors.grey[200],
-                      child: const CircularProgressIndicator(),
-                    ),
-                    errorWidget: (context, url, error) {
-                      return Image.network(
-                        "https://ui-avatars.com/api/?name=${Uri.encodeComponent(data?['displayName'] ?? widget.user.email ?? 'User')}&size=200",
-                        width: 100,
-                        height: 100,
+                  child: Builder(
+                    builder: (context) {
+                      final name = data?['displayName'] ?? widget.user.email ?? 'User';
+                      final imageUrl = (photoUrl != null && photoUrl.isNotEmpty) 
+                        ? photoUrl 
+                        : "https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&size=160";
+                      
+                      print('[Profile Avatar] Loading for: $name');
+                      print('[Profile Avatar] URL: $imageUrl');
+                      
+                      return CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        width: 80,
+                        height: 80,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
+                        placeholder: (context, url) {
+                          print('[Profile Avatar] Loading placeholder');
                           return Container(
-                            width: 100,
-                            height: 100,
-                            color: Colors.grey[300],
-                            child: Icon(Icons.person, size: 50, color: Colors.grey[600]),
+                            width: 80,
+                            height: 80,
+                            color: Colors.grey[200],
+                            child: const CircularProgressIndicator(),
+                          );
+                        },
+                        errorWidget: (context, url, error) {
+                          print('[Profile Avatar] Error: $error');
+                          print('[Profile Avatar] Failed URL: $url');
+                          return Image.network(
+                            "https://ui-avatars.com/api/?name=${Uri.encodeComponent(data?['displayName'] ?? widget.user.email ?? 'User')}&size=160",
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 80,
+                                height: 80,
+                                color: Colors.grey[300],
+                                child: Icon(Icons.person, size: 40, color: Colors.grey[600]),
+                              );
+                            },
                           );
                         },
                       );
                     },
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _nameController,
                   decoration: const InputDecoration(
@@ -105,7 +120,7 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     helperText: "This will override your Google name",
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 5),
                 Row(
                   children: [
                     Expanded(
@@ -147,7 +162,7 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 TextField(
                   controller: TextEditingController(text: widget.user.email),
                   enabled: false,
@@ -157,53 +172,167 @@ class _ProfileDialogState extends State<ProfileDialog> {
                   ),
                 ),
                 const Divider(),
-                const SizedBox(height: 10),
+                const SizedBox(height: 5),
                 const Text("Default Location", style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 5),
                 ListTile(
+                  contentPadding: const EdgeInsets.only(left: 16, right: 0),
                   leading: const Icon(Icons.location_on),
                   title: Text(data?['defaultLocation'] ?? "Not set"),
-                  trailing: const Icon(Icons.edit),
-                  onTap: () {
-                    // Helper function to remove emoji flags
-                    String stripEmojis(String text) {
-                      return text.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F', unicode: true), '').trim();
-                    }
-                    
-                    final defaultLocation = data?['defaultLocation'];
-                    String? defaultCountry;
-                    String? defaultState;
-                    
-                    if (defaultLocation != null && defaultLocation.isNotEmpty) {
-                      final parts = defaultLocation.split(',');
-                      if (parts.length == 2) {
-                        // Format: "🇲🇾 Country, State"
-                        defaultCountry = stripEmojis(parts[0].trim());  // First part is COUNTRY
-                        defaultState = stripEmojis(parts[1].trim());     // Second part is STATE
-                      } else {
-                        defaultCountry = stripEmojis(parts[0].trim());
-                      }
-                    }
-                    
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (context) => DefaultLocationPicker(
-                        defaultCountry: defaultCountry,
-                        defaultState: defaultState,
-                        onLocationSelected: (country, state) async {
-                          // Save in "Country, State" format (not "State, Country")
-                          final loc = state != null ? "$country, $state" : country;
-                          await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
-                            'defaultLocation': loc,
-                          });
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Default location set to $loc")));
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        iconSize: 24,
+                        onPressed: () {
+                          // Helper function to remove emoji flags
+                          String stripEmojis(String text) {
+                            return text.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F', unicode: true), '').trim();
+                          }
+                          
+                          final defaultLocation = data?['defaultLocation'];
+                          String? defaultCountry;
+                          String? defaultState;
+                          
+                          if (defaultLocation != null && defaultLocation.isNotEmpty) {
+                            final parts = defaultLocation.split(',');
+                            if (parts.length == 2) {
+                              // Format: "🇲🇾 Country, State"
+                              defaultCountry = stripEmojis(parts[0].trim());  // First part is COUNTRY
+                              defaultState = stripEmojis(parts[1].trim());     // Second part is STATE
+                            } else {
+                              defaultCountry = stripEmojis(parts[0].trim());
+                            }
+                          }
+                          
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (context) => DefaultLocationPicker(
+                              defaultCountry: defaultCountry,
+                              defaultState: defaultState,
+                              onLocationSelected: (country, state) async {
+                                // Save in "Country, State" format (not "State, Country")
+                                final loc = state != null ? "$country, $state" : country;
+                                await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                                  'defaultLocation': loc,
+                                });
+                                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Default location set to $loc")));
+                              },
+                            ),
+                          );
                         },
+                        tooltip: 'Edit Default Location',
                       ),
-                    );
-                  },
+                      if (data?['defaultLocation'] != null && (data?['defaultLocation'] as String).isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.red),
+                          iconSize: 24,
+                          onPressed: () async {
+                            await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                              'defaultLocation': FieldValue.delete(),
+                            });
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Default location cleared"))
+                              );
+                            }
+                          },
+                          tooltip: 'Clear Default Location',
+                        ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 40),
+                const Divider(),
+                const SizedBox(height: 5),
+                const Text("Birthday", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 5),
+                ListTile(
+                  contentPadding: const EdgeInsets.only(left: 16, right: 0),
+                  leading: const Icon(Icons.cake),
+                  title: Text(_formatBirthday(data?['birthday'])),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        iconSize: 24,
+                        onPressed: () async {
+                          final birthday = data?['birthday'];
+                          DateTime? initialDate;
+                          
+                          if (birthday != null) {
+                            initialDate = (birthday as Timestamp).toDate();
+                          } else {
+                            // Default to 25 years ago
+                            final now = DateTime.now();
+                            initialDate = DateTime(now.year - 25, now.month, now.day);
+                          }
+
+                          final selectedDate = await showDatePicker(
+                            context: context,
+                            initialDate: initialDate,
+                            firstDate: DateTime(1900),
+                            lastDate: DateTime.now(),
+                            helpText: 'Select Birthday',
+                          );
+
+                          if (selectedDate != null) {
+                            // Show dialog to ask if this is a lunar birthday
+                            bool? isLunar = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text("Birthday Type"),
+                                content: const Text("Is this a Chinese lunar calendar birthday?"),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, false),
+                                    child: const Text("Solar (Normal)"),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    child: const Text("Lunar (Chinese)"),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (isLunar != null && mounted) {
+                              await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                                'birthday': Timestamp.fromDate(selectedDate),
+                                'isLunarBirthday': isLunar,
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text("Birthday updated (${isLunar ? 'Lunar' : 'Solar'})"))
+                                );
+                              }
+                            }
+                          }
+                        },
+                        tooltip: 'Edit Birthday',
+                      ),
+                      if (data?['birthday'] != null)
+                        IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.red),
+                          iconSize: 24,
+                          onPressed: () async {
+                            await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                              'birthday': FieldValue.delete(),
+                              'isLunarBirthday': FieldValue.delete(),
+                            });
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Birthday cleared"))
+                              );
+                            }
+                          },
+                          tooltip: 'Clear Birthday',
+                        ),
+                    ],
+                  ),
+                ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                   onPressed: () async {
@@ -247,5 +376,13 @@ class _ProfileDialogState extends State<ProfileDialog> {
         ),
       ),
     );
+  }
+
+  String _formatBirthday(dynamic birthday) {
+    if (birthday == null) return "Not set";
+    final date = (birthday as Timestamp).toDate();
+    final now = DateTime.now();
+    final age = now.year - date.year - (now.month < date.month || (now.month == date.month && now.day < date.day) ? 1 : 0);
+    return "${date.day}/${date.month}/${date.year} (Age: $age)";
   }
 }

@@ -25,6 +25,7 @@ class _AddEventModalState extends State<AddEventModal> {
   final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
+  final TextEditingController _venueController = TextEditingController();
   
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
@@ -40,6 +41,7 @@ class _AddEventModalState extends State<AddEventModal> {
       final event = widget.eventToEdit!;
       _titleController.text = event.title;
       _descController.text = event.description;
+      _venueController.text = event.venue ?? '';
       _selectedDate = event.date;
       _selectedTime = TimeOfDay.fromDateTime(event.date);
       _hasTime = event.hasTime;
@@ -86,6 +88,7 @@ class _AddEventModalState extends State<AddEventModal> {
           creatorId: widget.eventToEdit!.creatorId,
           title: _titleController.text,
           description: _descController.text,
+          venue: _venueController.text.isEmpty ? null : _venueController.text,
           date: finalDate,
           hasTime: _hasTime,
           rsvps: widget.eventToEdit!.rsvps,
@@ -99,6 +102,7 @@ class _AddEventModalState extends State<AddEventModal> {
           creatorId: widget.currentUserId,
           title: _titleController.text,
           description: _descController.text,
+          venue: _venueController.text.isEmpty ? null : _venueController.text,
           date: finalDate,
           hasTime: _hasTime,
           rsvps: {widget.currentUserId: 'Yes'},
@@ -163,6 +167,13 @@ class _AddEventModalState extends State<AddEventModal> {
               minLines: 1,
               maxLines: 5,
               keyboardType: TextInputType.multiline,
+            ),
+            TextFormField(
+              controller: _venueController,
+              decoration: const InputDecoration(
+                labelText: "Venue (Optional)",
+                hintText: "Enter event location",
+              ),
             ),
             const SizedBox(height: 16),
             Row(

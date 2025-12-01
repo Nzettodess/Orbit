@@ -99,6 +99,24 @@ class _HomeCalendarState extends State<HomeCalendar> {
       l.date.year == date.year && l.date.month == date.month && l.date.day == date.day).toList();
   }
 
+  // Helper to get birthdays for a date
+  List<Birthday> _getBirthdaysForDate(DateTime date) {
+    final birthdays = <Birthday>[];
+    
+    for (final user in widget.allUsers) {
+      final birthday = Birthday.fromUserData(user, date.year);
+      if (birthday != null) {
+        // Check if birthday matches this date
+        if (birthday.occurrenceDate.month == date.month && 
+            birthday.occurrenceDate.day == date.day) {
+          birthdays.add(birthday);
+        }
+      }
+    }
+    
+    return birthdays;
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +156,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
             h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
           final dayEvents = widget.events.where((e) => 
             e.date.year == date.year && e.date.month == date.month && e.date.day == date.day).toList();
+          final dayBirthdays = _getBirthdaysForDate(date);  // Get birthdays for this date
           
           // Get religious calendar dates for this day
           final religiousDates = ReligiousCalendarHelper.getReligiousDates(
@@ -145,8 +164,8 @@ class _HomeCalendarState extends State<HomeCalendar> {
             widget.tileCalendarDisplay == 'none' ? [] : [widget.tileCalendarDisplay]
           );
           
-          // Items to display as bars (Holidays & Events)
-          final allItems = [...dayHolidays, ...dayEvents];
+          // Items to display as bars (Holidays, Events & Birthdays)
+          final allItems = <dynamic>[...dayHolidays, ...dayEvents, ...dayBirthdays];
           final maxBars = 2;
           final displayItems = allItems.take(maxBars).toList();
           final remainingCount = allItems.length - maxBars;
@@ -204,6 +223,11 @@ class _HomeCalendarState extends State<HomeCalendar> {
                     } else if (item is GroupEvent) {
                       title = item.title;
                       color = Colors.blue.withOpacity(0.7);
+                    } else if (item is Birthday) {
+                      // Format: "Name - Ageth" (e.g., "John - 25th")
+                      final ageSuffix = _getAgeSuffix(item.age);
+                      title = "${item.displayName} - ${item.age}$ageSuffix";
+                      color = Colors.green.withOpacity(0.7);
                     }
                     
                     // Dim bars for non-current month
@@ -264,6 +288,10 @@ class _HomeCalendarState extends State<HomeCalendar> {
                             ? photoUrl 
                             : "https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&size=${(avatarSize * 3).toInt()}";
                           
+                          // Debug logging for avatar loading
+                          print('[Avatar] Loading for user: $name (${l.userId})');
+                          print('[Avatar] URL: $imageUrl');
+                          
                           return Padding(
                             padding: const EdgeInsets.only(right: 2),
                             child: Opacity(
@@ -274,12 +302,17 @@ class _HomeCalendarState extends State<HomeCalendar> {
                                   width: avatarSize,
                                   height: avatarSize,
                                   fit: BoxFit.cover,
-                                  placeholder: (context, url) => Container(
-                                    width: avatarSize,
-                                    height: avatarSize,
-                                    color: Colors.grey[200],
-                                  ),
+                                  placeholder: (context, url) {
+                                    print('[Avatar] Loading placeholder for: $name');
+                                    return Container(
+                                      width: avatarSize,
+                                      height: avatarSize,
+                                      color: Colors.grey[200],
+                                    );
+                                  },
                                   errorWidget: (context, url, error) {
+                                    print('[Avatar] Error loading for $name: $error');
+                                    print('[Avatar] Failed URL: $url');
                                     // Tier 2: If primary image fails, try ui-avatars
                                     return Image.network(
                                       "https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&size=${(avatarSize * 3).toInt()}",
@@ -337,6 +370,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
               h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
             final dayEvents = widget.events.where((e) => 
               e.date.year == date.year && e.date.month == date.month && e.date.day == date.day).toList();
+            final dayBirthdays = _getBirthdaysForDate(date);
 
             showModalBottomSheet(
               context: context,
@@ -346,6 +380,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
                 locations: dayLocations,
                 events: dayEvents,
                 holidays: dayHolidays,
+                birthdays: dayBirthdays,
                 currentUserId: widget.currentUserId,
               ),
             );
@@ -353,5 +388,21 @@ class _HomeCalendarState extends State<HomeCalendar> {
         },
       ),
     );
+  }
+
+  String _getAgeSuffix(int age) {
+    if (age % 100 >= 11 && age % 100 <= 13) {
+      return 'th';
+    }
+    switch (age % 10) {
+      case 1:
+        return 'st';
+      case 2:
+        return 'nd';
+      case 3:
+        return 'rd';
+      default:
+        return 'th';
+    }
   }
 }
