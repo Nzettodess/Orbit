@@ -277,37 +277,18 @@ class Birthday {
     this.isLunar = false,
   });
 
-  // Helper to calculate birthday occurrence for a given year
-  static Birthday? fromUserData(Map<String, dynamic> userData, int year) {
+  // Get solar (Georgian) birthday - ignores isLunarBirthday flag (deprecated)
+  static Birthday? getSolarBirthday(Map<String, dynamic> userData, int year) {
     final birthday = userData['birthday'];
-    final isLunarBirthday = userData['isLunarBirthday'] ?? false;
-    
     if (birthday == null) return null;
 
     final birthDate = (birthday as Timestamp).toDate();
     final userId = userData['uid'] ?? '';
     final displayName = userData['displayName'] ?? userData['email'] ?? 'User';
 
-    DateTime occurrenceDate;
+    // Regular solar calendar birthday
+    final occurrenceDate = DateTime(year, birthDate.month, birthDate.day);
     int age = year - birthDate.year;
-
-    if (isLunarBirthday) {
-      // Convert lunar birth date to solar date for this year
-      try {
-        // Import lunar package at top of file
-        final lunar = Lunar.fromDate(birthDate);
-        // Find solar date for this lunar date in target year
-        final solarDate = Solar.fromYmd(year, lunar.getMonth(), lunar.getDay());
-        occurrenceDate = DateTime(year, solarDate.getMonth(), solarDate.getDay());
-      } catch (e) {
-        print('Error converting lunar birthday: $e');
-        // Fallback to solar calendar
-        occurrenceDate = DateTime(year, birthDate.month, birthDate.day);
-      }
-    } else {
-      // Regular solar calendar birthday
-      occurrenceDate = DateTime(year, birthDate.month, birthDate.day);
-    }
 
     return Birthday(
       userId: userId,
@@ -315,7 +296,57 @@ class Birthday {
       birthDate: birthDate,
       occurrenceDate: occurrenceDate,
       age: age,
-      isLunar: isLunarBirthday,
+      isLunar: false,
     );
+  }
+
+  // Get lunar birthday (separate from solar) - checks if date's lunar month/day matches stored values
+  static Birthday? getLunarBirthday(Map<String, dynamic> userData, int year, DateTime checkDate) {
+    final hasLunarBirthday = userData['hasLunarBirthday'] ?? false;
+    final lunarBirthdayMonth = userData['lunarBirthdayMonth'];
+    final lunarBirthdayDay = userData['lunarBirthdayDay'];
+    
+    if (!hasLunarBirthday || lunarBirthdayMonth == null || lunarBirthdayDay == null) {
+      return null;
+    }
+
+    final userId = userData['uid'] ?? '';
+    final displayName = userData['displayName'] ?? userData['email'] ?? 'User';
+
+    try {
+      // Convert checkDate to lunar calendar and compare month/day
+      final lunar = Lunar.fromDate(checkDate);
+      final lunarMonth = lunar.getMonth();
+      final lunarDay = lunar.getDay();
+
+      // Check if this date's lunar month/day matches the stored lunar birthday
+      if (lunarMonth == lunarBirthdayMonth && lunarDay == lunarBirthdayDay) {
+        // Calculate approximate age (using current year minus birth year from solar birthday if available)
+        int age = 0;
+        final solarBirthday = userData['birthday'];
+        if (solarBirthday != null) {
+          final birthDate = (solarBirthday as Timestamp).toDate();
+          age = year - birthDate.year;
+        }
+
+        return Birthday(
+          userId: userId,
+          displayName: displayName, // Keep display name clean
+          birthDate: checkDate, // Use checkDate as placeholder
+          occurrenceDate: checkDate,
+          age: -1, // Use -1 to indicate age should not be shown for lunar birthday
+          isLunar: true,
+        );
+      }
+    } catch (e) {
+      print('Error checking lunar birthday: $e');
+    }
+
+    return null;
+  }
+
+  // Legacy method - now just returns solar birthday (for backward compatibility)
+  static Birthday? fromUserData(Map<String, dynamic> userData, int year) {
+    return getSolarBirthday(userData, year);
   }
 }

@@ -77,18 +77,25 @@ class _HomeCalendarState extends State<HomeCalendar> {
       l.date.year == date.year && l.date.month == date.month && l.date.day == date.day).toList();
   }
 
-  // Helper to get birthdays for a date
+  // Helper to get birthdays for a date (both solar and lunar)
   List<Birthday> _getBirthdaysForDate(DateTime date) {
     final birthdays = <Birthday>[];
     
     for (final user in widget.allUsers) {
-      final birthday = Birthday.fromUserData(user, date.year);
-      if (birthday != null) {
-        // Check if birthday matches this date
-        if (birthday.occurrenceDate.month == date.month && 
-            birthday.occurrenceDate.day == date.day) {
-          birthdays.add(birthday);
+      // Get solar birthday
+      final solarBirthday = Birthday.getSolarBirthday(user, date.year);
+      if (solarBirthday != null) {
+        // Check if solar birthday matches this date
+        if (solarBirthday.occurrenceDate.month == date.month && 
+            solarBirthday.occurrenceDate.day == date.day) {
+          birthdays.add(solarBirthday);
         }
+      }
+      
+      // Get lunar birthday (separate from solar)
+      final lunarBirthday = Birthday.getLunarBirthday(user, date.year, date);
+      if (lunarBirthday != null) {
+        birthdays.add(lunarBirthday);
       }
     }
     
@@ -200,9 +207,13 @@ class _HomeCalendarState extends State<HomeCalendar> {
                       title = item.title;
                       color = Colors.blue.withOpacity(0.7);
                     } else if (item is Birthday) {
-                      // Format: "Name - Ageth" (e.g., "John - 25th")
-                      final ageSuffix = _getAgeSuffix(item.age);
-                      title = "${item.displayName} - ${item.age}$ageSuffix";
+                      // Format: "Name - Ageth" for solar, "[农历] Name" for lunar
+                      if (item.isLunar) {
+                        title = "${item.displayName} [lunar birthday]"; // Lunar birthday - no age
+                      } else {
+                        final ageSuffix = _getAgeSuffix(item.age);
+                        title = "${item.displayName} - ${item.age}$ageSuffix";
+                      }
                       color = Colors.green.withOpacity(0.7);
                     }
                     

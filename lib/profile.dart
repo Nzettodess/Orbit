@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'login.dart';
 import 'widgets/default_location_picker.dart';
 import 'widgets/syncfusion_date_picker.dart';
+import 'widgets/lunar_date_picker.dart';
 
 class ProfileDialog extends StatefulWidget {
   final User user;
@@ -53,9 +54,10 @@ class _ProfileDialogState extends State<ProfileDialog> {
             final data = snapshot.data!.data() as Map<String, dynamic>?;
             final photoUrl = data?['photoURL'];
 
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -63,7 +65,7 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
                   ],
                 ),
-                const Divider(),
+                const Divider(height: 16),
                 const SizedBox(height: 10),
                 ClipOval(
                   child: Builder(
@@ -118,13 +120,13 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     },
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 TextField(
                   controller: _nameController,
                   decoration: const InputDecoration(
                     labelText: "Display Name",
                     border: OutlineInputBorder(),
-                    helperText: "This will override your Google name",
+                    helperText: "Use Reset to restore Google name",
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -169,22 +171,13 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: TextEditingController(text: widget.user.email),
-                  enabled: false,
-                  decoration: const InputDecoration(
-                    labelText: "Email",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const Divider(),
-                const SizedBox(height: 5),
-                const Text("Default Location", style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 5),
+                const Divider(height: 12),
+                const Text("Default Location", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 ListTile(
-                  contentPadding: const EdgeInsets.only(left: 16, right: 0),
-                  leading: const Icon(Icons.location_on),
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  contentPadding: const EdgeInsets.only(left: 8, right: 0),
+                  leading: const Icon(Icons.location_on, size: 20),
                   title: Text(data?['defaultLocation'] ?? "Not set"),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -251,12 +244,12 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     ],
                   ),
                 ),
-                const Divider(),
-                const SizedBox(height: 5),
-                const Text("Birthday", style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 5),
+                const Divider(height: 12),
+                const Text("Birthday", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 ListTile(
-                  contentPadding: const EdgeInsets.only(left: 16, right: 0),
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  contentPadding: const EdgeInsets.only(left: 8, right: 0),
                   leading: const Icon(Icons.cake),
                   title: Text(_formatBirthday(data?['birthday'])),
                   trailing: Row(
@@ -285,36 +278,15 @@ class _ProfileDialogState extends State<ProfileDialog> {
                             helpText: 'Select Birthday',
                           );
 
-                          if (selectedDate != null) {
-                            // Show dialog to ask if this is a lunar birthday
-                            bool? isLunar = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text("Birthday Type"),
-                                content: const Text("Is this a Chinese lunar calendar birthday?"),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context, false),
-                                    child: const Text("Solar (Normal)"),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context, true),
-                                    child: const Text("Lunar (Chinese)"),
-                                  ),
-                                ],
-                              ),
-                            );
-
-                            if (isLunar != null && mounted) {
-                              await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
-                                'birthday': Timestamp.fromDate(selectedDate),
-                                'isLunarBirthday': isLunar,
-                              });
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text("Birthday updated (${isLunar ? 'Lunar' : 'Solar'})"))
-                                );
-                              }
+                          if (selectedDate != null && mounted) {
+                            // Save as solar birthday (lunar birthday has its own separate section)
+                            await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                              'birthday': Timestamp.fromDate(selectedDate),
+                            });
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Birthday updated"))
+                              );
                             }
                           }
                         },
@@ -340,6 +312,74 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     ],
                   ),
                 ),
+                const Divider(height: 12),
+                const Text("Lunar Birthday (农历生日)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                CheckboxListTile(
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text("Enable Lunar Birthday"),
+                  subtitle: const Text("Show a separate lunar calendar birthday", style: TextStyle(fontSize: 12)),
+                  value: data?['hasLunarBirthday'] ?? false,
+                  onChanged: (value) async {
+                    await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                      'hasLunarBirthday': value,
+                    });
+                  },
+                ),
+                if (data?['hasLunarBirthday'] == true)
+                  ListTile(
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    contentPadding: const EdgeInsets.only(left: 8, right: 0),
+                    leading: const Icon(Icons.nights_stay, size: 20, color: Colors.orange),
+                    title: Text(_formatLunarBirthday(data?['lunarBirthdayMonth'], data?['lunarBirthdayDay'])),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          iconSize: 24,
+                          onPressed: () async {
+                            final result = await showLunarDatePicker(
+                              context: context,
+                              initialMonth: data?['lunarBirthdayMonth'],
+                              initialDay: data?['lunarBirthdayDay'],
+                            );
+                            if (result != null && mounted) {
+                              await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                                'lunarBirthdayMonth': result.$1,
+                                'lunarBirthdayDay': result.$2,
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text("Lunar birthday set to ${LunarDatePickerDialog.formatLunarDate(result.$1, result.$2)}")),
+                                );
+                              }
+                            }
+                          },
+                          tooltip: 'Edit Lunar Birthday',
+                        ),
+                        if (data?['lunarBirthdayMonth'] != null)
+                          IconButton(
+                            icon: const Icon(Icons.clear, color: Colors.red),
+                            iconSize: 24,
+                            onPressed: () async {
+                              await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                                'lunarBirthdayMonth': FieldValue.delete(),
+                                'lunarBirthdayDay': FieldValue.delete(),
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Lunar birthday cleared")),
+                                );
+                              }
+                            },
+                            tooltip: 'Clear Lunar Birthday',
+                          ),
+                      ],
+                    ),
+                  ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                   onPressed: () async {
@@ -378,6 +418,7 @@ class _ProfileDialogState extends State<ProfileDialog> {
                   child: const Text("Logout"),
                 ),
               ],
+              ),
             );
           },
         ),
@@ -391,5 +432,10 @@ class _ProfileDialogState extends State<ProfileDialog> {
     final now = DateTime.now();
     final age = now.year - date.year - (now.month < date.month || (now.month == date.month && now.day < date.day) ? 1 : 0);
     return "${date.day}/${date.month}/${date.year} (Age: $age)";
+  }
+
+  String _formatLunarBirthday(int? month, int? day) {
+    if (month == null || day == null) return "Not set";
+    return LunarDatePickerDialog.formatLunarDate(month, day);
   }
 }

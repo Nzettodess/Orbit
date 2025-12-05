@@ -163,9 +163,12 @@ class _DetailModalState extends State<DetailModal> {
           if (widget.birthdays.isNotEmpty) ...[
             const Text("Birthdays 🎂", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
             ...widget.birthdays.map((b) => ListTile(
-              leading: const Icon(Icons.cake, color: Colors.green),
-              title: Text(b.displayName),
-              subtitle: Text("Turning ${b.age} years old"),
+              leading: Icon(
+                b.isLunar ? Icons.nights_stay : Icons.cake, 
+                color: b.isLunar ? Colors.orange : Colors.green,
+              ),
+              title: Text(b.isLunar ? "${b.displayName} [lunar birthday]" : b.displayName),
+              subtitle: b.isLunar ? null : Text("Turning ${b.age} years old"),
             )),
             const Divider(),
           ],
