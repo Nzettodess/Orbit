@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firestore_service.dart';
 import 'models.dart';
+import 'placeholder_member_management.dart';
+import 'member_management.dart';
 
 class GroupManagementDialog extends StatefulWidget {
   const GroupManagementDialog({super.key});
@@ -212,6 +214,8 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                     itemCount: groups.length,
                     itemBuilder: (context, index) {
                       final group = groups[index];
+                      final isOwner = group.ownerId == _user!.uid;
+                      final isAdmin = group.admins.contains(_user!.uid);
                       return ListTile(
                         title: Text(group.name),
                         subtitle: Row(
@@ -236,9 +240,44 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                             ),
                           ],
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.exit_to_app, color: Colors.red),
-                          onPressed: () => _leaveGroup(group),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Placeholder members button (owner/admin)
+                            if (isOwner || isAdmin)
+                              IconButton(
+                                icon: const Icon(Icons.person_outline, color: Colors.blue),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => PlaceholderMemberManagement(
+                                      group: group,
+                                      currentUserId: _user!.uid,
+                                    ),
+                                  );
+                                },
+                                tooltip: 'Manage Placeholders',
+                              ),
+                            // Manage Members button (owner only)
+                            if (isOwner)
+                              IconButton(
+                                icon: const Icon(Icons.group, color: Colors.green),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => MemberManagement(
+                                      group: group,
+                                      currentUserId: _user!.uid,
+                                    ),
+                                  );
+                                },
+                                tooltip: 'Manage Members',
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.exit_to_app, color: Colors.red),
+                              onPressed: () => _leaveGroup(group),
+                            ),
+                          ],
                         ),
                       );
                     },

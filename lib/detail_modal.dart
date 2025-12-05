@@ -50,10 +50,23 @@ class _DetailModalState extends State<DetailModal> {
     // Load group names for all groups in locations
     final groupIds = widget.locations.map((l) => l.groupId).toSet();
     for (final groupId in groupIds) {
+      // Handle special "global" groupId
+      if (groupId == 'global') {
+        setState(() {
+          _groupNames['global'] = 'All Members';
+        });
+        continue;
+      }
+      
       final doc = await FirebaseFirestore.instance.collection('groups').doc(groupId).get();
       if (doc.exists) {
         setState(() {
           _groupNames[groupId] = doc.data()?['name'] ?? 'Unknown Group';
+        });
+      } else {
+        // Group doesn't exist, use a readable fallback
+        setState(() {
+          _groupNames[groupId] = 'Group';
         });
       }
     }
@@ -86,11 +99,28 @@ class _DetailModalState extends State<DetailModal> {
     final userIds = widget.locations.map((l) => l.userId).toSet();
     for (final uid in userIds) {
       if (!_userDetails.containsKey(uid)) {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-        if (doc.exists) {
-          setState(() {
-            _userDetails[uid] = doc.data() as Map<String, dynamic>;
-          });
+        // Check if this is a placeholder member
+        if (uid.startsWith('placeholder_')) {
+          final doc = await FirebaseFirestore.instance.collection('placeholder_members').doc(uid).get();
+          if (doc.exists) {
+            final data = doc.data() as Map<String, dynamic>;
+            setState(() {
+              _userDetails[uid] = {
+                'displayName': '👻 ${data['displayName'] ?? 'Placeholder'}',
+                'photoURL': null,
+                'isPlaceholder': true,
+                'groupId': data['groupId'],
+              };
+            });
+          }
+        } else {
+          // Regular user
+          final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+          if (doc.exists) {
+            setState(() {
+              _userDetails[uid] = doc.data() as Map<String, dynamic>;
+            });
+          }
         }
       }
     }
@@ -111,6 +141,51 @@ class _DetailModalState extends State<DetailModal> {
     setState(() {
       _pinnedMembers = newPinned;
     });
+  }
+
+  // Check if current user is owner or admin of the group
+  Future<bool> _isOwnerOrAdminOfGroup(String groupId) async {
+    if (groupId == 'global') return false;
+    final doc = await FirebaseFirestore.instance.collection('groups').doc(groupId).get();
+    if (!doc.exists) return false;
+    final data = doc.data()!;
+    final ownerId = data['ownerId'] as String?;
+    final admins = List<String>.from(data['admins'] ?? []);
+    return ownerId == widget.currentUserId || admins.contains(widget.currentUserId);
+  }
+
+  // Edit placeholder member location
+  Future<void> _editPlaceholderLocation(UserLocation element) async {
+    final result = await showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: LocationPicker(
+            currentUserId: widget.currentUserId,
+            defaultCountry: element.nation,
+            defaultState: element.state,
+            initialStartDate: widget.date,
+            initialEndDate: widget.date,
+            onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
+              // Save the placeholder location
+              await _firestoreService.setPlaceholderMemberLocationRange(
+                element.userId,
+                element.groupId,
+                startDate,
+                endDate,
+                country,
+                state,
+              );
+              Navigator.pop(context, true);
+            },
+          ),
+        ),
+      ),
+    );
+    if (result == true && mounted) {
+      Navigator.pop(context); // Refresh detail modal
+    }
   }
 
   @override
@@ -310,20 +385,43 @@ class _DetailModalState extends State<DetailModal> {
                     final photoUrl = user?['photoURL'];
                     final isPinned = _pinnedMembers.contains(element.userId);
                     final isCurrentUser = element.userId == widget.currentUserId;
+                    final isPlaceholder = element.userId.startsWith('placeholder_');
 
-                    return ListTile(
-                      leading: UserAvatar(
-                        photoUrl: photoUrl,
-                        name: name,
-                        radius: 20,
-                      ),
-                      title: Text(name),
-                      subtitle: Text("${element.nation}, ${element.state ?? ''}"),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Edit/Delete for own location
-                          if (isCurrentUser) ...[
+                    return FutureBuilder<bool>(
+                      future: isPlaceholder ? _isOwnerOrAdminOfGroup(element.groupId) : Future.value(false),
+                      builder: (context, canEditSnapshot) {
+                        final canEditPlaceholder = canEditSnapshot.data ?? false;
+
+                        return ListTile(
+                          leading: isPlaceholder
+                            ? CircleAvatar(
+                                backgroundColor: Colors.grey[300],
+                                child: const Icon(Icons.person_outline, color: Colors.grey),
+                              )
+                            : UserAvatar(
+                                photoUrl: photoUrl,
+                                name: name,
+                                radius: 20,
+                              ),
+                          title: Text(name),
+                          subtitle: element.nation == "No location selected"
+                            ? Text(
+                                "No location selected",
+                                style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                              )
+                            : Text("${element.nation}${element.state != null && element.state!.isNotEmpty ? ', ${element.state}' : ''}"),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Edit for placeholder members (owner/admin only)
+                              if (isPlaceholder && canEditPlaceholder)
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 20, color: Colors.blue),
+                                  onPressed: () => _editPlaceholderLocation(element),
+                                  tooltip: 'Edit Placeholder Location',
+                                ),
+                              // Edit/Delete for own location
+                              if (isCurrentUser) ...[
                             IconButton(
                               icon: const Icon(Icons.edit, size: 20),
                               onPressed: () async {
@@ -362,11 +460,12 @@ class _DetailModalState extends State<DetailModal> {
                                     child: Container(
                                       constraints: const BoxConstraints(maxWidth: 500),
                                       child: LocationPicker(
+                                        currentUserId: widget.currentUserId,
                                         defaultCountry: defaultCountry ?? element.nation,
                                         defaultState: defaultState ?? element.state,
                                         initialStartDate: widget.date,
                                         initialEndDate: widget.date, // Default to single day
-                                        onLocationSelected: (country, state, startDate, endDate) async {
+                                        onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
                                           // Save the updated location for date range
                                           await _firestoreService.setLocationRange(
                                             widget.currentUserId,
@@ -429,6 +528,8 @@ class _DetailModalState extends State<DetailModal> {
                           ),
                         ],
                       ),
+                    );
+                      },
                     );
                   },
                 ),

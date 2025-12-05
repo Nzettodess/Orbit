@@ -39,34 +39,49 @@ class HomeCalendar extends StatefulWidget {
 class _HomeCalendarState extends State<HomeCalendar> {
 
 
-  // Helper to get effective locations for a date
+  // Helper to get effective locations for a date (includes ALL users for detail modal)
   List<UserLocation> _getLocationsForDate(DateTime date) {
-    // 1. Get explicit locations
+    // 1. Get explicit locations (manually set for this date)
     final explicit = widget.locations.where((l) => 
       l.date.year == date.year && l.date.month == date.month && l.date.day == date.day).toList();
     
     final explicitUserIds = explicit.map((l) => l.userId).toSet();
 
-    // 2. Add default locations for users who don't have explicit location
-    final defaults = <UserLocation>[];
+    // 2. Add locations for all other users (default location or "No location")
+    final others = <UserLocation>[];
     for (final user in widget.allUsers) {
-      if (!explicitUserIds.contains(user['uid']) && user['defaultLocation'] != null && (user['defaultLocation'] as String).isNotEmpty) {
-        // Parse default location "Country, State" or "Country"
-        final parts = (user['defaultLocation'] as String).split(', ');
-        final country = parts[0];
-        final state = parts.length > 1 ? parts[1] : null;
+      if (!explicitUserIds.contains(user['uid'])) {
+        final defaultLoc = user['defaultLocation'] as String?;
+        // Use user's groupId if available (for placeholders), otherwise 'global'
+        final userGroupId = user['groupId'] as String? ?? 'global';
         
-        defaults.add(UserLocation(
-          userId: user['uid'],
-          groupId: "global", // or "default"
-          date: date,
-          nation: country,
-          state: state,
-        ));
+        if (defaultLoc != null && defaultLoc.isNotEmpty) {
+          // Has default location
+          final parts = defaultLoc.split(', ');
+          final country = parts[0];
+          final state = parts.length > 1 ? parts[1] : null;
+          
+          others.add(UserLocation(
+            userId: user['uid'],
+            groupId: userGroupId,
+            date: date,
+            nation: country,
+            state: state,
+          ));
+        } else {
+          // No location - add placeholder entry for detail modal
+          others.add(UserLocation(
+            userId: user['uid'],
+            groupId: userGroupId,
+            date: date,
+            nation: "No location selected",
+            state: null,
+          ));
+        }
       }
     }
 
-    return [...explicit, ...defaults];
+    return [...explicit, ...others];
   }
 
 

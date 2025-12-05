@@ -9,6 +9,7 @@ import 'profile.dart';
 import 'group_management.dart';
 import 'firestore_service.dart';
 import 'models.dart';
+import 'models/placeholder_member.dart';
 import 'location_picker.dart';
 import 'google_calendar_service.dart';
 import 'add_event_modal.dart';
@@ -40,6 +41,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
   String _currentMonthTitle = "Calendar";
   DateTime _currentViewMonth = DateTime.now();
   List<Map<String, dynamic>> _allUsers = [];
+  List<PlaceholderMember> _placeholderMembers = [];
   final CalendarController _calendarController = CalendarController();
 
   @override
@@ -89,10 +91,27 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
   void _loadData() {
     if (_user == null) return;
     
-    // Listen to locations
-    FirebaseFirestore.instance.collection('user_locations').snapshots().listen((snapshot) {
-      setState(() {
-        _locations = snapshot.docs.map((doc) => UserLocation.fromFirestore(doc.data())).toList();
+    // Listen to both user_locations and placeholder_locations, merge them
+    FirebaseFirestore.instance.collection('user_locations').snapshots().listen((userLocSnapshot) {
+      final userLocations = userLocSnapshot.docs.map((doc) => UserLocation.fromFirestore(doc.data())).toList();
+      
+      // Also listen to placeholder_member_locations
+      FirebaseFirestore.instance.collection('placeholder_member_locations').snapshots().listen((placeholderLocSnapshot) {
+        final placeholderLocations = placeholderLocSnapshot.docs.map((doc) {
+          final data = doc.data();
+          // Convert PlaceholderLocation to UserLocation for unified display
+          return UserLocation(
+            userId: data['placeholderMemberId'] ?? '',
+            groupId: data['groupId'] ?? 'global',
+            date: (data['date'] as Timestamp).toDate(),
+            nation: data['nation'] ?? '',
+            state: data['state'],
+          );
+        }).toList();
+        
+        setState(() {
+          _locations = [...userLocations, ...placeholderLocations];
+        });
       });
     });
 
@@ -103,10 +122,74 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
       });
     });
 
-    // Listen to all users for default locations
-    FirebaseFirestore.instance.collection('users').snapshots().listen((snapshot) {
-      setState(() {
-        _allUsers = snapshot.docs.map((doc) => doc.data()..['uid'] = doc.id).toList();
+    // First, get current user's groups to filter by
+    _firestoreService.getUserGroups(_user!.uid).listen((userGroups) {
+      final myGroupIds = userGroups.map((g) => g.id).toSet();
+      
+      // Build a map of userId -> groupId (user's first group)
+      // Note: if user is in multiple groups, they'll appear in each group's section
+      final userToGroupsMap = <String, List<String>>{};
+      for (final group in userGroups) {
+        for (final memberId in group.members) {
+          userToGroupsMap.putIfAbsent(memberId, () => []);
+          userToGroupsMap[memberId]!.add(group.id);
+        }
+      }
+      
+      final myGroupMemberIds = userToGroupsMap.keys.toSet();
+      
+      // Listen to all users but filter to only those in my groups
+      FirebaseFirestore.instance.collection('users').snapshots().listen((snapshot) {
+        final allUsers = snapshot.docs.map((doc) => doc.data()..['uid'] = doc.id).toList();
+        
+        // Filter and assign groupId to users based on membership
+        // Create separate entries for each group a user belongs to
+        final filteredUsersWithGroups = <Map<String, dynamic>>[];
+        for (final user in allUsers) {
+          final userId = user['uid'] as String;
+          if (userToGroupsMap.containsKey(userId)) {
+            // Add user once for each group they belong to
+            for (final groupId in userToGroupsMap[userId]!) {
+              final userWithGroup = Map<String, dynamic>.from(user);
+              userWithGroup['groupId'] = groupId;
+              filteredUsersWithGroups.add(userWithGroup);
+            }
+          }
+        }
+        
+        // Also listen to placeholder members (filter by my groups)
+        FirebaseFirestore.instance.collection('placeholder_members').snapshots().listen((placeholderSnapshot) {
+          final allPlaceholders = placeholderSnapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'uid': doc.id,
+              'displayName': '👻 ${data['displayName'] ?? 'Placeholder'}',
+              'defaultLocation': data['defaultLocation'],
+              'birthday': data['birthday'],
+              'hasLunarBirthday': data['hasLunarBirthday'] ?? false,
+              'lunarBirthdayMonth': data['lunarBirthdayMonth'],
+              'lunarBirthdayDay': data['lunarBirthdayDay'],
+              'isPlaceholder': true,
+              'groupId': data['groupId'],
+            };
+          }).toList();
+          
+          // Filter placeholders to only those in my groups
+          final filteredPlaceholders = allPlaceholders.where((p) {
+            return myGroupIds.contains(p['groupId']);
+          }).toList();
+          
+          // Also populate placeholder members list for location picker
+          final placeholderMembersList = placeholderSnapshot.docs
+            .where((doc) => myGroupIds.contains(doc.data()['groupId']))
+            .map((doc) => PlaceholderMember.fromFirestore(doc))
+            .toList();
+          
+          setState(() {
+            _allUsers = [...filteredUsersWithGroups, ...filteredPlaceholders];
+            _placeholderMembers = placeholderMembersList;
+          });
+        });
       });
     });
 
@@ -312,19 +395,39 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
       builder: (context) => LocationPicker(
         defaultCountry: defaultCountry,
         defaultState: defaultState,
-        onLocationSelected: (country, state, startDate, endDate) async {
+        currentUserId: _user!.uid,
+        placeholderMembers: List<PlaceholderMember>.from(_placeholderMembers),
+        onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
           try {
-            await _firestoreService.setLocationRange(
-              _user!.uid,
-              "global",
-              startDate,
-              endDate,
-              country,
-              state,
-            );
+            // Set location for each selected member
+            for (final memberId in selectedMemberIds) {
+              if (memberId.startsWith('placeholder_')) {
+                // Placeholder member - use placeholder location service
+                await _firestoreService.setPlaceholderMemberLocationRange(
+                  memberId,
+                  // Find the group ID from placeholder
+                  _placeholderMembers.firstWhere((p) => p.id == memberId).groupId,
+                  startDate,
+                  endDate,
+                  country,
+                  state,
+                );
+              } else {
+                // Regular user
+                await _firestoreService.setLocationRange(
+                  memberId,
+                  "global",
+                  startDate,
+                  endDate,
+                  country,
+                  state,
+                );
+              }
+            }
             
             if (mounted) {
               final dayCount = endDate.difference(startDate).inDays + 1;
+              final memberCount = selectedMemberIds.length;
               final dateRange = dayCount == 1 
                   ? DateFormat('MMM dd, yyyy').format(startDate)
                   : "${DateFormat('MMM dd').format(startDate)} - ${DateFormat('MMM dd, yyyy').format(endDate)}";
@@ -332,7 +435,8 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    "Location set to ${state != null ? '$state, ' : ''}$country for $dateRange ($dayCount day${dayCount > 1 ? 's' : ''})"
+                    "Location set for $memberCount member${memberCount > 1 ? 's' : ''} " 
+                    "to ${state != null ? '$state, ' : ''}$country for $dateRange"
                   )
                 )
               );

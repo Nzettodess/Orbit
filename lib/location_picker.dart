@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:csc_picker_plus/csc_picker_plus.dart';
 import 'package:intl/intl.dart';
 import 'widgets/syncfusion_date_picker.dart';
+import 'models/placeholder_member.dart';
 
 class LocationPicker extends StatefulWidget {
-  final Function(String country, String? state, DateTime startDate, DateTime endDate) onLocationSelected;
+  final Function(String country, String? state, DateTime startDate, DateTime endDate, List<String> selectedMemberIds) onLocationSelected;
   final String? defaultCountry;
   final String? defaultState;
   final DateTime? initialStartDate;
   final DateTime? initialEndDate;
+  final String currentUserId;
+  final List<PlaceholderMember> placeholderMembers;
 
   const LocationPicker({
     super.key, 
@@ -17,6 +20,8 @@ class LocationPicker extends StatefulWidget {
     this.defaultState,
     this.initialStartDate,
     this.initialEndDate,
+    required this.currentUserId,
+    this.placeholderMembers = const [],
   });
 
   @override
@@ -29,6 +34,9 @@ class _LocationPickerState extends State<LocationPicker> {
   String? cityValue;
   late DateTime startDate;
   late DateTime endDate;
+  
+  // Track selected members (current user always selected by default)
+  late Set<String> selectedMemberIds;
 
   @override
   void initState() {
@@ -40,6 +48,9 @@ class _LocationPickerState extends State<LocationPicker> {
     // Initialize date range
     startDate = widget.initialStartDate ?? DateTime.now();
     endDate = widget.initialEndDate ?? DateTime.now();
+    
+    // Current user selected by default
+    selectedMemberIds = {widget.currentUserId};
   }
 
   Future<void> _selectStartDate() async {
@@ -77,6 +88,19 @@ class _LocationPickerState extends State<LocationPicker> {
   }
 
   int get _dayCount => endDate.difference(startDate).inDays + 1;
+
+  String _getSelectedMembersSummary() {
+    final names = <String>[];
+    if (selectedMemberIds.contains(widget.currentUserId)) {
+      names.add("Myself");
+    }
+    for (final p in widget.placeholderMembers) {
+      if (selectedMemberIds.contains(p.id)) {
+        names.add(p.displayName);
+      }
+    }
+    return names.join(", ");
+  }
 
   // Map country names to CscCountry enum values
   CscCountry? _getCountryEnum(String? countryName) {
@@ -147,10 +171,124 @@ class _LocationPickerState extends State<LocationPicker> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Set Your Location",
+              "Set Location",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            
+            // Member Selection (if there are placeholder members)
+            if (widget.placeholderMembers.isNotEmpty) ...[
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ExpansionTile(
+                  initiallyExpanded: false,
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                  title: Row(
+                    children: [
+                      const Icon(Icons.people, size: 20, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Apply to ${selectedMemberIds.length} member${selectedMemberIds.length > 1 ? 's' : ''}",
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                  subtitle: Text(
+                    _getSelectedMembersSummary(),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  children: [
+                    const Divider(height: 1),
+                    // Current user
+                    CheckboxListTile(
+                      dense: true,
+                      title: const Row(
+                        children: [
+                          Icon(Icons.person, size: 20, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text("Myself"),
+                        ],
+                      ),
+                      value: selectedMemberIds.contains(widget.currentUserId),
+                      onChanged: (value) {
+                        setState(() {
+                          if (value == true) {
+                            selectedMemberIds.add(widget.currentUserId);
+                          } else {
+                            if (selectedMemberIds.length > 1) {
+                              selectedMemberIds.remove(widget.currentUserId);
+                            }
+                          }
+                        });
+                      },
+                    ),
+                    // Placeholder members
+                    ...widget.placeholderMembers.map((placeholder) => CheckboxListTile(
+                      dense: true,
+                      title: Row(
+                        children: [
+                          const Icon(Icons.person_outline, size: 20, color: Colors.grey),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "👻 ${placeholder.displayName}",
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      value: selectedMemberIds.contains(placeholder.id),
+                      onChanged: (value) {
+                        setState(() {
+                          if (value == true) {
+                            selectedMemberIds.add(placeholder.id);
+                          } else {
+                            if (selectedMemberIds.length > 1) {
+                              selectedMemberIds.remove(placeholder.id);
+                            }
+                          }
+                        });
+                      },
+                    )),
+                    // Quick actions
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                selectedMemberIds = {widget.currentUserId};
+                                for (var p in widget.placeholderMembers) {
+                                  selectedMemberIds.add(p.id);
+                                }
+                              });
+                            },
+                            child: const Text("Select All", style: TextStyle(fontSize: 12)),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                selectedMemberIds = {widget.currentUserId};
+                              });
+                            },
+                            child: const Text("Only Me", style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             
             // Date Range Selection
             const Text(
@@ -270,19 +408,32 @@ class _LocationPickerState extends State<LocationPicker> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  if (countryValue != null) {
-                    widget.onLocationSelected(countryValue!, stateValue, startDate, endDate);
+                  if (countryValue != null && selectedMemberIds.isNotEmpty) {
+                    widget.onLocationSelected(
+                      countryValue!, 
+                      stateValue, 
+                      startDate, 
+                      endDate,
+                      selectedMemberIds.toList(),
+                    );
                     Navigator.pop(context);
-                  } else {
+                  } else if (countryValue == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("Please select a country")),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Please select at least one member")),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: Text("Save Location for $_dayCount day${_dayCount > 1 ? 's' : ''}"),
+                child: Text(
+                  "Save Location for ${selectedMemberIds.length} member${selectedMemberIds.length > 1 ? 's' : ''} " 
+                  "($_dayCount day${_dayCount > 1 ? 's' : ''})"
+                ),
               ),
             ),
           ],

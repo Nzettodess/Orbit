@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'models.dart';
+import 'models/placeholder_member.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -426,4 +427,324 @@ class FirestoreService {
       });
     }
   }
+
+  // --- Placeholder Members ---
+
+  /// Create a new placeholder member
+  Future<String> createPlaceholderMember(PlaceholderMember member) async {
+    final docRef = _db.collection('placeholder_members').doc(member.id);
+    await docRef.set(member.toMap());
+    return member.id;
+  }
+
+  /// Update placeholder member details
+  Future<void> updatePlaceholderMember(PlaceholderMember member) async {
+    await _db.collection('placeholder_members').doc(member.id).update(member.toMap());
+  }
+
+  /// Delete placeholder member and all related data
+  Future<void> deletePlaceholderMember(String memberId) async {
+    // Delete all locations for this placeholder
+    final locationsSnapshot = await _db
+        .collection('placeholder_member_locations')
+        .where('placeholderMemberId', isEqualTo: memberId)
+        .get();
+    
+    final batch = _db.batch();
+    for (var doc in locationsSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    
+    // Cancel any pending inheritance requests
+    final requestsSnapshot = await _db
+        .collection('inheritance_requests')
+        .where('placeholderMemberId', isEqualTo: memberId)
+        .where('status', isEqualTo: 'pending')
+        .get();
+    
+    for (var doc in requestsSnapshot.docs) {
+      batch.update(doc.reference, {'status': 'cancelled'});
+    }
+    
+    // Delete the placeholder member
+    batch.delete(_db.collection('placeholder_members').doc(memberId));
+    
+    await batch.commit();
+  }
+
+  /// Get all placeholder members for a group
+  Stream<List<PlaceholderMember>> getGroupPlaceholderMembers(String groupId) {
+    return _db
+        .collection('placeholder_members')
+        .where('groupId', isEqualTo: groupId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => PlaceholderMember.fromFirestore(doc))
+            .toList());
+  }
+
+  /// Get a single placeholder member by ID
+  Future<PlaceholderMember?> getPlaceholderMember(String memberId) async {
+    final doc = await _db.collection('placeholder_members').doc(memberId).get();
+    if (!doc.exists) return null;
+    return PlaceholderMember.fromFirestore(doc);
+  }
+
+  // --- Placeholder Member Locations ---
+
+  /// Set location for a placeholder member on a specific date
+  Future<void> setPlaceholderMemberLocation(
+    String placeholderMemberId,
+    String groupId,
+    DateTime date,
+    String nation,
+    String? state,
+  ) async {
+    final dateStr = "${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}";
+    final docId = "${placeholderMemberId}_$dateStr";
+    
+    await _db.collection('placeholder_member_locations').doc(docId).set({
+      'placeholderMemberId': placeholderMemberId,
+      'groupId': groupId,
+      'date': Timestamp.fromDate(date),
+      'nation': nation,
+      'state': state,
+    }, SetOptions(merge: true));
+  }
+
+  /// Set location for a placeholder member over a date range
+  Future<void> setPlaceholderMemberLocationRange(
+    String placeholderMemberId,
+    String groupId,
+    DateTime startDate,
+    DateTime endDate,
+    String nation,
+    String? state,
+  ) async {
+    final dates = <DateTime>[];
+    var currentDate = DateTime(startDate.year, startDate.month, startDate.day);
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+    
+    while (!currentDate.isAfter(end)) {
+      dates.add(currentDate);
+      currentDate = currentDate.add(const Duration(days: 1));
+    }
+    
+    const maxOpsPerBatch = 500;
+    for (var i = 0; i < dates.length; i += maxOpsPerBatch) {
+      final batch = _db.batch();
+      final batchEnd = (i + maxOpsPerBatch < dates.length) ? i + maxOpsPerBatch : dates.length;
+      
+      for (var j = i; j < batchEnd; j++) {
+        final date = dates[j];
+        final dateStr = "${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}";
+        final docId = "${placeholderMemberId}_$dateStr";
+        
+        batch.set(_db.collection('placeholder_member_locations').doc(docId), {
+          'placeholderMemberId': placeholderMemberId,
+          'groupId': groupId,
+          'date': Timestamp.fromDate(date),
+          'nation': nation,
+          'state': state,
+        }, SetOptions(merge: true));
+      }
+      
+      await batch.commit();
+    }
+  }
+
+  /// Get placeholder member locations for a specific date
+  Stream<List<PlaceholderLocation>> getPlaceholderMemberLocations(
+    String groupId,
+    DateTime date,
+  ) {
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    return _db
+        .collection('placeholder_member_locations')
+        .where('groupId', isEqualTo: groupId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('date', isLessThan: Timestamp.fromDate(endOfDay))
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => PlaceholderLocation.fromFirestore(doc.data()))
+            .toList());
+  }
+
+  // --- Inheritance Requests ---
+
+  /// Request to inherit a placeholder member's data
+  Future<void> requestInheritance(
+    String placeholderMemberId,
+    String requesterId,
+    String groupId,
+  ) async {
+    // Check if there's already a pending request from this user
+    final existingRequest = await _db
+        .collection('inheritance_requests')
+        .where('placeholderMemberId', isEqualTo: placeholderMemberId)
+        .where('requesterId', isEqualTo: requesterId)
+        .where('status', isEqualTo: 'pending')
+        .get();
+    
+    if (existingRequest.docs.isNotEmpty) {
+      throw Exception('You already have a pending request for this placeholder.');
+    }
+    
+    final requestId = 'request_${_uuid.v4()}';
+    await _db.collection('inheritance_requests').doc(requestId).set({
+      'placeholderMemberId': placeholderMemberId,
+      'requesterId': requesterId,
+      'groupId': groupId,
+      'status': 'pending',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Get pending inheritance requests for a group (owner/admin view)
+  Stream<List<InheritanceRequest>> getPendingInheritanceRequests(String groupId) {
+    return _db
+        .collection('inheritance_requests')
+        .where('groupId', isEqualTo: groupId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => InheritanceRequest.fromFirestore(doc))
+            .toList());
+  }
+
+  /// Process an inheritance request (approve or reject)
+  Future<void> processInheritanceRequest(
+    String requestId,
+    bool approved,
+    String processedBy,
+  ) async {
+    final requestDoc = await _db.collection('inheritance_requests').doc(requestId).get();
+    if (!requestDoc.exists) {
+      throw Exception('Request not found');
+    }
+    
+    final request = InheritanceRequest.fromFirestore(requestDoc);
+    
+    if (approved) {
+      // Perform the inheritance
+      await performInheritance(
+        request.placeholderMemberId,
+        request.requesterId,
+        request.groupId,
+      );
+    }
+    
+    // Update request status
+    await _db.collection('inheritance_requests').doc(requestId).update({
+      'status': approved ? 'approved' : 'rejected',
+      'processedBy': processedBy,
+      'processedAt': FieldValue.serverTimestamp(),
+    });
+    
+    // Cancel all other pending requests for the same placeholder if approved
+    if (approved) {
+      final otherRequests = await _db
+          .collection('inheritance_requests')
+          .where('placeholderMemberId', isEqualTo: request.placeholderMemberId)
+          .where('status', isEqualTo: 'pending')
+          .get();
+      
+      final batch = _db.batch();
+      for (var doc in otherRequests.docs) {
+        batch.update(doc.reference, {'status': 'cancelled'});
+      }
+      await batch.commit();
+    }
+  }
+
+  /// Perform the actual inheritance - transfer all data from placeholder to real user
+  Future<void> performInheritance(
+    String placeholderMemberId,
+    String userId,
+    String groupId,
+  ) async {
+    // Get the placeholder member data
+    final placeholderDoc = await _db.collection('placeholder_members').doc(placeholderMemberId).get();
+    if (!placeholderDoc.exists) {
+      throw Exception('Placeholder member not found');
+    }
+    
+    final placeholder = PlaceholderMember.fromFirestore(placeholderDoc);
+    
+    // Transfer data to user profile
+    final userUpdate = <String, dynamic>{};
+    
+    if (placeholder.defaultLocation != null) {
+      userUpdate['defaultLocation'] = placeholder.defaultLocation;
+    }
+    if (placeholder.birthday != null) {
+      userUpdate['birthday'] = Timestamp.fromDate(placeholder.birthday!);
+    }
+    if (placeholder.hasLunarBirthday) {
+      userUpdate['hasLunarBirthday'] = true;
+      userUpdate['lunarBirthdayMonth'] = placeholder.lunarBirthdayMonth;
+      userUpdate['lunarBirthdayDay'] = placeholder.lunarBirthdayDay;
+    }
+    
+    if (userUpdate.isNotEmpty) {
+      await _db.collection('users').doc(userId).update(userUpdate);
+    }
+    
+    // Transfer all location entries
+    final locationsSnapshot = await _db
+        .collection('placeholder_member_locations')
+        .where('placeholderMemberId', isEqualTo: placeholderMemberId)
+        .get();
+    
+    final batch = _db.batch();
+    
+    for (var doc in locationsSnapshot.docs) {
+      final data = doc.data();
+      final date = (data['date'] as Timestamp).toDate();
+      final dateStr = "${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}";
+      final newDocId = "${userId}_${groupId}_$dateStr";
+      
+      // Create new location entry for the real user
+      batch.set(_db.collection('user_locations').doc(newDocId), {
+        'userId': userId,
+        'groupId': groupId,
+        'date': data['date'],
+        'nation': data['nation'],
+        'state': data['state'],
+      }, SetOptions(merge: true));
+      
+      // Delete the old placeholder location
+      batch.delete(doc.reference);
+    }
+    
+    // Delete the placeholder member
+    batch.delete(_db.collection('placeholder_members').doc(placeholderMemberId));
+    
+    await batch.commit();
+    
+    // Send notification to the user
+    await sendNotification(
+      userId,
+      'You have successfully inherited data from "${placeholder.displayName}".',
+    );
+  }
+
+  /// Cancel pending requests when user leaves group
+  Future<void> cancelUserInheritanceRequests(String userId, String groupId) async {
+    final requests = await _db
+        .collection('inheritance_requests')
+        .where('requesterId', isEqualTo: userId)
+        .where('groupId', isEqualTo: groupId)
+        .where('status', isEqualTo: 'pending')
+        .get();
+    
+    final batch = _db.batch();
+    for (var doc in requests.docs) {
+      batch.update(doc.reference, {'status': 'cancelled'});
+    }
+    await batch.commit();
+  }
 }
+
