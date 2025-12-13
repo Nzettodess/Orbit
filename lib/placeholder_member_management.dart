@@ -7,6 +7,8 @@ import 'models/placeholder_member.dart';
 import 'widgets/default_location_picker.dart';
 import 'widgets/lunar_date_picker.dart';
 import 'widgets/syncfusion_date_picker.dart';
+import 'widgets/user_profile_dialog.dart';
+import 'edit_member_dialog.dart';
 
 class PlaceholderMemberManagement extends StatefulWidget {
   final Group group;
@@ -132,10 +134,31 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
     );
   }
 
+  void _showUserProfile(PlaceholderMember placeholder) {
+    showDialog(
+      context: context,
+      builder: (context) => UserProfileDialog(
+        displayName: placeholder.displayName,
+        photoUrl: null,
+        defaultLocation: placeholder.defaultLocation,
+        birthday: placeholder.birthday, // Assuming it's DateTime
+        hasLunarBirthday: placeholder.hasLunarBirthday,
+        lunarBirthdayMonth: placeholder.lunarBirthdayMonth,
+        lunarBirthdayDay: placeholder.lunarBirthdayDay,
+        isPlaceholder: true,
+        canEdit: canEdit,
+        onEdit: () {
+          _showEditDialog(placeholder);
+        },
+      ),
+    );
+  }
+
   Widget _buildPlaceholderTile(PlaceholderMember placeholder) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
+        onTap: () => _showUserProfile(placeholder),
         leading: CircleAvatar(
           backgroundColor: Colors.grey[300],
           child: const Icon(Icons.person_outline, color: Colors.grey),
@@ -487,141 +510,26 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
   }
 
   void _showEditDialog(PlaceholderMember placeholder) {
-    final nameController = TextEditingController(text: placeholder.displayName);
-    String? selectedLocation = placeholder.defaultLocation;
-    DateTime? selectedBirthday = placeholder.birthday;
-    bool hasLunarBirthday = placeholder.hasLunarBirthday;
-    int? lunarMonth = placeholder.lunarBirthdayMonth;
-    int? lunarDay = placeholder.lunarBirthdayDay;
+    // EditMemberDialog will fetch fresh data, so we can pass basic details
+    final details = {
+      'displayName': placeholder.displayName,
+      'defaultLocation': placeholder.defaultLocation,
+      'birthday': placeholder.birthday != null ? Timestamp.fromDate(placeholder.birthday!) : null,
+      'hasLunarBirthday': placeholder.hasLunarBirthday,
+      'lunarBirthdayMonth': placeholder.lunarBirthdayMonth,
+      'lunarBirthdayDay': placeholder.lunarBirthdayDay,
+    };
 
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text("Edit Placeholder Member"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: "Display Name *"),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(selectedLocation ?? "Set Default Location"),
-                  trailing: const Icon(Icons.location_on),
-                  onTap: () async {
-                    await showDialog(
-                      context: dialogContext,
-                      builder: (pickerContext) => Dialog(
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 500),
-                          child: DefaultLocationPicker(
-                            onLocationSelected: (country, state) {
-                              final location = state != null && state.isNotEmpty 
-                                  ? "$country, $state" 
-                                  : country;
-                              setDialogState(() => selectedLocation = location);
-                              // DefaultLocationPicker pops itself
-                            },
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(selectedBirthday != null 
-                    ? "Birthday: ${selectedBirthday!.month}/${selectedBirthday!.day}/${selectedBirthday!.year}"
-                    : "Set Birthday"),
-                  trailing: const Icon(Icons.cake),
-                  onTap: () async {
-                    final result = await showDialog<DateTime>(
-                      context: dialogContext,
-                      builder: (_) => SyncfusionDatePickerDialog(
-                        initialDate: selectedBirthday ?? DateTime(2000, 1, 1),
-                        firstDate: DateTime(1900),
-                        lastDate: DateTime.now(),
-                      ),
-                    );
-                    if (result != null) {
-                      setDialogState(() => selectedBirthday = result);
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(hasLunarBirthday && lunarMonth != null
-                    ? "Lunar Birthday: Month $lunarMonth, Day $lunarDay"
-                    : "Set Lunar Birthday (Optional)"),
-                  trailing: Icon(
-                    Icons.nights_stay,
-                    color: hasLunarBirthday ? Colors.orange : Colors.grey,
-                  ),
-                  onTap: () async {
-                    // LunarDatePickerDialog returns (int, int) tuple
-                    final result = await showDialog<(int, int)>(
-                      context: dialogContext,
-                      builder: (_) => const LunarDatePickerDialog(),
-                    );
-                    if (result != null) {
-                      setDialogState(() {
-                        hasLunarBirthday = true;
-                        lunarMonth = result.$1;  // Access tuple's first element
-                        lunarDay = result.$2;    // Access tuple's second element
-                      });
-                    }
-                  },
-                ),
-                if (hasLunarBirthday)
-                  TextButton(
-                    onPressed: () {
-                      setDialogState(() {
-                        hasLunarBirthday = false;
-                        lunarMonth = null;
-                        lunarDay = null;
-                      });
-                    },
-                    child: const Text("Clear Lunar Birthday", style: TextStyle(color: Colors.red)),
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.isEmpty) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(content: Text("Please enter a name")),
-                  );
-                  return;
-                }
-                
-                final updated = placeholder.copyWith(
-                  displayName: nameController.text,
-                  defaultLocation: selectedLocation,
-                  birthday: selectedBirthday,
-                  hasLunarBirthday: hasLunarBirthday,
-                  lunarBirthdayMonth: hasLunarBirthday ? lunarMonth : null,
-                  lunarBirthdayDay: hasLunarBirthday ? lunarDay : null,
-                );
-                
-                await _firestoreService.updatePlaceholderMember(updated);
-                if (mounted) Navigator.pop(dialogContext);
-              },
-              child: const Text("Save"),
-            ),
-          ],
-        ),
+      builder: (_) => EditMemberDialog(
+        memberId: placeholder.id,
+        memberDetails: details,
+        groupId: widget.group.id,
+        isPlaceholder: true,
+        onSaved: () {
+          // StreamBuilder will auto-update the list
+        },
       ),
     );
   }

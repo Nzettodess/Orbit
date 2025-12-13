@@ -10,6 +10,8 @@ import 'location_picker.dart';
 import 'add_event_modal.dart';
 import 'widgets/user_avatar.dart';
 import 'rsvp_management.dart';
+import 'edit_member_dialog.dart';
+import 'widgets/user_profile_dialog.dart';
 
 class DetailModal extends StatefulWidget {
   final DateTime date;
@@ -190,6 +192,11 @@ class _DetailModalState extends State<DetailModal> {
                 'photoURL': null,
                 'isPlaceholder': true,
                 'groupId': data['groupId'],
+                'defaultLocation': data['defaultLocation'],
+                'birthday': data['birthday'],
+                'hasLunarBirthday': data['hasLunarBirthday'] ?? false,
+                'lunarBirthdayMonth': data['lunarBirthdayMonth'],
+                'lunarBirthdayDay': data['lunarBirthdayDay'],
               };
             });
           }
@@ -234,39 +241,7 @@ class _DetailModalState extends State<DetailModal> {
     return ownerId == widget.currentUserId || admins.contains(widget.currentUserId);
   }
 
-  // Edit placeholder member location
-  Future<void> _editPlaceholderLocation(UserLocation element) async {
-    final result = await showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 500),
-          child: LocationPicker(
-            currentUserId: widget.currentUserId,
-            defaultCountry: element.nation,
-            defaultState: element.state,
-            initialStartDate: widget.date,
-            initialEndDate: widget.date,
-            onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
-              // Save the placeholder location
-              await _firestoreService.setPlaceholderMemberLocationRange(
-                element.userId,
-                element.groupId,
-                startDate,
-                endDate,
-                country,
-                state,
-              );
-              Navigator.pop(context, true);
-            },
-          ),
-        ),
-      ),
-    );
-    if (result == true && mounted) {
-      Navigator.pop(context); // Refresh detail modal
-    }
-  }
+
 
   // Delete placeholder member location
   Future<void> _deletePlaceholderLocation(UserLocation element) async {
@@ -313,12 +288,30 @@ class _DetailModalState extends State<DetailModal> {
     }
   }
 
+  Future<void> _editPlaceholderLocation(UserLocation element) async {
+    final userData = _userDetails[element.userId] ?? {};
+    
+    await showDialog(
+      context: context,
+      builder: (_) => EditMemberDialog(
+        memberId: element.userId,
+        memberDetails: userData,
+        groupId: element.groupId,
+        isPlaceholder: true,
+        onSaved: () {
+          _loadUserDetails(); 
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       height: MediaQuery.of(context).size.height * 0.8,
-      child: Column(
+      child: SingleChildScrollView(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -356,27 +349,37 @@ class _DetailModalState extends State<DetailModal> {
               title: Text(h.localName),
               subtitle: Text(h.countryCode),
             )),
-            const Divider(),
-          ],
+            ],
 
           // Birthdays
-          if (widget.birthdays.isNotEmpty) ...[
-            const Text("Birthdays 🎂", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-            ...widget.birthdays.map((b) => ListTile(
-              leading: Icon(
-                b.isLunar ? Icons.nights_stay : Icons.cake, 
-                color: b.isLunar ? Colors.orange : Colors.green,
-              ),
-              title: Text(b.isLunar ? "${b.displayName} [lunar birthday]" : b.displayName),
-              subtitle: b.isLunar ? null : Text("Turning ${b.age} years old"),
-            )),
-            const Divider(),
-          ],
+          if (widget.birthdays.isNotEmpty)
+            ExpansionTile(
+              title: const Text("Birthdays 🎂", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+              initiallyExpanded: false,
+              shape: const Border(),
+              collapsedShape: const Border(),
+              tilePadding: EdgeInsets.zero,
+              children: widget.birthdays.map((b) => ListTile(
+                leading: Icon(
+                  b.isLunar ? Icons.nights_stay : Icons.cake, 
+                  color: b.isLunar ? Colors.orange : Colors.green,
+                ),
+                title: Text(b.isLunar ? "${b.displayName} [lunar birthday]" : b.displayName),
+                subtitle: b.isLunar ? null : Text("Turning ${b.age} years old"),
+              )).toList(),
+            ),
+          
+
 
           // Events
-          if (widget.events.isNotEmpty) ...[
-             const Text("Events", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-             ...widget.events.map((e) {
+          if (widget.events.isNotEmpty)
+             ExpansionTile(
+               title: const Text("Events", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+               initiallyExpanded: false,
+               shape: const Border(),
+               collapsedShape: const Border(),
+               tilePadding: EdgeInsets.zero,
+               children: widget.events.map((e) {
                final isOwner = e.creatorId == widget.currentUserId;
                return ListTile(
                  leading: const Icon(Icons.event, color: Colors.blue),
@@ -480,22 +483,24 @@ class _DetailModalState extends State<DetailModal> {
                    ],
                  ),
                );
-             }),
-             const Divider(),
-          ],
+             }).toList(),
+             ),
+          
+
 
           // Locations (Grouped) - Deduplicated
-          Expanded(
-            child: Builder(
-              builder: (context) {
-                final deduplicatedLocations = _getDeduplicatedLocations();
-                
-                if (deduplicatedLocations.isEmpty) {
-                  return const Center(child: Text("No member locations set."));
-                }
-                
-                return GroupedListView<UserLocation, String>(
-                  elements: deduplicatedLocations,
+          Builder(
+            builder: (context) {
+              final deduplicatedLocations = _getDeduplicatedLocations();
+              
+              if (deduplicatedLocations.isEmpty) {
+                return const Center(child: Text("No member locations set."));
+              }
+              
+              return GroupedListView<UserLocation, String>(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                elements: deduplicatedLocations,
                   groupBy: (element) {
                     // Current user always at top
                     if (element.userId == widget.currentUserId) {
@@ -540,6 +545,7 @@ class _DetailModalState extends State<DetailModal> {
                         final canEditPlaceholder = canEditSnapshot.data ?? false;
 
                         return ListTile(
+                          onTap: () => _showUserProfileDialog(element, user),
                           leading: isPlaceholder
                             ? CircleAvatar(
                                 backgroundColor: Colors.grey[300],
@@ -713,11 +719,75 @@ class _DetailModalState extends State<DetailModal> {
                       },
                     );
                   },
-                );
-              },
-            ),
-          ),
+
+            );
+          }),
         ],
+      ),
+      ),
+    );
+  }
+
+  void _showUserProfileDialog(UserLocation location, Map<String, dynamic>? userData) async {
+    final isPlaceholder = location.userId.startsWith('placeholder_');
+    final name = userData?['displayName'] ?? userData?['email'] ?? "Unknown User";
+    final photoUrl = userData?['photoURL'];
+    
+    // Check editing permissions
+    bool canEdit = false;
+    if (isPlaceholder) {
+      if (_adminGroups.contains(location.groupId)) {
+        canEdit = true;
+      } else {
+        final groupDoc = await FirebaseFirestore.instance.collection('groups').doc(location.groupId).get();
+        if (groupDoc.exists) {
+          final groupData = groupDoc.data()!;
+          final ownerId = groupData['ownerId'];
+          final admins = List<String>.from(groupData['admins'] ?? []);
+          if (ownerId == widget.currentUserId || admins.contains(widget.currentUserId)) {
+            canEdit = true;
+          }
+        }
+      }
+    } else {
+      if (location.userId == widget.currentUserId) {
+         canEdit = false; 
+      } else if (_manageableMembers.contains(location.userId)) {
+        canEdit = true;
+      }
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => UserProfileDialog(
+        displayName: name,
+        photoUrl: photoUrl,
+        isPlaceholder: isPlaceholder,
+        canEdit: canEdit,
+        defaultLocation: userData?['defaultLocation'],
+        birthday: userData?['birthday'] != null ? (userData!['birthday'] as Timestamp).toDate() : null,
+        hasLunarBirthday: userData?['hasLunarBirthday'] ?? false,
+        lunarBirthdayMonth: userData?['lunarBirthdayMonth'],
+        lunarBirthdayDay: userData?['lunarBirthdayDay'],
+        onEdit: () {
+          if (isPlaceholder) {
+            _editPlaceholderLocation(location);
+          } else {
+             showDialog(
+               context: context,
+               builder: (_) => EditMemberDialog(
+                 memberId: location.userId,
+                 memberDetails: userData ?? {},
+                 groupId: location.groupId,
+                 onSaved: () {
+                   _loadUserDetails(); // Refresh data
+                 },
+               ),
+             );
+          }
+        },
       ),
     );
   }

@@ -9,6 +9,7 @@ class EditMemberDialog extends StatefulWidget {
   final Map<String, dynamic> memberDetails;
   final String groupId;
   final VoidCallback onSaved;
+  final bool isPlaceholder;
 
   const EditMemberDialog({
     super.key,
@@ -16,6 +17,7 @@ class EditMemberDialog extends StatefulWidget {
     required this.memberDetails,
     required this.groupId,
     required this.onSaved,
+    this.isPlaceholder = false,
   });
 
   @override
@@ -42,8 +44,9 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
   }
 
   Future<void> _loadMemberData() async {
+    final collection = widget.isPlaceholder ? 'placeholder_members' : 'users';
     final doc = await FirebaseFirestore.instance
-        .collection('users')
+        .collection(collection)
         .doc(widget.memberId)
         .get();
     
@@ -81,8 +84,9 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
         'lunarBirthdayDay': _lunarBirthdayDay,
       };
       
+      final collection = widget.isPlaceholder ? 'placeholder_members' : 'users';
       await FirebaseFirestore.instance
-          .collection('users')
+          .collection(collection)
           .doc(widget.memberId)
           .update(updateData);
       

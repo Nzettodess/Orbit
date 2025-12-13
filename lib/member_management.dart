@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'models.dart';
 import 'firestore_service.dart';
 import 'edit_member_dialog.dart';
+import 'widgets/user_profile_dialog.dart';
 
 class MemberManagement extends StatefulWidget {
   final Group group;
@@ -80,6 +81,40 @@ class _MemberManagementState extends State<MemberManagement> {
     });
     
     return members;
+  }
+
+  void _showUserProfile(String memberId, Map<String, dynamic>? userData) {
+    if (userData == null) return;
+    
+    final name = userData['displayName'] ?? userData['email'] ?? 'Unknown User';
+    final photoUrl = userData['photoURL'];
+    final isThisOwner = memberId == _group.ownerId;
+    final isThisAdmin = _group.admins.contains(memberId);
+    
+    // Determine edit permission (same logic as _buildTrailingActions)
+    bool canEdit = false;
+    if (isOwner) {
+      canEdit = !isThisOwner; // Owner can edit everyone but self (self edit via profile)
+    } else if (isAdmin) {
+      canEdit = !isThisOwner && !isThisAdmin; // Admin can edit members only
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => UserProfileDialog(
+        displayName: name,
+        photoUrl: photoUrl,
+        defaultLocation: userData['defaultLocation'],
+        birthday: userData['birthday'] != null ? (userData['birthday'] as Timestamp).toDate() : null,
+        hasLunarBirthday: userData['hasLunarBirthday'] ?? false,
+        lunarBirthdayMonth: userData['lunarBirthdayMonth'],
+        lunarBirthdayDay: userData['lunarBirthdayDay'],
+        canEdit: canEdit,
+        onEdit: () {
+          _showEditMemberDialog(memberId);
+        },
+      ),
+    );
   }
 
   Widget _buildTrailingActions(String memberId, bool isThisOwner, bool isThisAdmin, bool isCurrentUser) {
@@ -421,6 +456,7 @@ class _MemberManagementState extends State<MemberManagement> {
                       final isCurrentUser = memberId == widget.currentUserId;
 
                       return ListTile(
+                        onTap: () => _showUserProfile(memberId, member),
                         leading: CircleAvatar(
                           backgroundColor: isThisOwner 
                             ? Colors.amber[100] 
