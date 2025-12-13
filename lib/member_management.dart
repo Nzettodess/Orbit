@@ -54,9 +54,42 @@ class _MemberManagementState extends State<MemberManagement> {
   bool get isAdmin => _group.admins.contains(widget.currentUserId);
   bool get canManage => isOwner || isAdmin;
 
-  Widget? _buildTrailingActions(String memberId, bool isThisOwner, bool isThisAdmin, bool isCurrentUser) {
-    // Can't edit yourself
-    if (isCurrentUser) return null;
+  /// Returns sorted member list: Owner first, then Admins, then Members.
+  /// Within each tier, sorted alphabetically by display name.
+  List<String> _getSortedMembers() {
+    final members = List<String>.from(_group.members);
+    
+    members.sort((a, b) {
+      final aIsOwner = a == _group.ownerId;
+      final bIsOwner = b == _group.ownerId;
+      final aIsAdmin = _group.admins.contains(a);
+      final bIsAdmin = _group.admins.contains(b);
+      
+      // Priority: Owner (0) > Admin (1) > Member (2)
+      int aPriority = aIsOwner ? 0 : (aIsAdmin ? 1 : 2);
+      int bPriority = bIsOwner ? 0 : (bIsAdmin ? 1 : 2);
+      
+      if (aPriority != bPriority) {
+        return aPriority - bPriority;
+      }
+      
+      // Same role: sort alphabetically by display name
+      final aName = (_memberDetails[a]?['displayName'] ?? _memberDetails[a]?['email'] ?? '').toString().toLowerCase();
+      final bName = (_memberDetails[b]?['displayName'] ?? _memberDetails[b]?['email'] ?? '').toString().toLowerCase();
+      return aName.compareTo(bName);
+    });
+    
+    return members;
+  }
+
+  Widget _buildTrailingActions(String memberId, bool isThisOwner, bool isThisAdmin, bool isCurrentUser) {
+    // Always return a fixed-width widget to ensure consistent alignment
+    const double trailingWidth = 40.0;
+    
+    // Can't edit yourself - return empty placeholder for alignment
+    if (isCurrentUser) {
+      return const SizedBox(width: trailingWidth);
+    }
     
     // Determine hierarchy: Owner > Admin > Member
     // canEditThis = true if current user has higher rank than target
@@ -76,13 +109,19 @@ class _MemberManagementState extends State<MemberManagement> {
     // Members see greyed out icon for higher roles
     if (!canManage) {
       // Show greyed out icon to indicate they can view but not manage
-      return const Icon(Icons.more_vert, color: Colors.grey);
+      return const SizedBox(
+        width: trailingWidth,
+        child: Icon(Icons.more_vert, color: Colors.grey),
+      );
     }
     
     // If user can't edit this target (e.g., admin looking at another admin)
     if (!canEditThis) {
       // Show greyed out icon
-      return const Icon(Icons.more_vert, color: Colors.grey);
+      return const SizedBox(
+        width: trailingWidth,
+        child: Icon(Icons.more_vert, color: Colors.grey),
+      );
     }
     
     return PopupMenuButton<String>(
@@ -363,67 +402,72 @@ class _MemberManagementState extends State<MemberManagement> {
             ),
             const Divider(),
             Expanded(
-              child: ListView.builder(
-                itemCount: _group.members.length,
-                itemBuilder: (context, index) {
-                  final memberId = _group.members[index];
-                  final member = _memberDetails[memberId];
-                  final name = member?['displayName'] ?? member?['email'] ?? 'Loading...';
-                  final email = member?['email'] ?? '';
-                  final isThisOwner = memberId == _group.ownerId;
-                  final isThisAdmin = _group.admins.contains(memberId);
-                  final isCurrentUser = memberId == widget.currentUserId;
+              child: Builder(
+                builder: (context) {
+                  final sortedMembers = _getSortedMembers();
+                  return ListView.builder(
+                    itemCount: sortedMembers.length,
+                    itemBuilder: (context, index) {
+                      final memberId = sortedMembers[index];
+                      final member = _memberDetails[memberId];
+                      final name = member?['displayName'] ?? member?['email'] ?? 'Loading...';
+                      final email = member?['email'] ?? '';
+                      final isThisOwner = memberId == _group.ownerId;
+                      final isThisAdmin = _group.admins.contains(memberId);
+                      final isCurrentUser = memberId == widget.currentUserId;
 
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: isThisOwner 
-                        ? Colors.amber[100] 
-                        : isThisAdmin 
-                          ? Colors.blue[100] 
-                          : Colors.grey[200],
-                      child: Icon(
-                        isThisOwner 
-                          ? Icons.star 
-                          : isThisAdmin 
-                            ? Icons.admin_panel_settings 
-                            : Icons.person,
-                        color: isThisOwner 
-                          ? Colors.amber[700] 
-                          : isThisAdmin 
-                            ? Colors.blue[700] 
-                            : Colors.grey[600],
-                      ),
-                    ),
-                    title: Row(
-                      children: [
-                        Expanded(child: Text(name, overflow: TextOverflow.ellipsis)),
-                        if (isCurrentUser)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green[100],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text('You', style: TextStyle(fontSize: 10, color: Colors.green)),
-                          ),
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (email.isNotEmpty) 
-                          Text(email, style: const TextStyle(fontSize: 12)),
-                        Text(
-                          isThisOwner ? 'Owner' : isThisAdmin ? 'Admin' : 'Member',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isThisOwner ? Colors.amber[700] : isThisAdmin ? Colors.blue : Colors.grey,
-                            fontWeight: FontWeight.bold,
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isThisOwner 
+                            ? Colors.amber[100] 
+                            : isThisAdmin 
+                              ? Colors.blue[100] 
+                              : Colors.grey[200],
+                          child: Icon(
+                            isThisOwner 
+                              ? Icons.star 
+                              : isThisAdmin 
+                                ? Icons.admin_panel_settings 
+                                : Icons.person,
+                            color: isThisOwner 
+                              ? Colors.amber[700] 
+                              : isThisAdmin 
+                                ? Colors.blue[700] 
+                                : Colors.grey[600],
                           ),
                         ),
-                      ],
-                    ),
-                    trailing: _buildTrailingActions(memberId, isThisOwner, isThisAdmin, isCurrentUser),
+                        title: Row(
+                          children: [
+                            Expanded(child: Text(name, overflow: TextOverflow.ellipsis)),
+                            if (isCurrentUser)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[100],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('You', style: TextStyle(fontSize: 10, color: Colors.green)),
+                              ),
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (email.isNotEmpty) 
+                              Text(email, style: const TextStyle(fontSize: 12)),
+                            Text(
+                              isThisOwner ? 'Owner' : isThisAdmin ? 'Admin' : 'Member',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isThisOwner ? Colors.amber[700] : isThisAdmin ? Colors.blue : Colors.grey,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        trailing: _buildTrailingActions(memberId, isThisOwner, isThisAdmin, isCurrentUser),
+                      );
+                    },
                   );
                 },
               ),

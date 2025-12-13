@@ -46,6 +46,47 @@ class _DetailModalState extends State<DetailModal> {
     _loadGroupNames();
   }
 
+  /// Deduplicates locations by userId - each user appears only once.
+  /// Priority: explicit location > default location > "No location selected"
+  /// Uses a "global" groupId for consolidated view.
+  List<UserLocation> _getDeduplicatedLocations() {
+    final Map<String, UserLocation> userLocationMap = {};
+    
+    for (final loc in widget.locations) {
+      final userId = loc.userId;
+      final existing = userLocationMap[userId];
+      
+      if (existing == null) {
+        // First occurrence - add it with 'global' groupId
+        userLocationMap[userId] = UserLocation(
+          userId: loc.userId,
+          groupId: 'global', // Use 'global' for consolidated view
+          date: loc.date,
+          nation: loc.nation,
+          state: loc.state,
+        );
+      } else {
+        // Already exists - prefer explicit location over "No location selected"
+        final isNewExplicit = loc.nation != "No location selected";
+        final isExistingNoLocation = existing.nation == "No location selected";
+        
+        if (isNewExplicit && isExistingNoLocation) {
+          // Replace with the explicit location
+          userLocationMap[userId] = UserLocation(
+            userId: loc.userId,
+            groupId: 'global',
+            date: loc.date,
+            nation: loc.nation,
+            state: loc.state,
+          );
+        }
+        // Otherwise keep existing (first explicit wins)
+      }
+    }
+    
+    return userLocationMap.values.toList();
+  }
+
   Future<void> _loadGroupNames() async {
     // Load group names for all groups in locations
     final groupIds = widget.locations.map((l) => l.groupId).toSet();
@@ -343,12 +384,18 @@ class _DetailModalState extends State<DetailModal> {
              const Divider(),
           ],
 
-          // Locations (Grouped)
+          // Locations (Grouped) - Deduplicated
           Expanded(
-            child: widget.locations.isEmpty 
-              ? const Center(child: Text("No member locations set."))
-              : GroupedListView<UserLocation, String>(
-                  elements: widget.locations,
+            child: Builder(
+              builder: (context) {
+                final deduplicatedLocations = _getDeduplicatedLocations();
+                
+                if (deduplicatedLocations.isEmpty) {
+                  return const Center(child: Text("No member locations set."));
+                }
+                
+                return GroupedListView<UserLocation, String>(
+                  elements: deduplicatedLocations,
                   groupBy: (element) {
                     // Current user always at top
                     if (element.userId == widget.currentUserId) {
@@ -358,8 +405,8 @@ class _DetailModalState extends State<DetailModal> {
                     if (_pinnedMembers.contains(element.userId)) {
                       return "___FAVORITES";
                     }
-                    // Then by group
-                    return element.groupId;
+                    // All other members
+                    return "___OTHER_MEMBERS";
                   },
                   groupComparator: (value1, value2) {
                     if (value1 == "___CURRENT_USER") return -1;
@@ -375,7 +422,7 @@ class _DetailModalState extends State<DetailModal> {
                         ? "You" 
                         : value == "___FAVORITES" 
                           ? "Favorites" 
-                          : _groupNames[value] ?? "Group",
+                          : "Members",
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
                     ),
                   ),
@@ -532,7 +579,9 @@ class _DetailModalState extends State<DetailModal> {
                       },
                     );
                   },
-                ),
+                );
+              },
+            ),
           ),
         ],
       ),

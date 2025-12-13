@@ -86,10 +86,20 @@ class _HomeCalendarState extends State<HomeCalendar> {
 
 
   // Helper to get users with explicit location entries (for avatar display)
+  // Deduplicated by userId - each user appears only once
   List<UserLocation> _getTravelersForDate(DateTime date) {
-    // Simply return explicit locations - if they manually set it, show avatar
-    return widget.locations.where((l) => 
+    final locationsForDate = widget.locations.where((l) => 
       l.date.year == date.year && l.date.month == date.month && l.date.day == date.day).toList();
+    
+    // Deduplicate by userId - keep only the first occurrence per user
+    final Map<String, UserLocation> uniqueUsers = {};
+    for (final loc in locationsForDate) {
+      if (!uniqueUsers.containsKey(loc.userId)) {
+        uniqueUsers[loc.userId] = loc;
+      }
+    }
+    
+    return uniqueUsers.values.toList();
   }
 
   // Helper to get birthdays for a date (both solar and lunar)

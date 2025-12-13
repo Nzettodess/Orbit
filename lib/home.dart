@@ -91,69 +91,78 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
   void _loadData() {
     if (_user == null) return;
     
-    // Listen to both user_locations and placeholder_locations, merge them
-    FirebaseFirestore.instance.collection('user_locations').snapshots().listen((userLocSnapshot) {
-      final userLocations = userLocSnapshot.docs.map((doc) => UserLocation.fromFirestore(doc.data())).toList();
-      
-      // Also listen to placeholder_member_locations
-      FirebaseFirestore.instance.collection('placeholder_member_locations').snapshots().listen((placeholderLocSnapshot) {
-        final placeholderLocations = placeholderLocSnapshot.docs.map((doc) {
-          final data = doc.data();
-          // Convert PlaceholderLocation to UserLocation for unified display
-          return UserLocation(
-            userId: data['placeholderMemberId'] ?? '',
-            groupId: data['groupId'] ?? 'global',
-            date: (data['date'] as Timestamp).toDate(),
-            nation: data['nation'] ?? '',
-            state: data['state'],
-          );
-        }).toList();
-        
-        setState(() {
-          _locations = [...userLocations, ...placeholderLocations];
-        });
-      });
-    });
-
-    // Listen to events
+    // Listen to events (global - not filtered by groups)
     FirebaseFirestore.instance.collection('events').snapshots().listen((snapshot) {
       setState(() {
         _events = snapshot.docs.map((doc) => GroupEvent.fromFirestore(doc)).toList();
       });
     });
 
-    // First, get current user's groups to filter by
+    // Get current user's groups to filter locations and users
     _firestoreService.getUserGroups(_user!.uid).listen((userGroups) {
       final myGroupIds = userGroups.map((g) => g.id).toSet();
       
-      // Build a map of userId -> groupId (user's first group)
-      // Note: if user is in multiple groups, they'll appear in each group's section
-      final userToGroupsMap = <String, List<String>>{};
+      // Build a set of all member IDs across all my groups (for filtering)
+      final myGroupMemberIds = <String>{};
       for (final group in userGroups) {
-        for (final memberId in group.members) {
-          userToGroupsMap.putIfAbsent(memberId, () => []);
-          userToGroupsMap[memberId]!.add(group.id);
-        }
+        myGroupMemberIds.addAll(group.members);
       }
       
-      final myGroupMemberIds = userToGroupsMap.keys.toSet();
+      // Listen to user_locations - filter to only my group members
+      FirebaseFirestore.instance.collection('user_locations').snapshots().listen((userLocSnapshot) {
+        final userLocations = userLocSnapshot.docs
+          .map((doc) => UserLocation.fromFirestore(doc.data()))
+          .where((loc) => myGroupMemberIds.contains(loc.userId)) // Filter by group members
+          .toList();
+        
+        // Also listen to placeholder_member_locations - filter to my groups
+        FirebaseFirestore.instance.collection('placeholder_member_locations').snapshots().listen((placeholderLocSnapshot) {
+          final placeholderLocations = placeholderLocSnapshot.docs
+            .map((doc) {
+              final data = doc.data();
+              return UserLocation(
+                userId: data['placeholderMemberId'] ?? '',
+                groupId: data['groupId'] ?? 'global',
+                date: (data['date'] as Timestamp).toDate(),
+                nation: data['nation'] ?? '',
+                state: data['state'],
+              );
+            })
+            .where((loc) => myGroupIds.contains(loc.groupId)) // Filter by my groups
+            .toList();
+          
+          setState(() {
+            _locations = [...userLocations, ...placeholderLocations];
+          });
+        });
+      });
       
       // Listen to all users but filter to only those in my groups
       FirebaseFirestore.instance.collection('users').snapshots().listen((snapshot) {
         final allUsers = snapshot.docs.map((doc) => doc.data()..['uid'] = doc.id).toList();
         
-        // Filter and assign groupId to users based on membership
-        // Create separate entries for each group a user belongs to
+        // Filter to only my group members and DEDUPLICATE by userId
+        // Each user should appear only once, not per-group
+        final userIdToGroupId = <String, String>{}; // First group the user is found in
+        for (final user in allUsers) {
+          final userId = user['uid'] as String;
+          if (myGroupMemberIds.contains(userId) && !userIdToGroupId.containsKey(userId)) {
+            // Use first group found for this user
+            final matchingGroups = userGroups.where((g) => g.members.contains(userId)).toList();
+            if (matchingGroups.isNotEmpty) {
+              userIdToGroupId[userId] = matchingGroups.first.id;
+            }
+          }
+        }
+        
+        // Create deduplicated user list with single groupId per user
         final filteredUsersWithGroups = <Map<String, dynamic>>[];
         for (final user in allUsers) {
           final userId = user['uid'] as String;
-          if (userToGroupsMap.containsKey(userId)) {
-            // Add user once for each group they belong to
-            for (final groupId in userToGroupsMap[userId]!) {
-              final userWithGroup = Map<String, dynamic>.from(user);
-              userWithGroup['groupId'] = groupId;
-              filteredUsersWithGroups.add(userWithGroup);
-            }
+          if (userIdToGroupId.containsKey(userId)) {
+            final userWithGroup = Map<String, dynamic>.from(user);
+            userWithGroup['groupId'] = userIdToGroupId[userId];
+            filteredUsersWithGroups.add(userWithGroup);
           }
         }
         
