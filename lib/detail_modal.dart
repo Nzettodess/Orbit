@@ -37,6 +37,7 @@ class _DetailModalState extends State<DetailModal> {
   Map<String, Map<String, dynamic>> _userDetails = {};
   Map<String, String> _groupNames = {}; // Map groupId -> groupName
   List<String> _pinnedMembers = [];
+  Set<String> _manageableMembers = {}; // Members the current user can edit (as admin/owner)
 
   @override
   void initState() {
@@ -44,11 +45,12 @@ class _DetailModalState extends State<DetailModal> {
     _loadUserDetails();
     _loadPinnedMembers();
     _loadGroupNames();
+    _loadManageableMembers();
   }
 
   /// Deduplicates locations by userId - each user appears only once.
   /// Priority: explicit location > default location > "No location selected"
-  /// Uses a "global" groupId for consolidated view.
+  /// Preserves original groupId for edit/delete operations.
   List<UserLocation> _getDeduplicatedLocations() {
     final Map<String, UserLocation> userLocationMap = {};
     
@@ -57,28 +59,16 @@ class _DetailModalState extends State<DetailModal> {
       final existing = userLocationMap[userId];
       
       if (existing == null) {
-        // First occurrence - add it with 'global' groupId
-        userLocationMap[userId] = UserLocation(
-          userId: loc.userId,
-          groupId: 'global', // Use 'global' for consolidated view
-          date: loc.date,
-          nation: loc.nation,
-          state: loc.state,
-        );
+        // First occurrence - keep with original groupId
+        userLocationMap[userId] = loc;
       } else {
         // Already exists - prefer explicit location over "No location selected"
         final isNewExplicit = loc.nation != "No location selected";
         final isExistingNoLocation = existing.nation == "No location selected";
         
         if (isNewExplicit && isExistingNoLocation) {
-          // Replace with the explicit location
-          userLocationMap[userId] = UserLocation(
-            userId: loc.userId,
-            groupId: 'global',
-            date: loc.date,
-            nation: loc.nation,
-            state: loc.state,
-          );
+          // Replace with the explicit location (keeps its original groupId)
+          userLocationMap[userId] = loc;
         }
         // Otherwise keep existing (first explicit wins)
       }
@@ -110,6 +100,41 @@ class _DetailModalState extends State<DetailModal> {
           _groupNames[groupId] = 'Group';
         });
       }
+    }
+  }
+
+  /// Load all members that the current user can manage (as owner or admin)
+  Future<void> _loadManageableMembers() async {
+    try {
+      // Get all groups where current user is owner or admin
+      final groupsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('members', arrayContains: widget.currentUserId)
+          .get();
+      
+      final manageableMembers = <String>{};
+      
+      for (final doc in groupsSnapshot.docs) {
+        final data = doc.data();
+        final ownerId = data['ownerId'] as String?;
+        final admins = List<String>.from(data['admins'] ?? []);
+        
+        // Check if current user is owner or admin of this group
+        if (ownerId == widget.currentUserId || admins.contains(widget.currentUserId)) {
+          // Add all members of this group to manageable set
+          final members = List<String>.from(data['members'] ?? []);
+          manageableMembers.addAll(members);
+        }
+      }
+      
+      // Remove current user from manageable set (can't manage yourself via this)
+      manageableMembers.remove(widget.currentUserId);
+      
+      setState(() {
+        _manageableMembers = manageableMembers;
+      });
+    } catch (e) {
+      print('Error loading manageable members: $e');
     }
   }
 
@@ -226,6 +251,51 @@ class _DetailModalState extends State<DetailModal> {
     );
     if (result == true && mounted) {
       Navigator.pop(context); // Refresh detail modal
+    }
+  }
+
+  // Delete placeholder member location
+  Future<void> _deletePlaceholderLocation(UserLocation element) async {
+    // Check if placeholder has a default location
+    final placeholderDoc = await FirebaseFirestore.instance
+        .collection('placeholder_members')
+        .doc(element.userId)
+        .get();
+    final defaultLocation = placeholderDoc.data()?['defaultLocation'] as String?;
+    final hasDefaultLocation = defaultLocation != null && defaultLocation.isNotEmpty;
+    final placeholderName = placeholderDoc.data()?['displayName'] ?? 'this placeholder';
+    
+    if (!mounted) return;
+    
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Location?'),
+        content: Text(hasDefaultLocation
+          ? 'This will revert $placeholderName\'s location to their default ($defaultLocation) for this date.'
+          : 'This will remove $placeholderName\'s location for this date (no default location set).'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm == true) {
+      final dateStr = "${widget.date.year}${widget.date.month.toString().padLeft(2, '0')}${widget.date.day.toString().padLeft(2, '0')}";
+      // Note: placeholder_member_locations docId does NOT include groupId (unlike user_locations)
+      final docId = "${element.userId}_$dateStr";
+      
+      // Always delete the document - app will fall back to default from placeholder profile
+      await FirebaseFirestore.instance.collection('placeholder_member_locations').doc(docId).delete();
+      
+      if (mounted) Navigator.pop(context); // Refresh
     }
   }
 
@@ -405,8 +475,8 @@ class _DetailModalState extends State<DetailModal> {
                     if (_pinnedMembers.contains(element.userId)) {
                       return "___FAVORITES";
                     }
-                    // All other members
-                    return "___OTHER_MEMBERS";
+                    // Group by actual group name
+                    return element.groupId;
                   },
                   groupComparator: (value1, value2) {
                     if (value1 == "___CURRENT_USER") return -1;
@@ -422,7 +492,7 @@ class _DetailModalState extends State<DetailModal> {
                         ? "You" 
                         : value == "___FAVORITES" 
                           ? "Favorites" 
-                          : "Members",
+                          : (_groupNames[value] ?? value),
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
                     ),
                   ),
@@ -461,112 +531,146 @@ class _DetailModalState extends State<DetailModal> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               // Edit for placeholder members (owner/admin only)
-                              if (isPlaceholder && canEditPlaceholder)
+                              if (isPlaceholder && canEditPlaceholder) ...[
                                 IconButton(
                                   icon: const Icon(Icons.edit, size: 20, color: Colors.blue),
                                   onPressed: () => _editPlaceholderLocation(element),
                                   tooltip: 'Edit Placeholder Location',
                                 ),
-                              // Edit/Delete for own location
-                              if (isCurrentUser) ...[
-                            IconButton(
-                              icon: const Icon(Icons.edit, size: 20),
-                              onPressed: () async {
-                                // Fetch user's default location for pre-population
-                                final userDoc = await FirebaseFirestore.instance
-                                    .collection('users')
-                                    .doc(widget.currentUserId)
-                                    .get();
-                                final defaultLocation = userDoc.data()?['defaultLocation'] as String?;
-                                
-                                // Helper function to remove emoji flags
-                                String stripEmojis(String text) {
-                                  return text.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F', unicode: true), '').trim();
-                                }
-                                
-                                String? defaultCountry;
-                                String? defaultState;
-                                
-                                if (defaultLocation != null && defaultLocation.isNotEmpty) {
-                                  final parts = defaultLocation.split(',');
-                                  if (parts.length == 2) {
-                                    // Format: "🇲🇾 Country, State"
-                                    defaultCountry = stripEmojis(parts[0].trim());  // First part is COUNTRY
-                                    defaultState = stripEmojis(parts[1].trim());     // Second part is STATE
-                                  } else {
-                                    defaultCountry = stripEmojis(parts[0].trim());
-                                  }
-                                }
-                                
-                                if (!mounted) return;
-                                
-                                // Show location picker to edit
-                                final result = await showDialog(
-                                  context: context,
-                                  builder: (_) => Dialog(
-                                    child: Container(
-                                      constraints: const BoxConstraints(maxWidth: 500),
-                                      child: LocationPicker(
-                                        currentUserId: widget.currentUserId,
-                                        defaultCountry: defaultCountry ?? element.nation,
-                                        defaultState: defaultState ?? element.state,
-                                        initialStartDate: widget.date,
-                                        initialEndDate: widget.date, // Default to single day
-                                        onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
-                                          // Save the updated location for date range
-                                          await _firestoreService.setLocationRange(
-                                            widget.currentUserId,
-                                            element.groupId,
-                                            startDate,
-                                            endDate,
-                                            country,
-                                            state,
-                                          );
-                                          Navigator.pop(context, true); // Return true to indicate success
-                                        },
-                                      ),
-                                    ),
+                                // Delete for placeholder members (only when location is set)
+                                if (element.nation != "No location selected")
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                                    onPressed: () => _deletePlaceholderLocation(element),
+                                    tooltip: 'Delete Placeholder Location',
                                   ),
-                                );
-                                if (result == true && mounted) {
-                                  Navigator.pop(context); // Refresh detail modal
-                                }
-                              },
-                              tooltip: 'Edit Location',
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                              onPressed: () async {
-                                // Delete location - reverts to default
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text('Delete Location?'),
-                                    content: const Text('This will revert to your default location for this date.'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
-                                        child: const Text('Cancel'),
+                              ],
+                              // Edit for own location OR manageable members (always available)
+                              if (isCurrentUser || _manageableMembers.contains(element.userId))
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 20),
+                                  onPressed: () async {
+                                    // Target user for editing
+                                    final targetUserId = element.userId;
+                                    
+                                    // Fetch target user's default location for pre-population
+                                    final userDoc = await FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(targetUserId)
+                                        .get();
+                                    final defaultLocation = userDoc.data()?['defaultLocation'] as String?;
+                                    
+                                    // Helper function to remove emoji flags
+                                    String stripEmojis(String text) {
+                                      return text.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F', unicode: true), '').trim();
+                                    }
+                                    
+                                    String? defaultCountry;
+                                    String? defaultState;
+                                    
+                                    if (defaultLocation != null && defaultLocation.isNotEmpty) {
+                                      final parts = defaultLocation.split(',');
+                                      if (parts.length == 2) {
+                                        // Format: "🇲🇾 Country, State"
+                                        defaultCountry = stripEmojis(parts[0].trim());  // First part is COUNTRY
+                                        defaultState = stripEmojis(parts[1].trim());     // Second part is STATE
+                                      } else {
+                                        defaultCountry = stripEmojis(parts[0].trim());
+                                      }
+                                    }
+                                    
+                                    if (!mounted) return;
+                                    
+                                    // Show location picker to edit
+                                    final result = await showDialog(
+                                      context: context,
+                                      builder: (_) => Dialog(
+                                        child: Container(
+                                          constraints: const BoxConstraints(maxWidth: 500),
+                                          child: LocationPicker(
+                                            currentUserId: widget.currentUserId,
+                                            defaultCountry: defaultCountry ?? element.nation,
+                                            defaultState: defaultState ?? element.state,
+                                            initialStartDate: widget.date,
+                                            initialEndDate: widget.date, // Default to single day
+                                            onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
+                                              // Save the updated location for the target user
+                                              await _firestoreService.setLocationRange(
+                                                targetUserId,
+                                                element.groupId,
+                                                startDate,
+                                                endDate,
+                                                country,
+                                                state,
+                                              );
+                                              Navigator.pop(context, true); // Return true to indicate success
+                                            },
+                                          ),
+                                        ),
                                       ),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, true),
-                                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                    );
+                                    if (result == true && mounted) {
+                                      Navigator.pop(context); // Refresh detail modal
+                                    }
+                                  },
+                                  tooltip: isCurrentUser ? 'Edit Location' : 'Edit Member Location',
+                                ),
+                              // Delete only shows when there's an actual location (not "No location selected")
+                              if ((isCurrentUser || _manageableMembers.contains(element.userId)) && 
+                                  element.nation != "No location selected")
+                                IconButton(
+                                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                                  onPressed: () async {
+                                    final targetUserId = element.userId;
+                                    final targetName = _userDetails[targetUserId]?['displayName'] ?? 'this member';
+                                    
+                                    // Check if target user has a default location
+                                    final userDoc = await FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(targetUserId)
+                                        .get();
+                                    final defaultLocation = userDoc.data()?['defaultLocation'] as String?;
+                                    final hasDefaultLocation = defaultLocation != null && defaultLocation.isNotEmpty;
+                                    
+                                    if (!mounted) return;
+                                    
+                                    // Delete location - reverts to default or removes entirely
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        title: const Text('Delete Location?'),
+                                        content: Text(hasDefaultLocation
+                                          ? (isCurrentUser 
+                                              ? 'This will revert to your default location ($defaultLocation) for this date.'
+                                              : 'This will revert $targetName\'s location to their default ($defaultLocation) for this date.')
+                                          : (isCurrentUser
+                                              ? 'This will remove your location for this date (no default location set).'
+                                              : 'This will remove $targetName\'s location for this date (no default location set).')),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, true),
+                                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                );
-                                
-                                if (confirm == true) {
-                                  // Delete from Firestore
-                                  final dateStr = "${widget.date.year}${widget.date.month.toString().padLeft(2, '0')}${widget.date.day.toString().padLeft(2, '0')}";
-                                  final docId = "${element.userId}_${element.groupId}_$dateStr";
-                                  await FirebaseFirestore.instance.collection('user_locations').doc(docId).delete();
-                                  if (mounted) Navigator.pop(context); // Refresh
-                                }
-                              },
-                              tooltip: 'Delete (Revert to Default)',
-                            ),
-                          ],
+                                    );
+                                    
+                                    if (confirm == true) {
+                                      final dateStr = "${widget.date.year}${widget.date.month.toString().padLeft(2, '0')}${widget.date.day.toString().padLeft(2, '0')}";
+                                      final docId = "${targetUserId}_${element.groupId}_$dateStr";
+                                      
+                                      // Always delete the document - app will fall back to default from user profile
+                                      await FirebaseFirestore.instance.collection('user_locations').doc(docId).delete();
+                                      
+                                      if (mounted) Navigator.pop(context); // Refresh
+                                    }
+                                  },
+                                  tooltip: isCurrentUser ? 'Delete (Revert to Default)' : 'Delete Member Location',
+                                ),
                           // Pin button for all users
                           IconButton(
                             icon: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined),
