@@ -156,9 +156,9 @@ service cloud.firestore {
       allow update: if isAuthenticated() && 
                        isGroupAdmin(resource.data.groupId);
       
-      // Only Owner can delete
+      // Owner or Admin can delete (Admin needs this to approve inheritance)
       allow delete: if isAuthenticated() && 
-                       isGroupOwner(resource.data.groupId);
+                       isGroupAdmin(resource.data.groupId);
     }
     
     // ============================================
@@ -200,9 +200,12 @@ service cloud.firestore {
                        request.resource.data.requesterId == userId() &&
                        !isGroupOwner(request.resource.data.groupId);
       
-      // Only Owner can approve/reject (update status)
+      // Owner or Admin can approve/reject (update status), but NOT their own request
+      // Owner can approve any request except their own (though owner shouldn't have requests)
+      // Admin can approve any request except their own
       allow update: if isAuthenticated() && 
-                       isGroupOwner(resource.data.groupId);
+                       isGroupAdmin(resource.data.groupId) &&
+                       resource.data.requesterId != userId();
       
       // Requester or Owner can delete
       allow delete: if isAuthenticated() && (

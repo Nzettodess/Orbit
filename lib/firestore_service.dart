@@ -444,10 +444,18 @@ class FirestoreService {
 
   /// Delete placeholder member and all related data
   Future<void> deletePlaceholderMember(String memberId) async {
-    // Delete all locations for this placeholder
+    // First, get the placeholder member to know its groupId (needed for security rules)
+    final placeholderDoc = await _db.collection('placeholder_members').doc(memberId).get();
+    if (!placeholderDoc.exists) {
+      throw Exception('Placeholder member not found');
+    }
+    final groupId = placeholderDoc.data()!['groupId'] as String;
+    
+    // Delete all locations for this placeholder (groupId filter helps security rules)
     final locationsSnapshot = await _db
         .collection('placeholder_member_locations')
         .where('placeholderMemberId', isEqualTo: memberId)
+        .where('groupId', isEqualTo: groupId)
         .get();
     
     final batch = _db.batch();
@@ -455,10 +463,11 @@ class FirestoreService {
       batch.delete(doc.reference);
     }
     
-    // Cancel any pending inheritance requests
+    // Cancel any pending inheritance requests (groupId filter required for security rules)
     final requestsSnapshot = await _db
         .collection('inheritance_requests')
         .where('placeholderMemberId', isEqualTo: memberId)
+        .where('groupId', isEqualTo: groupId)
         .where('status', isEqualTo: 'pending')
         .get();
     
@@ -614,6 +623,19 @@ class FirestoreService {
             .toList());
   }
 
+  /// Get pending inheritance requests for a specific user (member view)
+  Stream<List<InheritanceRequest>> getMyPendingInheritanceRequests(String groupId, String userId) {
+    return _db
+        .collection('inheritance_requests')
+        .where('groupId', isEqualTo: groupId)
+        .where('requesterId', isEqualTo: userId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => InheritanceRequest.fromFirestore(doc))
+            .toList());
+  }
+
   /// Process an inheritance request (approve or reject)
   Future<void> processInheritanceRequest(
     String requestId,
@@ -648,6 +670,7 @@ class FirestoreService {
       final otherRequests = await _db
           .collection('inheritance_requests')
           .where('placeholderMemberId', isEqualTo: request.placeholderMemberId)
+          .where('groupId', isEqualTo: request.groupId)
           .where('status', isEqualTo: 'pending')
           .get();
       
@@ -696,6 +719,7 @@ class FirestoreService {
     final locationsSnapshot = await _db
         .collection('placeholder_member_locations')
         .where('placeholderMemberId', isEqualTo: placeholderMemberId)
+        .where('groupId', isEqualTo: groupId)
         .get();
     
     final batch = _db.batch();

@@ -384,7 +384,7 @@ class _MemberManagementState extends State<MemberManagement> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Manage Members - ${_group.name}',
+                    'Members - ${_group.name}',
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis,
                   ),

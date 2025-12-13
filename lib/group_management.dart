@@ -214,8 +214,6 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                     itemCount: groups.length,
                     itemBuilder: (context, index) {
                       final group = groups[index];
-                      final isOwner = group.ownerId == _user!.uid;
-                      final isAdmin = group.admins.contains(_user!.uid);
                       return ListTile(
                         title: Text(group.name),
                         subtitle: Row(
@@ -243,22 +241,21 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Placeholder members button (owner/admin)
-                            if (isOwner || isAdmin)
-                              IconButton(
-                                icon: const Icon(Icons.person_outline, color: Colors.blue),
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (_) => PlaceholderMemberManagement(
-                                      group: group,
-                                      currentUserId: _user!.uid,
-                                    ),
-                                  );
-                                },
-                                tooltip: 'Manage Placeholders',
-                              ),
-                            // Manage Members button (all roles can view)
+                            // Placeholder members button (all members can access)
+                            IconButton(
+                              icon: const Icon(Icons.person_outline, color: Colors.blue),
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => PlaceholderMemberManagement(
+                                    group: group,
+                                    currentUserId: _user!.uid,
+                                  ),
+                                );
+                              },
+                              tooltip: 'Placeholder Members',
+                            ),
+                            // Members button (all roles can view)
                             IconButton(
                               icon: const Icon(Icons.group, color: Colors.green),
                               onPressed: () {
@@ -270,7 +267,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                                   ),
                                 );
                               },
-                              tooltip: 'Manage Members',
+                              tooltip: 'Members',
                             ),
                             IconButton(
                               icon: const Icon(Icons.exit_to_app, color: Colors.red),

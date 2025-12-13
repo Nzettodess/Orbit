@@ -113,11 +113,9 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
               ),
             ),
             
-            // Pending Requests Section (Owner/Admin only)
-            if (canEdit) ...[
-              const Divider(),
-              _buildPendingRequestsSection(),
-            ],
+            // Pending Requests Section (visible to all members)
+            const Divider(),
+            _buildPendingRequestsSection(),
             
             // Create Button (Owner only)
             if (canCreate) ...[
@@ -194,8 +192,15 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
   }
 
   Widget _buildPendingRequestsSection() {
+    // Use different queries based on role:
+    // - Owners/Admins: query all pending requests for the group
+    // - Regular members: query only their own requests (required by Firestore security rules)
+    final stream = canEdit
+        ? _firestoreService.getPendingInheritanceRequests(widget.group.id)
+        : _firestoreService.getMyPendingInheritanceRequests(widget.group.id, widget.currentUserId);
+    
     return StreamBuilder<List<InheritanceRequest>>(
-      stream: _firestoreService.getPendingInheritanceRequests(widget.group.id),
+      stream: stream,
       builder: (context, snapshot) {
         final requests = snapshot.data ?? [];
         
@@ -206,9 +211,9 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Pending Inheritance Requests",
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+            Text(
+              canEdit ? "Pending Inheritance Requests" : "Your Pending Requests",
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
             ),
             const SizedBox(height: 8),
             ...requests.map((request) => _buildRequestTile(request)),
@@ -219,6 +224,9 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
   }
 
   Widget _buildRequestTile(InheritanceRequest request) {
+    // Check if this is the current user's own request
+    final isOwnRequest = request.requesterId == widget.currentUserId;
+    
     return FutureBuilder<List<dynamic>>(
       future: Future.wait([
         FirebaseFirestore.instance.collection('users').doc(request.requesterId).get(),
@@ -239,28 +247,95 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
           child: ListTile(
             dense: true,
             title: Text(
-              "$requesterName wants to inherit $placeholderName",
+              isOwnRequest 
+                  ? "Your request to inherit $placeholderName"
+                  : "$requesterName wants to inherit $placeholderName",
               style: const TextStyle(fontSize: 13),
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.check, color: Colors.green, size: 20),
-                  onPressed: () => _processRequest(request, true),
-                  tooltip: 'Approve',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red, size: 20),
-                  onPressed: () => _processRequest(request, false),
-                  tooltip: 'Reject',
-                ),
-              ],
-            ),
+            trailing: isOwnRequest
+                // Own request - show pending indicator and cancel button
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Chip(
+                        label: Text('Pending', style: TextStyle(fontSize: 10)),
+                        backgroundColor: Colors.orange,
+                        labelStyle: TextStyle(color: Colors.white),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(Icons.cancel, color: Colors.red, size: 20),
+                        onPressed: () => _cancelRequest(request, placeholderName),
+                        tooltip: 'Cancel Request',
+                      ),
+                    ],
+                  )
+                // Other's request - show approve/reject buttons
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.check, color: Colors.green, size: 20),
+                        onPressed: () => _processRequest(request, true),
+                        tooltip: 'Approve',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red, size: 20),
+                        onPressed: () => _processRequest(request, false),
+                        tooltip: 'Reject',
+                      ),
+                    ],
+                  ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _cancelRequest(InheritanceRequest request, String placeholderName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Cancel Request?"),
+        content: Text("Are you sure you want to cancel your request to inherit $placeholderName?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("No"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Yes, Cancel", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('inheritance_requests')
+            .doc(request.id)
+            .delete();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Request cancelled")),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Failed to cancel: ${e.toString()}"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _showCreateDialog() {
@@ -586,11 +661,22 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
     );
 
     if (confirm == true) {
-      await _firestoreService.deletePlaceholderMember(placeholder.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Placeholder deleted")),
-        );
+      try {
+        await _firestoreService.deletePlaceholderMember(placeholder.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Placeholder deleted")),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Failed to delete: ${e.toString()}"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
