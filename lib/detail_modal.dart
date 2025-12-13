@@ -309,11 +309,11 @@ class _DetailModalState extends State<DetailModal> {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      height: MediaQuery.of(context).size.height * 0.8,
-      child: SingleChildScrollView(
-        child: Column(
+      height: MediaQuery.of(context).size.height * 0.9,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Sticky Header Section
           Text(
             "Details for ${widget.date.toLocal().toString().split(' ')[0]}",
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -338,8 +338,16 @@ class _DetailModalState extends State<DetailModal> {
               return const SizedBox.shrink();
             },
           ),
-          
           const SizedBox(height: 10),
+          
+          // Scrollable Content
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+
+
           
           // Holidays
           if (widget.holidays.isNotEmpty) ...[
@@ -382,9 +390,51 @@ class _DetailModalState extends State<DetailModal> {
                children: widget.events.map((e) {
                final isOwner = e.creatorId == widget.currentUserId;
                return ListTile(
+                 onTap: () {
+                   showDialog(
+                     context: context,
+                     builder: (context) => AlertDialog(
+                       title: Text(e.title),
+                       content: SingleChildScrollView(
+                         child: Column(
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           mainAxisSize: MainAxisSize.min,
+                           children: [
+                             if (e.hasTime)
+                               Text("Time: ${DateFormat('HH:mm').format(e.date)}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                             const SizedBox(height: 8),
+                             if (e.venue != null && e.venue!.isNotEmpty) ...[
+                               Text("Venue: ${e.venue}", style: const TextStyle(fontStyle: FontStyle.italic)),
+                               const SizedBox(height: 8),
+                             ],
+                             if (e.description.isNotEmpty)
+                               Text(e.description),
+                             const SizedBox(height: 16),
+                             FutureBuilder<DocumentSnapshot>(
+                               future: FirebaseFirestore.instance.collection('users').doc(e.creatorId).get(),
+                               builder: (context, snapshot) {
+                                 if (snapshot.hasData) {
+                                    final data = snapshot.data!.data() as Map<String, dynamic>?;
+                                    return Text("Owner: ${data?['displayName'] ?? 'Unknown'}", style: const TextStyle(fontSize: 12, color: Colors.grey));
+                                 }
+                                 return const SizedBox.shrink();
+                               },
+                             ),
+                           ],
+                         ),
+                       ),
+                       actions: [
+                         TextButton(
+                           onPressed: () => Navigator.pop(context),
+                           child: const Text('Close'),
+                         ),
+                       ],
+                     ),
+                   );
+                 },
                  leading: const Icon(Icons.event, color: Colors.blue),
                  title: Text(
-                   "${e.title} (${e.hasTime ? DateFormat('yyyy-MM-dd HH:mm').format(e.date) : DateFormat('yyyy-MM-dd').format(e.date)})",
+                   e.title,
                    maxLines: 1,
                    overflow: TextOverflow.ellipsis,
                    style: const TextStyle(fontWeight: FontWeight.bold),
@@ -713,20 +763,25 @@ class _DetailModalState extends State<DetailModal> {
                             color: isPinned ? Colors.blue : Colors.grey,
                             onPressed: () => _togglePin(element.userId),
                           ),
+
                         ],
                       ),
                     );
-                      },
-                    );
                   },
-
+                );
+              },
             );
-          }),
+          },
+        ),
         ],
       ),
       ),
+      ),
+        ],
+      ),
     );
   }
+
 
   void _showUserProfileDialog(UserLocation location, Map<String, dynamic>? userData) async {
     final isPlaceholder = location.userId.startsWith('placeholder_');
