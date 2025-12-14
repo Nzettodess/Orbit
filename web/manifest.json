@@ -1,11 +1,11 @@
 {
-    "name": "whereabouts",
-    "short_name": "whereabouts",
+    "name": "Orbit",
+    "short_name": "Orbit",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#673AB7",
+    "theme_color": "#673AB7",
+    "description": "Keep your world in sync. A location and calendar coordination app for groups.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
