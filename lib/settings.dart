@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'theme.dart';
 
 class SettingsDialog extends StatefulWidget {
   final String currentUserId;
@@ -14,6 +15,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   List<String> _holidayCountries = [];
   List<String> _religiousCalendars = [];
   String _tileCalendarDisplay = 'none'; // none, chinese, islamic
+  String _themeMode = 'system'; // system, light, dark
   
   // Privacy settings - who can edit my data
   bool _blockAllAdminEdits = false;
@@ -112,7 +114,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
         } else {
           _tileCalendarDisplay = 'none';
         }
-        
+
+        // Load theme mode
+        final theme = data?['themeMode'];
+        if (theme != null && theme is String) {
+          _themeMode = theme;
+        } else {
+          _themeMode = 'system';
+        }
+
         // Load privacy settings
         final privacy = data?['privacySettings'] as Map<String, dynamic>?;
         if (privacy != null) {
@@ -127,21 +137,31 @@ class _SettingsDialogState extends State<SettingsDialog> {
   }
 
   Future<void> _saveSettings() async {
-    await FirebaseFirestore.instance.collection('users').doc(widget.currentUserId).update({
-      'additionalHolidayCountry': _holidayCountries.isNotEmpty ? _holidayCountries[0] : null,
-      'religiousCalendars': _religiousCalendars,
-      'tileCalendarDisplay': _tileCalendarDisplay,
-      'privacySettings': {
-        'blockDefaultLocation': _blockDefaultLocation,
-        'blockLocationDate': _blockLocationDate,
-        'blockBirthday': _blockBirthday,
-        'blockLunarBirthday': _blockLunarBirthday,
-      },
-    });
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Settings Saved")));
-      Navigator.pop(context);
+    print('[Settings] Saving themeMode: $_themeMode');
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(widget.currentUserId).set({
+        'additionalHolidayCountry': _holidayCountries.isNotEmpty ? _holidayCountries[0] : null,
+        'religiousCalendars': _religiousCalendars,
+        'tileCalendarDisplay': _tileCalendarDisplay,
+        'themeMode': _themeMode,
+        'privacySettings': {
+          'blockDefaultLocation': _blockDefaultLocation,
+          'blockLocationDate': _blockLocationDate,
+          'blockBirthday': _blockBirthday,
+          'blockLunarBirthday': _blockLunarBirthday,
+        },
+      }, SetOptions(merge: true));
+      
+      print('[Settings] Save successful');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Settings Saved")));
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      print('[Settings] Save failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error saving settings: $e")));
+      }
     }
   }
 
@@ -273,6 +293,29 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
                     const SizedBox(height: 20),
                     
+                    DropdownButtonFormField<String>(
+                      value: _themeMode,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        labelText: "App Theme",
+                        prefixIcon: Icon(Icons.brightness_6),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'system', child: Text('System Default')),
+                        DropdownMenuItem(value: 'light', child: Text('Light Mode')),
+                        DropdownMenuItem(value: 'dark', child: Text('Dark Mode')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            _themeMode = value;
+                          });
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
                     // Calendar Tile Display Setting
                     const Text("Calendar Tile Display", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 5),
@@ -405,6 +448,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _saveSettings,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.getButtonBackground(context),
+                          foregroundColor: Colors.white,
+                        ),
                         child: const Text("Save Settings"),
                       ),
                     ),

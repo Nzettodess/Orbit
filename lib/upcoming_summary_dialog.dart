@@ -57,7 +57,7 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
             Container(
               padding: const EdgeInsets.all(20.0),
               decoration: BoxDecoration(
-                color: Colors.deepPurple.shade50,
+                color: Theme.of(context).colorScheme.primaryContainer,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20),
                   topRight: Radius.circular(20),
@@ -68,14 +68,14 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.event_note, color: Colors.deepPurple.shade700),
+                      Icon(Icons.event_note, color: Theme.of(context).colorScheme.onSurface),
                       const SizedBox(width: 8),
                       Text(
                         "Upcoming",
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple.shade700,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -145,7 +145,7 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: isSelected ? Colors.white : Colors.grey.shade600),
+          Icon(icon, size: 16, color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface),
           const SizedBox(width: 4),
           Text(label),
         ],
@@ -157,8 +157,10 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
         });
       },
       selectedColor: Colors.deepPurple,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+      side: BorderSide(color: Theme.of(context).dividerColor),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.black87,
+        color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
       ),
       checkmarkColor: Colors.white,
@@ -171,13 +173,13 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.event_available, size: 64, color: Colors.grey.shade300),
+          Icon(Icons.event_available, size: 64, color: Theme.of(context).hintColor),
           const SizedBox(height: 16),
           Text(
             'No upcoming items',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey.shade600,
+              color: Theme.of(context).hintColor,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -187,7 +189,7 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade400,
+              color: Theme.of(context).hintColor,
             ),
           ),
         ],
@@ -218,20 +220,20 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
     final dateFormatted = DateFormat('MMM d').format(date);
     
     return Container(
-      color: Colors.grey.shade50,
+      color: Theme.of(context).colorScheme.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: itemDate == today ? Colors.deepPurple : Colors.deepPurple.shade100,
+              color: itemDate == today ? Theme.of(context).primaryColor : Theme.of(context).primaryColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               dateFormatted,
               style: TextStyle(
-                color: itemDate == today ? Colors.white : Colors.deepPurple.shade700,
+                color: itemDate == today ? Colors.white : Theme.of(context).primaryColor,
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
               ),
@@ -242,7 +244,7 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
             dateLabel,
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
             ),
           ),
@@ -250,14 +252,14 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -271,36 +273,39 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
     Color iconColor;
     Color bgColor;
     
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     switch (item.type) {
       case UpcomingItemType.event:
         icon = Icons.celebration;
-        iconColor = Colors.orange.shade700;
-        bgColor = Colors.orange.shade50;
+        iconColor = isDark ? Colors.orange.shade300 : Colors.orange.shade700;
+        bgColor = isDark ? Colors.orange.withOpacity(0.2) : Colors.orange.shade50;
         break;
       case UpcomingItemType.locationChange:
         icon = Icons.location_on;
-        iconColor = Colors.blue.shade700;
-        bgColor = Colors.blue.shade50;
+        iconColor = isDark ? Colors.blue.shade300 : Colors.blue.shade700;
+        bgColor = isDark ? Colors.blue.withOpacity(0.2) : Colors.blue.shade50;
         break;
       case UpcomingItemType.birthday:
         icon = Icons.cake;
-        iconColor = Colors.pink.shade700;
-        bgColor = Colors.pink.shade50;
+        iconColor = isDark ? Colors.pink.shade300 : Colors.pink.shade700;
+        bgColor = isDark ? Colors.pink.withOpacity(0.2) : Colors.pink.shade50;
         break;
       case UpcomingItemType.lunarBirthday:
         icon = Icons.nightlight_round;
-        iconColor = Colors.purple.shade700;
-        bgColor = Colors.purple.shade50;
+        iconColor = isDark ? Colors.purple.shade300 : Colors.purple.shade700;
+        bgColor = isDark ? Colors.purple.withOpacity(0.2) : Colors.purple.shade50;
         break;
     }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Card(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.grey.shade200),
+          side: BorderSide(color: Theme.of(context).dividerColor),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -337,7 +342,7 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
                         Text(
                           item.subtitle!,
                           style: TextStyle(
-                            color: Colors.grey.shade600,
+                            color: Theme.of(context).hintColor,
                             fontSize: 12,
                           ),
                           maxLines: 1,
@@ -482,14 +487,14 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.deepPurple.shade50,
+          color: Theme.of(context).colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           groupNames.first,
           style: TextStyle(
             fontSize: 11,
-            color: Colors.deepPurple.shade700,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
             fontWeight: FontWeight.w500,
           ),
         ),

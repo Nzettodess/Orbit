@@ -180,15 +180,19 @@ class _HomeCalendarState extends State<HomeCalendar> {
           final displayItems = allItems.take(maxBars).toList();
           final remainingCount = allItems.length - maxBars;
 
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          
           return Container(
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.withOpacity(0.1)),
+              border: Border.all(color: isDarkMode ? Colors.white10 : Colors.grey.withOpacity(0.1)),
               color: isToday 
-                ? Colors.deepPurple.withOpacity(0.2) 
-                : (isCurrentMonth ? null : Colors.grey[50]),
+                ? Theme.of(context).colorScheme.primary.withOpacity(isDarkMode ? 0.35 : 0.2) // Higher opacity in dark mode for vibrancy
+                : (isCurrentMonth 
+                    ? Theme.of(context).colorScheme.surface 
+                    : (isDarkMode ? Colors.grey.shade900 : Colors.grey[50])),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(1.0), // Reduced padding for overflow fix
+              padding: const EdgeInsets.all(1.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,8 +205,10 @@ class _HomeCalendarState extends State<HomeCalendar> {
                           fontWeight: FontWeight.bold, 
                           fontSize: 14,
                           color: isToday 
-                            ? Colors.deepPurple 
-                            : (isCurrentMonth ? Colors.black87 : Colors.grey)
+                            ? Theme.of(context).colorScheme.primary 
+                            : (isCurrentMonth 
+                                ? Theme.of(context).colorScheme.onSurface 
+                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.4))
                         )),
                       if (religiousDates.isNotEmpty)
                         Expanded(
@@ -210,7 +216,9 @@ class _HomeCalendarState extends State<HomeCalendar> {
                             religiousDates.join(' '),
                             style: TextStyle(
                               fontSize: 9, 
-                              color: isCurrentMonth ? Colors.black54 : Colors.grey, 
+                              color: isCurrentMonth 
+                                ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
+                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.3), 
                               fontWeight: FontWeight.w500
                             ),
                             maxLines: 1,

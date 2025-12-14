@@ -8,6 +8,10 @@ import 'models/join_request.dart';
 import 'models/placeholder_member.dart';
 import 'placeholder_member_management.dart';
 import 'member_management.dart';
+import 'theme.dart';
+import 'models/placeholder_member.dart';
+import 'placeholder_member_management.dart';
+import 'member_management.dart';
 
 class GroupManagementDialog extends StatefulWidget {
   const GroupManagementDialog({super.key});
@@ -389,19 +393,19 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
-                    color: Colors.orange[50],
+                    color: AppColors.getPendingBg(context),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange[200]!),
+                    border: Border.all(color: AppColors.getPendingBorder(context)),
                   ),
                   child: ExpansionTile(
                     initiallyExpanded: true,
                     tilePadding: const EdgeInsets.symmetric(horizontal: 12),
                     shape: const Border(),
                     collapsedShape: const Border(),
-                    leading: const Icon(Icons.hourglass_empty, size: 18, color: Colors.orange),
+                    leading: Icon(Icons.hourglass_empty, size: 18, color: AppColors.getPendingAccent(context)),
                     title: Text(
                       "Pending Requests (${pendingRequests.length})",
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange[700]),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.getPendingAccent(context)),
                     ),
                     children: [
 
@@ -409,6 +413,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                       constraints: const BoxConstraints(maxHeight: 120),
                       child: ListView.builder(
                         shrinkWrap: true,
+                        padding: const EdgeInsets.only(right: 12),
                         itemCount: pendingRequests.length,
                         itemBuilder: (context, index) {
                           final request = pendingRequests[index];
@@ -419,17 +424,22 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                               return ListTile(
                                 dense: true,
                                 contentPadding: EdgeInsets.zero,
-                                leading: const CircleAvatar(
+                                leading: CircleAvatar(
                                   radius: 16,
-                                  backgroundColor: Color(0xFFFFF3E0),
-                                  child: Icon(Icons.hourglass_empty, size: 16, color: Colors.orange),
+                                  backgroundColor: AppColors.getPendingBg(context),
+                                  child: Icon(Icons.hourglass_empty, size: 16, color: AppColors.getPendingAccent(context)),
                                 ),
                                 title: Text(groupName, style: const TextStyle(fontSize: 14)),
-                                subtitle: const Text(
+                                subtitle: Text(
                                   "Waiting for approval",
-                                  style: TextStyle(fontSize: 11, color: Colors.orange, fontStyle: FontStyle.italic),
+                                  style: TextStyle(fontSize: 11, color: AppColors.getPendingAccent(context), fontStyle: FontStyle.italic),
                                 ),
-                                trailing: TextButton(
+                                trailing: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.error,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  ),
                                   onPressed: () async {
                                     final confirm = await showDialog<bool>(
                                       context: context,
@@ -443,7 +453,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                                           ),
                                           ElevatedButton(
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.red,
+                                              backgroundColor: AppColors.error,
                                               foregroundColor: Colors.white,
                                             ),
                                             onPressed: () => Navigator.pop(context, true),
@@ -461,7 +471,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                                       }
                                     }
                                   },
-                                  child: const Text("Cancel", style: TextStyle(color: Colors.red, fontSize: 12)),
+                                  child: const Text("Cancel", style: TextStyle(fontSize: 12)),
                                 ),
                               );
                             },

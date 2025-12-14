@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:csc_picker_plus/csc_picker_plus.dart';
+import '../theme.dart';
 
 class DefaultLocationPicker extends StatefulWidget {
   final Function(String country, String? state) onLocationSelected;
@@ -97,9 +98,9 @@ class _DefaultLocationPickerState extends State<DefaultLocationPicker> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             "This will be your home location",
-            style: TextStyle(fontSize: 14, color: Colors.grey),
+            style: TextStyle(fontSize: 14, color: Theme.of(context).hintColor),
           ),
           const SizedBox(height: 20),
           
@@ -107,6 +108,31 @@ class _DefaultLocationPickerState extends State<DefaultLocationPicker> {
           CSCPickerPlus(
             showCities: false,
             defaultCountry: _getCountryEnum(countryValue) ?? CscCountry.United_States,
+            dropdownDecoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Theme.of(context).dividerColor),
+            ),
+            disabledDropdownDecoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Theme.of(context).dividerColor),
+            ),
+            selectedItemStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 14,
+            ),
+            dropdownHeadingStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            dropdownItemStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 14,
+            ),
+            dropdownDialogRadius: 12,
+            searchBarRadius: 12,
             onCountryChanged: (value) {
               // Strip emojis from CSCPickerPlus values
               final cleaned = value?.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F', unicode: true), '').trim();
@@ -142,6 +168,8 @@ class _DefaultLocationPickerState extends State<DefaultLocationPicker> {
                 }
               },
               style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.getButtonBackground(context),
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: const Text("Save Default Location"),

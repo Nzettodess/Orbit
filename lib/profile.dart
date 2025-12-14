@@ -6,6 +6,7 @@ import 'login.dart';
 import 'widgets/default_location_picker.dart';
 import 'widgets/syncfusion_date_picker.dart';
 import 'widgets/lunar_date_picker.dart';
+import 'theme.dart';
 
 class ProfileDialog extends StatefulWidget {
   final User user;
@@ -144,6 +145,10 @@ class _ProfileDialogState extends State<ProfileDialog> {
                             );
                           }
                         },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.getButtonBackground(context),
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        ),
                         child: const Text("Update Name"),
                       ),
                     ),
@@ -166,6 +171,10 @@ class _ProfileDialogState extends State<ProfileDialog> {
                             }
                           }
                         },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.onSurface,
+                          side: BorderSide(color: Theme.of(context).colorScheme.outline),
+                        ),
                         child: const Text("Reset"),
                       ),
                     ),

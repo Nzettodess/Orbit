@@ -727,14 +727,23 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
     final loggedIn = _user != null;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
+        backgroundColor: Colors.transparent, // Glassmorphism base
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.7), // Translucent using theme surface
+            ),
+          ),
+        ),
         title: Row(
           children: [
             SvgPicture.asset("assets/orbit_logo.svg", height: 40),
             const SizedBox(width: 8),
-            const Text("Orbit", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("Orbit", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           ],
         ),
         actions: [
@@ -832,30 +841,29 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
           : null,
       body: Stack(
         children: [
-          Column(
+          Padding(
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + kToolbarHeight + 16), // Glassmorphism padding
+            child: Column(
             children: [
-                const SizedBox(height: 20),
                 if (loggedIn)
                   StreamBuilder<List<Group>>(
                     stream: _firestoreService.getUserGroups(_user!.uid),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData || snapshot.data!.isEmpty) {
                         return Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          // Inherits minimal style from AppTheme
                           child: Padding(
                             padding: const EdgeInsets.all(20),
                             child: Column(
                               children: [
-                                const Icon(Icons.group_add, size: 40, color: Colors.deepPurple),
+                                Icon(Icons.group_add, size: 40, color: Theme.of(context).colorScheme.primary),
                                 const SizedBox(height: 10),
                                 const Text(
                                   "No Groups Yet",
                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 5),
-                                const Text("Create or join a group to see events.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                                Text("Create or join a group to see events.", textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
                                 const SizedBox(height: 10),
                                 ElevatedButton(
                                   onPressed: () {
@@ -897,7 +905,13 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
                             icon: const Icon(Icons.today, size: 16),
                             label: const Text('Today'),
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              backgroundColor: Colors.deepPurple, // Solid purple
+                              foregroundColor: Colors.white, // White text/icon
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             ),
                           ),
                           IconButton(
@@ -936,6 +950,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
                 const SizedBox(height: 20), // Space for FAB
               ],
             ),
+          ),
           if (!loggedIn) ...[
             Positioned.fill(
               child: BackdropFilter(
@@ -953,13 +968,13 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
           FloatingActionButton(
             heroTag: "event",
             onPressed: _openAddEventModal,
-            child: const Icon(Icons.event),
+            child: const Icon(Icons.event, color: Colors.black),
           ),
           const SizedBox(height: 16),
           FloatingActionButton(
             heroTag: "location",
             onPressed: _openLocationPicker,
-            child: const Icon(Icons.add_location),
+            child: const Icon(Icons.add_location, color: Colors.black),
           ),
         ],
       ) : null,

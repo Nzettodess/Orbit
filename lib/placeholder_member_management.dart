@@ -9,6 +9,7 @@ import 'widgets/lunar_date_picker.dart';
 import 'widgets/syncfusion_date_picker.dart';
 import 'widgets/user_profile_dialog.dart';
 import 'edit_member_dialog.dart';
+import 'theme.dart';
 
 class PlaceholderMemberManagement extends StatefulWidget {
   final Group group;
@@ -235,21 +236,21 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: Colors.orange[50],
+            color: AppColors.getPendingBg(context),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.orange[200]!),
+            border: Border.all(color: AppColors.getPendingBorder(context)),
           ),
           child: ExpansionTile(
             initiallyExpanded: true,
             tilePadding: const EdgeInsets.symmetric(horizontal: 12),
             shape: const Border(),
             collapsedShape: const Border(),
-            leading: Icon(Icons.download, color: Colors.orange[700], size: 20),
+            leading: Icon(Icons.download, color: AppColors.getPendingAccent(context), size: 20),
             title: Text(
               '$title (${requests.length})',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.orange[700],
+                color: AppColors.getPendingAccent(context),
                 fontSize: 14,
               ),
             ),

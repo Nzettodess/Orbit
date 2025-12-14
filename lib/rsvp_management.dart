@@ -156,6 +156,10 @@ class _RSVPManagementDialogState extends State<RSVPManagementDialog> {
       },
       selectedColor: Colors.blue[100],
       checkmarkColor: Colors.blue[800],
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.black : Theme.of(context).colorScheme.onSurface,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:csc_picker_plus/csc_picker_plus.dart';
 import 'package:intl/intl.dart';
 import 'widgets/syncfusion_date_picker.dart';
 import 'models/placeholder_member.dart';
+import 'theme.dart';
 
 class LocationPicker extends StatefulWidget {
   final Function(String country, String? state, DateTime startDate, DateTime endDate, List<String> selectedMemberIds) onLocationSelected;
@@ -187,7 +188,7 @@ class _LocationPickerState extends State<LocationPicker> {
                 (widget.isOwnerOrAdmin && widget.groupMembers.isNotEmpty)) ...[
               Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: Theme.of(context).dividerColor),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: ExpansionTile(
@@ -205,7 +206,7 @@ class _LocationPickerState extends State<LocationPicker> {
                   ),
                   subtitle: Text(
                     _getSelectedMembersSummary(),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -236,9 +237,9 @@ class _LocationPickerState extends State<LocationPicker> {
                     ),
                     // Group members (who allow location editing)
                     if (widget.isOwnerOrAdmin && widget.groupMembers.isNotEmpty) ...[
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        child: Text("Group Members", style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
+                        child: Text("Group Members", style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor, fontWeight: FontWeight.bold)),
                       ),
                       ...widget.groupMembers.map((member) {
                         final memberId = member['uid'] as String;
@@ -345,9 +346,9 @@ class _LocationPickerState extends State<LocationPicker> {
             ],
             
             // Date Range Selection
-            const Text(
+            Text(
               "Date Range",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Theme.of(context).hintColor),
             ),
             const SizedBox(height: 10),
             Row(
@@ -358,7 +359,7 @@ class _LocationPickerState extends State<LocationPicker> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade400),
+                        border: Border.all(color: Theme.of(context).dividerColor),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -366,7 +367,7 @@ class _LocationPickerState extends State<LocationPicker> {
                         children: [
                           Text(
                             "Start Date",
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -385,7 +386,7 @@ class _LocationPickerState extends State<LocationPicker> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade400),
+                        border: Border.all(color: Theme.of(context).dividerColor),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -393,7 +394,7 @@ class _LocationPickerState extends State<LocationPicker> {
                         children: [
                           Text(
                             "End Date",
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -411,16 +412,16 @@ class _LocationPickerState extends State<LocationPicker> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                  Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
                   Text(
                     "$_dayCount day${_dayCount > 1 ? 's' : ''} selected",
-                    style: TextStyle(fontSize: 13, color: Colors.blue.shade700),
+                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary),
                   ),
                 ],
               ),
@@ -428,14 +429,39 @@ class _LocationPickerState extends State<LocationPicker> {
             const SizedBox(height: 20),
             
             // Location Selection
-            const Text(
+            Text(
               "Location",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Theme.of(context).hintColor),
             ),
             const SizedBox(height: 10),
             CSCPickerPlus(
               showCities: false,
               defaultCountry: _getCountryEnum(countryValue) ?? CscCountry.United_States,
+              dropdownDecoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              disabledDropdownDecoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              selectedItemStyle: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 14,
+              ),
+              dropdownHeadingStyle: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              dropdownItemStyle: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 14,
+              ),
+              dropdownDialogRadius: 12,
+              searchBarRadius: 12,
               onCountryChanged: (value) {
                 // CSCPickerPlus returns values with emojis like "🇲🇾    Malaysia"
                 // We need to strip them to match our mapping
@@ -482,6 +508,8 @@ class _LocationPickerState extends State<LocationPicker> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.getButtonBackground(context),
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: Text(

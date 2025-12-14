@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
+import 'theme.dart';
 import 'home.dart';
 
 void main() async {
@@ -25,19 +28,75 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.system;
+  StreamSubscription? _userSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToThemeChanges();
+  }
+
+  void _listenToThemeChanges() {
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      _userSubscription?.cancel();
+      if (user != null) {
+        _userSubscription = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .snapshots()
+            .listen((snapshot) {
+          if (snapshot.exists) {
+            final data = snapshot.data();
+            final mode = data?['themeMode'] as String?;
+            print('[Main] Received user update. ThemeMode: $mode');
+            
+            if (mode != null) {
+              setState(() {
+                switch (mode) {
+                  case 'light':
+                    _themeMode = ThemeMode.light;
+                    break;
+                  case 'dark':
+                    _themeMode = ThemeMode.dark;
+                    break;
+                  default:
+                    _themeMode = ThemeMode.system;
+                }
+              });
+            }
+          }
+        }, onError: (e) => print('[Main] Error listening to user: $e'));
+      } else {
+        setState(() {
+          _themeMode = ThemeMode.system;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Orbit',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-        textTheme: GoogleFonts.notoSansScTextTheme(),
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: _themeMode,
       home: const HomeWithLogin(), // Wrapper for home + login
     );
   }

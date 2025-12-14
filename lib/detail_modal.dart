@@ -536,17 +536,17 @@ class _DetailModalState extends State<DetailModal> {
                          e.description,
                          maxLines: 3,
                          overflow: TextOverflow.ellipsis,
-                         style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                         style: TextStyle(fontSize: 13, color: Theme.of(context).hintColor),
                        ),
                      if (e.venue != null && e.venue!.isNotEmpty)
                        Row(
                          children: [
-                           const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                           Icon(Icons.location_on, size: 14, color: Theme.of(context).hintColor),
                            const SizedBox(width: 4),
                            Expanded(
                              child: Text(
                                e.venue!,
-                               style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Colors.grey),
+                               style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Theme.of(context).hintColor),
                                maxLines: 1,
                                overflow: TextOverflow.ellipsis,
                              ),
@@ -558,7 +558,7 @@ class _DetailModalState extends State<DetailModal> {
                        builder: (context, snapshot) {
                          if (snapshot.hasData) {
                            final data = snapshot.data!.data() as Map<String, dynamic>?;
-                           return Text("Owner: ${data?['displayName'] ?? 'Unknown'}", style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12));
+                           return Text("Owner: ${data?['displayName'] ?? 'Unknown'}", style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Theme.of(context).hintColor));
                          }
                          return const SizedBox.shrink();
                        },
@@ -1096,13 +1096,32 @@ class _DetailModalState extends State<DetailModal> {
           ),
           PopupMenuButton<String>(
             initialValue: currentRsvp == 'No Response' ? null : currentRsvp,
-            child: Chip(
-              label: Text(currentRsvp, style: const TextStyle(fontSize: 11)),
-              backgroundColor: currentRsvp == 'Yes' ? Colors.green[100] 
-                  : currentRsvp == 'No' ? Colors.red[100] 
-                  : currentRsvp == 'Maybe' ? Colors.orange[100] 
-                  : Colors.grey[200],
-              visualDensity: VisualDensity.compact,
+            child: Builder(
+              builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                Color bgColor;
+                Color textColor;
+                
+                if (currentRsvp == 'Yes') {
+                  bgColor = isDark ? Colors.green.shade800 : Colors.green.shade100;
+                  textColor = isDark ? Colors.green.shade100 : Colors.green.shade800;
+                } else if (currentRsvp == 'No') {
+                  bgColor = isDark ? Colors.red.shade800 : Colors.red.shade100;
+                  textColor = isDark ? Colors.red.shade100 : Colors.red.shade800;
+                } else if (currentRsvp == 'Maybe') {
+                  bgColor = isDark ? Colors.orange.shade800 : Colors.orange.shade100;
+                  textColor = isDark ? Colors.orange.shade100 : Colors.orange.shade800;
+                } else {
+                  bgColor = isDark ? Colors.grey.shade700 : Colors.grey.shade200;
+                  textColor = isDark ? Colors.grey.shade200 : Colors.grey.shade700;
+                }
+                
+                return Chip(
+                  label: Text(currentRsvp, style: TextStyle(fontSize: 11, color: textColor)),
+                  backgroundColor: bgColor,
+                  visualDensity: VisualDensity.compact,
+                );
+              },
             ),
             onSelected: (status) {
               _firestoreService.rsvpEvent(event.id, memberId, status);
@@ -1168,39 +1187,52 @@ class _DetailModalState extends State<DetailModal> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Current version
-                Card(
-                  color: Colors.blue[50],
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(event.title, 
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 4),
-                        Text(event.description, 
-                          maxLines: 3, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13)),
-                        if (event.venue != null && event.venue!.isNotEmpty)
-                          Text("📍 ${event.venue!}", 
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        const SizedBox(height: 8),
-                        // Show editor name
-                        FutureBuilder<String>(
-                          future: _getEditorName(event.lastEditedBy ?? event.creatorId),
-                          builder: (ctx, snap) {
-                            final editorName = snap.data ?? 'Unknown';
-                            return Text(
-                              "Current • by $editorName • ${event.lastEditedAt != null ? _formatTimestamp(event.lastEditedAt!) : 'Just now'}",
-                              style: const TextStyle(fontSize: 11, color: Colors.grey),
-                            );
-                          },
+                Builder(
+                  builder: (context) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return Card(
+                      margin: EdgeInsets.zero,
+                      color: isDark ? Colors.blue.shade900.withOpacity(0.3) : Colors.blue.shade50,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isDark ? Colors.blue.shade700 : Colors.blue.shade300,
+                          width: 1.5,
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(event.title, 
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                            const SizedBox(height: 4),
+                            Text(event.description, 
+                              maxLines: 3, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13)),
+                            if (event.venue != null && event.venue!.isNotEmpty)
+                              Text("📍 ${event.venue!}", 
+                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor)),
+                            const SizedBox(height: 8),
+                            // Show editor name
+                            FutureBuilder<String>(
+                              future: _getEditorName(event.lastEditedBy ?? event.creatorId),
+                              builder: (ctx, snap) {
+                                final editorName = snap.data ?? 'Unknown';
+                                return Text(
+                                  "Current • by $editorName • ${event.lastEditedAt != null ? _formatTimestamp(event.lastEditedAt!) : 'Just now'}",
+                                  style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 const Text("Previous Versions:", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1217,47 +1249,51 @@ class _DetailModalState extends State<DetailModal> {
                   final editedAtStr = editedAt != null 
                       ? _formatTimestamp((editedAt as Timestamp).toDate())
                       : 'Unknown';
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(title, 
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
-                                const SizedBox(height: 4),
-                                Text(desc, maxLines: 3, overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 13)),
-                                if (venue != null && venue.isNotEmpty)
-                                  Text("📍 $venue", 
-                                    maxLines: 1, overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                const SizedBox(height: 8),
-                                FutureBuilder<String>(
-                                  future: _getEditorName(editedBy),
-                                  builder: (ctx, snap) {
-                                    final editorName = snap.data ?? 'Unknown';
-                                    return Text(
-                                      "V${event.editHistory!.length - idx} • by $editorName • $editedAtStr",
-                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                    );
-                                  },
+                  return Builder(
+                    builder: (context) {
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(title, 
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 4),
+                                    Text(desc, maxLines: 3, overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13)),
+                                    if (venue != null && venue.isNotEmpty)
+                                      Text("📍 $venue", 
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor)),
+                                    const SizedBox(height: 8),
+                                    FutureBuilder<String>(
+                                      future: _getEditorName(editedBy),
+                                      builder: (ctx, snap) {
+                                        final editorName = snap.data ?? 'Unknown';
+                                        return Text(
+                                          "V${event.editHistory!.length - idx} • by $editorName • $editedAtStr",
+                                          style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              TextButton(
+                                onPressed: () => _revertToVersion(event, version, dialogContext),
+                                child: const Text("Revert"),
+                              ),
+                            ],
                           ),
-                          TextButton(
-                            onPressed: () => _revertToVersion(event, version, dialogContext),
-                            child: const Text("Revert"),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   );
                 }),
               ],

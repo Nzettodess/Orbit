@@ -6,6 +6,7 @@ import 'models/join_request.dart';
 import 'firestore_service.dart';
 import 'edit_member_dialog.dart';
 import 'widgets/user_profile_dialog.dart';
+import 'theme.dart';
 
 class MemberManagement extends StatefulWidget {
   final Group group;
@@ -428,8 +429,8 @@ class _MemberManagementState extends State<MemberManagement> {
             children: [
               CircleAvatar(
                 radius: 16,
-                backgroundColor: Colors.orange[100],
-                child: Icon(Icons.person_outline, size: 18, color: Colors.orange[700]),
+                backgroundColor: AppColors.getPendingBg(context),
+                child: Icon(Icons.person_outline, size: 18, color: AppColors.getPendingAccent(context)),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -444,12 +445,12 @@ class _MemberManagementState extends State<MemberManagement> {
                     if (requesterEmail.isNotEmpty)
                       Text(
                         requesterEmail,
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor),
                         overflow: TextOverflow.ellipsis,
                       ),
                     Text(
                       'Requested ${DateFormat('MMM d').format(request.createdAt)}',
-                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                      style: TextStyle(fontSize: 10, color: Theme.of(context).hintColor),
                     ),
                   ],
                 ),
@@ -573,7 +574,7 @@ class _MemberManagementState extends State<MemberManagement> {
             const SizedBox(height: 8),
             Text(
               '${_group.members.length} member${_group.members.length != 1 ? 's' : ''}',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: Theme.of(context).hintColor),
             ),
             const Divider(),
             
@@ -590,21 +591,21 @@ class _MemberManagementState extends State<MemberManagement> {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
-                      color: Colors.orange[50],
+                      color: AppColors.getPendingBg(context),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange[200]!),
+                      border: Border.all(color: AppColors.getPendingBorder(context)),
                     ),
                     child: ExpansionTile(
                       initiallyExpanded: true,
                       tilePadding: const EdgeInsets.symmetric(horizontal: 12),
                       shape: const Border(),
                       collapsedShape: const Border(),
-                      leading: Icon(Icons.person_add, color: Colors.orange[700], size: 20),
+                      leading: Icon(Icons.person_add, color: AppColors.getPendingAccent(context), size: 20),
                       title: Text(
                         'Join Requests (${requests.length})',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.orange[700],
+                          color: AppColors.getPendingAccent(context),
                           fontSize: 14,
                         ),
                       ),

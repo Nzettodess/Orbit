@@ -30,7 +30,9 @@ class HomeDrawer extends StatelessWidget {
         padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
-            decoration: const BoxDecoration(color: Colors.deepPurple),
+            decoration: const BoxDecoration(
+              color: Color(0xFF673AB7), // Deep Purple
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -69,7 +71,7 @@ class HomeDrawer extends StatelessWidget {
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.group),
+            leading: const Icon(Icons.group, color: Colors.deepPurpleAccent),
             title: const Text("Groups"),
             onTap: () {
               Navigator.pop(context);
@@ -77,7 +79,7 @@ class HomeDrawer extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.event_note),
+            leading: const Icon(Icons.event_note, color: Colors.orangeAccent),
             title: const Text("Upcoming"),
             onTap: () {
               Navigator.pop(context);
@@ -85,7 +87,7 @@ class HomeDrawer extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.cake, color: Colors.pink),
+            leading: const Icon(Icons.cake, color: Colors.pinkAccent),
             title: const Text("Birthday Baby"),
             onTap: () {
               Navigator.pop(context);
@@ -93,7 +95,7 @@ class HomeDrawer extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.event_available),
+            leading: const Icon(Icons.event_available, color: Colors.tealAccent),
             title: const Text("RSVP"),
             onTap: () {
               Navigator.pop(context);
@@ -101,7 +103,7 @@ class HomeDrawer extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.settings),
+            leading: const Icon(Icons.settings, color: Colors.blueGrey),
             title: const Text("Settings"),
             onTap: () {
               Navigator.pop(context);
