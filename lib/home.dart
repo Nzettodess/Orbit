@@ -450,12 +450,24 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
     }
   }
 
-  void _fetchHolidays(List<String> calendarIds) {
-    _googleCalendarService.fetchMultipleCalendars(calendarIds, DateTime.now().year).then((holidays) {
+  void _fetchHolidays(List<String> calendarIds) async {
+    // Fetch holidays from beginning of current year to end of next year
+    // This covers the full 365-day upcoming range with just 1 API call per calendar
+    final now = DateTime.now();
+    final startDate = DateTime(now.year, 1, 1); // Start of current year
+    final endDate = DateTime(now.year + 1, 12, 31); // End of next year
+    
+    final holidays = await _googleCalendarService.fetchMultipleCalendarsDateRange(
+      calendarIds, 
+      startDate, 
+      endDate
+    );
+    
+    if (mounted) {
       setState(() {
         _holidays = holidays;
       });
-    });
+    }
   }
 
   void _openAddEventModal() {
@@ -489,6 +501,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
         currentUserId: _user!.uid,
         events: _events,
         locations: _locations,
+        holidays: _holidays,
         allUsers: _allUsers,
         placeholderMembers: _placeholderMembers,
         groupNames: groupNames,

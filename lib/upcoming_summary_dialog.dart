@@ -12,6 +12,7 @@ class UpcomingSummaryDialog extends StatefulWidget {
   final String currentUserId;
   final List<GroupEvent> events;
   final List<UserLocation> locations;
+  final List<Holiday> holidays;
   final List<Map<String, dynamic>> allUsers;
   final List<PlaceholderMember> placeholderMembers;
   final Map<String, String> groupNames; // groupId -> groupName
@@ -22,6 +23,7 @@ class UpcomingSummaryDialog extends StatefulWidget {
     required this.currentUserId,
     required this.events,
     required this.locations,
+    required this.holidays,
     required this.allUsers,
     required this.placeholderMembers,
     required this.groupNames,
@@ -36,12 +38,50 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
   // Filter state
   UpcomingItemType? _selectedFilter; // null means "All"
   
+  // Infinite scroll state
+  int _daysToShow = 60; // Start with 60 days
+  static const int _daysIncrement = 60; // Load 60 more days at a time
+  static const int _maxDays = 365; // Max 1 year
+  final ScrollController _scrollController = ScrollController();
+  
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+  
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+  
+  void _onScroll() {
+    if (_scrollController.position.pixels >= 
+        _scrollController.position.maxScrollExtent - 200) {
+      // Near bottom, load more
+      if (_daysToShow < _maxDays) {
+        setState(() {
+          _daysToShow = (_daysToShow + _daysIncrement).clamp(0, _maxDays);
+        });
+      }
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     final upcomingItems = _buildUpcomingItems();
     final filteredItems = _selectedFilter == null
         ? upcomingItems
-        : upcomingItems.where((item) => item.type == _selectedFilter).toList();
+        : upcomingItems.where((item) {
+            // Special case: Birthdays filter includes both regular and lunar birthdays
+            if (_selectedFilter == UpcomingItemType.birthday) {
+              return item.type == UpcomingItemType.birthday || 
+                     item.type == UpcomingItemType.lunarBirthday;
+            }
+            return item.type == _selectedFilter;
+          }).toList();
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -102,6 +142,9 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
                     _buildFilterChip(UpcomingItemType.locationChange, 'Locations', Icons.location_on),
                     const SizedBox(width: 8),
                     _buildFilterChip(UpcomingItemType.birthday, 'Birthdays', Icons.cake),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(UpcomingItemType.holiday, 'Holidays', Icons.flag),
+                    const SizedBox(width: 16), // Extra padding at end for visibility
                   ],
                 ),
               ),
@@ -118,18 +161,58 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
                 ),
                 child: filteredItems.isEmpty
                     ? _buildEmptyState()
-                    : GroupedListView<UpcomingItem, String>(
-                        elements: filteredItems,
-                        groupBy: (item) => _formatDateKey(item.date),
-                        groupSeparatorBuilder: (String groupKey) =>
-                            _buildDateHeader(groupKey, filteredItems),
-                        itemBuilder: (context, UpcomingItem item) =>
-                            _buildItemCard(item),
-                        itemComparator: (a, b) => a.date.compareTo(b.date),
-                        order: GroupedListOrder.ASC,
-                        useStickyGroupSeparators: true,
-                        floatingHeader: true,
-                        padding: const EdgeInsets.only(bottom: 16),
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: GroupedListView<UpcomingItem, String>(
+                              controller: _scrollController,
+                              elements: filteredItems,
+                              groupBy: (item) => _formatDateKey(item.date),
+                              groupSeparatorBuilder: (String groupKey) =>
+                                  _buildDateHeader(groupKey, filteredItems),
+                              itemBuilder: (context, UpcomingItem item) =>
+                                  _buildItemCard(item),
+                              itemComparator: (a, b) => a.date.compareTo(b.date),
+                              order: GroupedListOrder.ASC,
+                              useStickyGroupSeparators: true,
+                              floatingHeader: true,
+                              padding: const EdgeInsets.only(bottom: 8),
+                            ),
+                          ),
+                          // Load More button
+                          if (_daysToShow < _maxDays)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _daysToShow = _daysToShow + _daysIncrement;
+                                      if (_daysToShow > _maxDays) _daysToShow = _maxDays;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.expand_more),
+                                  label: Text('Load more (showing $_daysToShow of $_maxDays days)'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    side: BorderSide(color: Colors.deepPurple.shade300),
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Text(
+                                'Showing all $_maxDays days',
+                                style: TextStyle(
+                                  color: Theme.of(context).hintColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
               ),
             ),
@@ -142,14 +225,16 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
   Widget _buildFilterChip(UpcomingItemType? type, String label, IconData icon) {
     final isSelected = _selectedFilter == type;
     return FilterChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface),
-          const SizedBox(width: 4),
-          Text(label),
-        ],
-      ),
+      label: isSelected 
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: Colors.white),
+                const SizedBox(width: 4),
+                Text(label),
+              ],
+            )
+          : Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurface),
       selected: isSelected,
       onSelected: (selected) {
         setState(() {
@@ -165,6 +250,7 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       ),
       checkmarkColor: Colors.white,
       showCheckmark: false,
+      padding: isSelected ? null : const EdgeInsets.symmetric(horizontal: 4),
     );
   }
 
@@ -227,13 +313,21 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: itemDate == today ? Theme.of(context).primaryColor : Theme.of(context).primaryColor.withOpacity(0.2),
+              color: itemDate == today 
+                  ? Colors.deepPurple 
+                  : (Theme.of(context).brightness == Brightness.dark 
+                      ? Colors.deepPurple.shade800 
+                      : Colors.deepPurple.shade100),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               dateFormatted,
               style: TextStyle(
-                color: itemDate == today ? Colors.white : Theme.of(context).primaryColor,
+                color: itemDate == today 
+                    ? Colors.white 
+                    : (Theme.of(context).brightness == Brightness.dark 
+                        ? Colors.deepPurple.shade200 
+                        : Colors.deepPurple.shade700),
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
               ),
@@ -292,9 +386,14 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
         bgColor = isDark ? Colors.pink.withOpacity(0.2) : Colors.pink.shade50;
         break;
       case UpcomingItemType.lunarBirthday:
-        icon = Icons.nightlight_round;
-        iconColor = isDark ? Colors.purple.shade300 : Colors.purple.shade700;
-        bgColor = isDark ? Colors.purple.withOpacity(0.2) : Colors.purple.shade50;
+        icon = Icons.auto_awesome; // Lantern-like sparkle for lunar birthday
+        iconColor = isDark ? Colors.amber.shade300 : Colors.amber.shade700;
+        bgColor = isDark ? Colors.amber.withOpacity(0.2) : Colors.amber.shade50;
+        break;
+      case UpcomingItemType.holiday:
+        icon = Icons.flag;
+        iconColor = isDark ? Colors.red.shade300 : Colors.red.shade700;
+        bgColor = isDark ? Colors.red.withOpacity(0.2) : Colors.red.shade50;
         break;
     }
 
@@ -542,12 +641,12 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
     final items = <UpcomingItem>[];
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final thirtyDaysLater = today.add(const Duration(days: 30));
+    final endDate = today.add(Duration(days: _daysToShow));
 
     // Helper to check if date is in upcoming range
     bool isUpcoming(DateTime date) {
       final dateOnly = DateTime(date.year, date.month, date.day);
-      return !dateOnly.isBefore(today) && dateOnly.isBefore(thirtyDaysLater);
+      return !dateOnly.isBefore(today) && dateOnly.isBefore(endDate);
     }
 
     // Add events
@@ -650,7 +749,7 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       }
 
       // Lunar birthday - check each day in range
-      for (int d = 0; d < 30; d++) {
+      for (int d = 0; d < _daysToShow; d++) {
         final checkDate = today.add(Duration(days: d));
         final lunarBirthday = Birthday.getLunarBirthday(user, now.year, checkDate);
         if (lunarBirthday != null) {
@@ -676,13 +775,20 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       if (placeholder.hasLunarBirthday && 
           placeholder.lunarBirthdayMonth != null && 
           placeholder.lunarBirthdayDay != null) {
-        for (int d = 0; d < 30; d++) {
+        for (int d = 0; d < _daysToShow; d++) {
           final checkDate = today.add(Duration(days: d));
           final lunarBirthday = Birthday.fromPlaceholderLunar(placeholder, now.year, checkDate);
           if (lunarBirthday != null) {
             items.add(UpcomingItem.fromBirthday(lunarBirthday, groupId, groupName));
           }
         }
+      }
+    }
+
+    // Add holidays
+    for (final holiday in widget.holidays) {
+      if (isUpcoming(holiday.date)) {
+        items.add(UpcomingItem.fromHoliday(holiday));
       }
     }
 

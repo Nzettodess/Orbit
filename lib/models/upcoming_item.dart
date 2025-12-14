@@ -5,7 +5,8 @@ enum UpcomingItemType {
   event, 
   locationChange, 
   birthday, 
-  lunarBirthday 
+  lunarBirthday,
+  holiday,
 }
 
 /// A unified model representing any upcoming item (event, location change, or birthday)
@@ -22,6 +23,7 @@ class UpcomingItem {
   final GroupEvent? event;
   final UserLocation? location;
   final Birthday? birthday;
+  final Holiday? holiday;
 
   UpcomingItem({
     required this.type,
@@ -36,6 +38,7 @@ class UpcomingItem {
     this.event,
     this.location,
     this.birthday,
+    this.holiday,
   }) : groupNames = groupNames ?? [groupName];
 
   /// Create an UpcomingItem from a GroupEvent
@@ -128,6 +131,21 @@ class UpcomingItem {
         return '🎂';
       case UpcomingItemType.lunarBirthday:
         return '🌙';
+      case UpcomingItemType.holiday:
+        return '🎌';
     }
+  }
+
+  /// Create an UpcomingItem from a Holiday
+  factory UpcomingItem.fromHoliday(Holiday holiday) {
+    return UpcomingItem(
+      type: UpcomingItemType.holiday,
+      groupId: 'public',
+      groupName: 'Public Holiday',
+      date: holiday.date,
+      title: holiday.localName,
+      subtitle: null,
+      holiday: holiday,
+    );
   }
 }

@@ -66,13 +66,21 @@ class GoogleCalendarService {
     'christian': 'en.christian#holiday@group.v.calendar.google.com',
   };
 
+  /// Fetch holidays for a specific year (legacy method)
   Future<List<Holiday>> fetchHolidays(String calendarId, int year) async {
+    final startDate = DateTime(year, 1, 1);
+    final endDate = DateTime(year, 12, 31);
+    return fetchHolidaysDateRange(calendarId, startDate, endDate);
+  }
+
+  /// Fetch holidays for a date range - more efficient for multi-year fetching
+  Future<List<Holiday>> fetchHolidaysDateRange(String calendarId, DateTime startDate, DateTime endDate) async {
     try {
-      final timeMin = Uri.encodeComponent('${year}-01-01T00:00:00Z');
-      final timeMax = Uri.encodeComponent('${year}-12-31T23:59:59Z');
+      final timeMin = Uri.encodeComponent(startDate.toUtc().toIso8601String());
+      final timeMax = Uri.encodeComponent(endDate.toUtc().toIso8601String());
       final encodedCalendarId = Uri.encodeComponent(calendarId);
       
-      final url = '$_baseUrl/$encodedCalendarId/events?key=$_apiKey&timeMin=$timeMin&timeMax=$timeMax&singleEvents=true';
+      final url = '$_baseUrl/$encodedCalendarId/events?key=$_apiKey&timeMin=$timeMin&timeMax=$timeMax&singleEvents=true&maxResults=250';
       
       final response = await http.get(Uri.parse(url));
 
@@ -98,14 +106,25 @@ class GoogleCalendarService {
     }
   }
 
+  /// Fetch multiple calendars for a specific year (legacy)
   Future<List<Holiday>> fetchMultipleCalendars(List<String> calendarIds, int year) async {
-    final futures = calendarIds.map((id) => fetchHolidays(id, year)).toList();
+    final startDate = DateTime(year, 1, 1);
+    final endDate = DateTime(year, 12, 31);
+    return fetchMultipleCalendarsDateRange(calendarIds, startDate, endDate);
+  }
+
+  /// Fetch multiple calendars for a date range - single API call per calendar
+  Future<List<Holiday>> fetchMultipleCalendarsDateRange(List<String> calendarIds, DateTime startDate, DateTime endDate) async {
+    final futures = calendarIds.map((id) => fetchHolidaysDateRange(id, startDate, endDate)).toList();
     final results = await Future.wait(futures);
     
     final allHolidays = <Holiday>[];
     for (final holidays in results) {
       allHolidays.addAll(holidays);
     }
+    
+    // Sort by date
+    allHolidays.sort((a, b) => a.date.compareTo(b.date));
     
     return allHolidays;
   }
