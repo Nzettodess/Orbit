@@ -307,20 +307,77 @@ class _DetailModalState extends State<DetailModal> {
 
   Future<void> _editPlaceholderLocation(UserLocation element) async {
     final userData = _userDetails[element.userId] ?? {};
+    final placeholderName = userData['displayName'] ?? 'Placeholder';
     
-    await showDialog(
+    // Show location picker for date-specific editing - uses the standard "Set Location" UI
+    await showModalBottomSheet(
       context: context,
-      builder: (_) => EditMemberDialog(
-        memberId: element.userId,
-        memberDetails: userData,
-        groupId: element.groupId,
-        isPlaceholder: true,
-        onSaved: () {
-          _loadUserDetails(); 
-        },
+      isScrollControlled: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with member name
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 0),
+              child: Row(
+                children: [
+                  const Icon(Icons.person_outline, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "Set Location for $placeholderName",
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(sheetContext),
+                  ),
+                ],
+              ),
+            ),
+            // Standard LocationPicker UI
+            LocationPicker(
+              currentUserId: widget.currentUserId,
+              defaultCountry: element.nation != "No location selected" ? element.nation : null,
+              defaultState: element.state,
+              initialStartDate: widget.date,
+              initialEndDate: widget.date,
+              placeholderMembers: [],
+              groupMembers: [],
+              isOwnerOrAdmin: false,
+              onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
+                final dateStr = "${widget.date.year}${widget.date.month.toString().padLeft(2, '0')}${widget.date.day.toString().padLeft(2, '0')}";
+                final docId = "${element.userId}_$dateStr";
+                
+                await FirebaseFirestore.instance
+                    .collection('placeholder_member_locations')
+                    .doc(docId)
+                    .set({
+                      'placeholderMemberId': element.userId,
+                      'groupId': element.groupId,
+                      'date': Timestamp.fromDate(widget.date),
+                      'nation': country,
+                      'state': state,
+                    });
+                
+                if (mounted) {
+                  Navigator.pop(context); // Close detail modal to refresh
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("$placeholderName's location updated")),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -671,6 +728,7 @@ class _DetailModalState extends State<DetailModal> {
                                   onPressed: () async {
                                     // Target user for editing
                                     final targetUserId = element.userId;
+                                    final targetName = isCurrentUser ? "Myself" : name;
                                     
                                     // Fetch target user's default location for pre-population
                                     final userDoc = await FirebaseFirestore.instance
@@ -700,37 +758,62 @@ class _DetailModalState extends State<DetailModal> {
                                     
                                     if (!mounted) return;
                                     
-                                    // Show location picker to edit
-                                    final result = await showDialog(
+                                    // Show location picker with header showing member name
+                                    final result = await showModalBottomSheet<bool>(
                                       context: context,
-                                      builder: (_) => Dialog(
-                                        child: Container(
-                                          constraints: const BoxConstraints(maxWidth: 500),
-                                          child: LocationPicker(
-                                            currentUserId: widget.currentUserId,
-                                            defaultCountry: defaultCountry ?? element.nation,
-                                            defaultState: defaultState ?? element.state,
-                                            initialStartDate: widget.date,
-                                            initialEndDate: widget.date, // Default to single day
-                                            onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
-                                              // Save the updated location for the target user
-                                              await _firestoreService.setLocationRange(
-                                                targetUserId,
-                                                element.groupId,
-                                                startDate,
-                                                endDate,
-                                                country,
-                                                state,
-                                              );
-                                              Navigator.pop(context, true); // Return true to indicate success
-                                            },
-                                          ),
+                                      isScrollControlled: true,
+                                      builder: (sheetContext) => Padding(
+                                        padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            // Header with member name
+                                            Container(
+                                              padding: const EdgeInsets.fromLTRB(20, 16, 8, 0),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(Icons.person, color: Colors.blue),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      "Set Location for $targetName",
+                                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.close),
+                                                    onPressed: () => Navigator.pop(sheetContext),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            // Standard LocationPicker UI
+                                            LocationPicker(
+                                              currentUserId: widget.currentUserId,
+                                              defaultCountry: defaultCountry ?? (element.nation != "No location selected" ? element.nation : null),
+                                              defaultState: defaultState ?? element.state,
+                                              initialStartDate: widget.date,
+                                              initialEndDate: widget.date,
+                                              onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
+                                                await _firestoreService.setLocationRange(
+                                                  targetUserId,
+                                                  element.groupId,
+                                                  startDate,
+                                                  endDate,
+                                                  country,
+                                                  state,
+                                                );
+                                                Navigator.pop(sheetContext, true);
+                                              },
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     );
                                     if (result == true && mounted) {
                                       Navigator.pop(context); // Refresh detail modal
                                     }
+
                                   },
                                   tooltip: isCurrentUser ? 'Edit Location' : 'Edit Member Location',
                                 ),

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lunar/lunar.dart';
+import 'models/placeholder_member.dart';
 
 class Group {
   final String id;
@@ -364,8 +365,65 @@ class Birthday {
     return null;
   }
 
+  // Get solar birthday from placeholder member
+  static Birthday? fromPlaceholderMember(PlaceholderMember placeholder, int year) {
+    if (placeholder.birthday == null) return null;
+
+    final birthDate = placeholder.birthday!;
+    final occurrenceDate = DateTime(year, birthDate.month, birthDate.day);
+    int age = year - birthDate.year;
+
+    return Birthday(
+      userId: placeholder.id, // Use placeholder ID as user ID
+      displayName: placeholder.displayName,
+      birthDate: birthDate,
+      occurrenceDate: occurrenceDate,
+      age: age,
+      isLunar: false,
+    );
+  }
+
+  // Get lunar birthday from placeholder member
+  static Birthday? fromPlaceholderLunar(PlaceholderMember placeholder, int year, DateTime checkDate) {
+    if (!placeholder.hasLunarBirthday || 
+        placeholder.lunarBirthdayMonth == null || 
+        placeholder.lunarBirthdayDay == null) {
+      return null;
+    }
+
+    try {
+      // Convert checkDate to lunar calendar and compare month/day
+      final lunar = Lunar.fromDate(checkDate);
+      final lunarMonth = lunar.getMonth();
+      final lunarDay = lunar.getDay();
+
+      // Check if this date's lunar month/day matches the stored lunar birthday
+      if (lunarMonth == placeholder.lunarBirthdayMonth && lunarDay == placeholder.lunarBirthdayDay) {
+        // Calculate approximate age (using solar birthday if available)
+        int age = 0;
+        if (placeholder.birthday != null) {
+          age = year - placeholder.birthday!.year;
+        }
+
+        return Birthday(
+          userId: placeholder.id, // Use placeholder ID as user ID
+          displayName: placeholder.displayName,
+          birthDate: checkDate,
+          occurrenceDate: checkDate,
+          age: -1, // Use -1 to indicate age should not be shown for lunar birthday
+          isLunar: true,
+        );
+      }
+    } catch (e) {
+      print('Error checking placeholder lunar birthday: $e');
+    }
+
+    return null;
+  }
+
   // Legacy method - now just returns solar birthday (for backward compatibility)
   static Birthday? fromUserData(Map<String, dynamic> userData, int year) {
     return getSolarBirthday(userData, year);
   }
 }
+

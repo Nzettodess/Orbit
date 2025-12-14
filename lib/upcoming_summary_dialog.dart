@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'models.dart';
 import 'models/upcoming_item.dart';
+import 'models/placeholder_member.dart';
 import 'add_event_modal.dart';
 
 /// Dialog showing upcoming events, location changes, and birthdays
@@ -12,6 +13,7 @@ class UpcomingSummaryDialog extends StatefulWidget {
   final List<GroupEvent> events;
   final List<UserLocation> locations;
   final List<Map<String, dynamic>> allUsers;
+  final List<PlaceholderMember> placeholderMembers;
   final Map<String, String> groupNames; // groupId -> groupName
   final void Function(DateTime date)? onDateTap; // Callback for opening date detail
 
@@ -21,6 +23,7 @@ class UpcomingSummaryDialog extends StatefulWidget {
     required this.events,
     required this.locations,
     required this.allUsers,
+    required this.placeholderMembers,
     required this.groupNames,
     this.onDateTap,
   });
@@ -574,12 +577,33 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       final locations = entry.value;
       final firstLocation = locations.first;
       
-      // Find user name
+      // Find user/placeholder name
+      String userName = 'Unknown';
+      
+      // First try to find in regular users
       final user = widget.allUsers.firstWhere(
         (u) => u['uid'] == firstLocation.userId,
-        orElse: () => {'displayName': 'Unknown'},
+        orElse: () => <String, dynamic>{},
       );
-      final userName = user['displayName'] as String? ?? 'Unknown';
+      
+      if (user.isNotEmpty && user['displayName'] != null) {
+        userName = user['displayName'] as String;
+      } else {
+        // Try to find in placeholder members
+        final placeholder = widget.placeholderMembers.firstWhere(
+          (p) => p.id == firstLocation.userId,
+          orElse: () => PlaceholderMember(
+            id: '', 
+            groupId: '', 
+            displayName: 'Unknown', 
+            createdBy: '', 
+            createdAt: DateTime.now(),
+          ),
+        );
+        if (placeholder.id.isNotEmpty) {
+          userName = placeholder.displayName;
+        }
+      }
       
       // Collect all unique group names for this location
       final groupNamesList = locations
@@ -605,6 +629,7 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       ));
     }
 
+
     // Add birthdays
     for (final user in widget.allUsers) {
       final uid = user['uid'] as String?;
@@ -629,9 +654,37 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       }
     }
 
+    // Add placeholder member birthdays
+    for (final placeholder in widget.placeholderMembers) {
+      final groupId = placeholder.groupId;
+      final groupName = widget.groupNames[groupId] ?? 'Group';
+
+      // Solar birthday (if set)
+      if (placeholder.birthday != null) {
+        final solarBirthday = Birthday.fromPlaceholderMember(placeholder, now.year);
+        if (solarBirthday != null && isUpcoming(solarBirthday.occurrenceDate)) {
+          items.add(UpcomingItem.fromBirthday(solarBirthday, groupId, groupName));
+        }
+      }
+
+      // Lunar birthday - check each day in range
+      if (placeholder.hasLunarBirthday && 
+          placeholder.lunarBirthdayMonth != null && 
+          placeholder.lunarBirthdayDay != null) {
+        for (int d = 0; d < 30; d++) {
+          final checkDate = today.add(Duration(days: d));
+          final lunarBirthday = Birthday.fromPlaceholderLunar(placeholder, now.year, checkDate);
+          if (lunarBirthday != null) {
+            items.add(UpcomingItem.fromBirthday(lunarBirthday, groupId, groupName));
+          }
+        }
+      }
+    }
+
     // Sort by date
     items.sort((a, b) => a.date.compareTo(b.date));
 
     return items;
   }
 }
+

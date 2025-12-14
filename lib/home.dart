@@ -468,6 +468,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
         events: _events,
         locations: _locations,
         allUsers: _allUsers,
+        placeholderMembers: _placeholderMembers,
         groupNames: groupNames,
         onDateTap: (date) {
           // Get data for the selected date
