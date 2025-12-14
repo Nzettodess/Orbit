@@ -2,7 +2,9 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart'; // Needed for CalendarController
 import 'login.dart';
@@ -730,7 +732,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
         elevation: 1,
         title: Row(
           children: [
-            Image.asset("assets/orbit_logo.png", height: 32),
+            SvgPicture.asset("assets/orbit_logo.svg", height: 40),
             const SizedBox(width: 8),
             const Text("Orbit", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
           ],

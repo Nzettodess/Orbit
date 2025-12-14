@@ -52,6 +52,7 @@ dependencies:
   cached_network_image: ^3.3.1
   intl: ^0.20.2
   flutter_dotenv: ^5.2.1
+  flutter_svg: ^2.2.3
 
 
 
@@ -78,6 +79,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/orbit_logo.png
+    - assets/orbit_logo.svg
     - assets/google_logo.png
     - .env
 
