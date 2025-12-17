@@ -442,20 +442,25 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         });
                       },
                     ),
-
-                    const SizedBox(height: 30),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _saveSettings,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.getButtonBackground(context),
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text("Save Settings"),
-                      ),
-                    ),
                   ],
+                ),
+              ),
+            ),
+            
+            // FIXED FOOTER - Save button stays at bottom
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _saveSettings,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.getButtonBackground(context),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text("Save Settings"),
                 ),
               ),
             ),

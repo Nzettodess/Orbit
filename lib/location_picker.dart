@@ -170,18 +170,22 @@ class _LocationPickerState extends State<LocationPicker> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Set Location",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // SCROLLABLE CONTENT
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Set Location",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
             
             // Member Selection (if owner/admin with members to manage, or placeholder members exist)
             if (widget.placeholderMembers.isNotEmpty || 
@@ -483,44 +487,52 @@ class _LocationPickerState extends State<LocationPicker> {
                 });
               },
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (countryValue != null && selectedMemberIds.isNotEmpty) {
-                    widget.onLocationSelected(
-                      countryValue!, 
-                      stateValue, 
-                      startDate, 
-                      endDate,
-                      selectedMemberIds.toList(),
-                    );
-                    Navigator.pop(context);
-                  } else if (countryValue == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Please select a country")),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Please select at least one member")),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.getButtonBackground(context),
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: Text(
-                  "Save Location for ${selectedMemberIds.length} member${selectedMemberIds.length > 1 ? 's' : ''} " 
-                  "($_dayCount day${_dayCount > 1 ? 's' : ''})"
-                ),
+              ],
+            ),
+          ),
+        ),
+        
+        // FIXED FOOTER - Save button stays at bottom
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                if (countryValue != null && selectedMemberIds.isNotEmpty) {
+                  widget.onLocationSelected(
+                    countryValue!, 
+                    stateValue, 
+                    startDate, 
+                    endDate,
+                    selectedMemberIds.toList(),
+                  );
+                  Navigator.pop(context);
+                } else if (countryValue == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please select a country")),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please select at least one member")),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.getButtonBackground(context),
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Text(
+                "Save Location for ${selectedMemberIds.length} member${selectedMemberIds.length > 1 ? 's' : ''} " 
+                "($_dayCount day${_dayCount > 1 ? 's' : ''})"
               ),
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
+
