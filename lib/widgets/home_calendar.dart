@@ -40,10 +40,93 @@ class HomeCalendar extends StatefulWidget {
 }
 
 class _HomeCalendarState extends State<HomeCalendar> {
+  // === PERFORMANCE OPTIMIZATION: Cached data for O(1) lookups ===
+  // Instead of computing data for all 42 cells on every rebuild,
+  // we pre-compute once when month changes and store in maps
+  Map<String, List<UserLocation>> _cachedLocations = {};
+  Map<String, List<UserLocation>> _cachedTravelers = {};
+  Map<String, List<GroupEvent>> _cachedEvents = {};
+  Map<String, List<Holiday>> _cachedHolidays = {};
+  Map<String, List<Birthday>> _cachedBirthdays = {};
+  Map<String, List<String>> _cachedReligiousDates = {};
+  DateTime? _lastCachedMonth;
 
+  @override
+  void didUpdateWidget(HomeCalendar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Invalidate cache when data changes
+    if (oldWidget.locations != widget.locations ||
+        oldWidget.events != widget.events ||
+        oldWidget.holidays != widget.holidays ||
+        oldWidget.allUsers != widget.allUsers ||
+        oldWidget.placeholderMembers != widget.placeholderMembers ||
+        oldWidget.currentViewMonth.month != widget.currentViewMonth.month ||
+        oldWidget.currentViewMonth.year != widget.currentViewMonth.year) {
+      _precomputeMonthData(widget.currentViewMonth);
+    }
+  }
 
-  // Helper to get effective locations for a date (includes ALL users for detail modal)
-  List<UserLocation> _getLocationsForDate(DateTime date) {
+  @override
+  void initState() {
+    super.initState();
+    // Initial precompute
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _precomputeMonthData(widget.currentViewMonth);
+    });
+  }
+
+  /// Pre-compute all data for the visible month (42 dates)
+  /// This runs ONCE when month changes, not 42 times per frame
+  void _precomputeMonthData(DateTime month) {
+    if (_lastCachedMonth?.year == month.year && 
+        _lastCachedMonth?.month == month.month) {
+      return; // Already cached for this month
+    }
+    
+    _lastCachedMonth = month;
+    _cachedLocations.clear();
+    _cachedTravelers.clear();
+    _cachedEvents.clear();
+    _cachedHolidays.clear();
+    _cachedBirthdays.clear();
+    _cachedReligiousDates.clear();
+    
+    // Get the 42 visible dates for this month view
+    final visibleDates = _getVisibleDatesForMonth(month);
+    
+    for (final date in visibleDates) {
+      final key = _dateKey(date);
+      
+      // Pre-compute all data for this date
+      _cachedLocations[key] = _computeLocationsForDate(date);
+      _cachedTravelers[key] = _computeTravelersForDate(date);
+      _cachedEvents[key] = widget.events.where((e) => 
+        e.date.year == date.year && e.date.month == date.month && e.date.day == date.day).toList();
+      _cachedHolidays[key] = widget.holidays.where((h) => 
+        h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
+      _cachedBirthdays[key] = _computeBirthdaysForDate(date);
+      _cachedReligiousDates[key] = widget.tileCalendarDisplay == 'none' 
+        ? [] 
+        : ReligiousCalendarHelper.getReligiousDates(date, [widget.tileCalendarDisplay]);
+    }
+    
+    if (mounted) setState(() {});
+  }
+
+  /// Get the 42 visible dates for a month view
+  List<DateTime> _getVisibleDatesForMonth(DateTime month) {
+    final firstOfMonth = DateTime(month.year, month.month, 1);
+    final startWeekday = firstOfMonth.weekday % 7; // Sunday = 0
+    final startDate = firstOfMonth.subtract(Duration(days: startWeekday));
+    
+    return List.generate(42, (i) => startDate.add(Duration(days: i)));
+  }
+
+  String _dateKey(DateTime date) => '${date.year}-${date.month}-${date.day}';
+
+  // Compute effective locations for a date (includes ALL users for detail modal)
+  // Used by _precomputeMonthData - NOT called in monthCellBuilder
+  List<UserLocation> _computeLocationsForDate(DateTime date) {
     // 1. Get explicit locations (manually set for this date)
     final explicit = widget.locations.where((l) => 
       l.date.year == date.year && l.date.month == date.month && l.date.day == date.day).toList();
@@ -119,9 +202,10 @@ class _HomeCalendarState extends State<HomeCalendar> {
   }
 
 
-  // Helper to get users with explicit location entries (for avatar display)
+  // Compute users with explicit location entries (for avatar display)
   // Deduplicated by userId - each user appears only once
-  List<UserLocation> _getTravelersForDate(DateTime date) {
+  // Used by _precomputeMonthData - NOT called in monthCellBuilder
+  List<UserLocation> _computeTravelersForDate(DateTime date) {
     final locationsForDate = widget.locations.where((l) => 
       l.date.year == date.year && l.date.month == date.month && l.date.day == date.day).toList();
     
@@ -136,8 +220,9 @@ class _HomeCalendarState extends State<HomeCalendar> {
     return uniqueUsers.values.toList();
   }
 
-  // Helper to get birthdays for a date (both solar and lunar)
-  List<Birthday> _getBirthdaysForDate(DateTime date) {
+  // Compute birthdays for a date (both solar and lunar)
+  // Used by _precomputeMonthData - NOT called in monthCellBuilder
+  List<Birthday> _computeBirthdaysForDate(DateTime date) {
     final birthdays = <Birthday>[];
     
     // Regular users
@@ -184,11 +269,71 @@ class _HomeCalendarState extends State<HomeCalendar> {
     return birthdays;
   }
 
+  /// Get responsive sizes based on screen width
+  /// Mobile (<500): smaller fonts, tighter spacing, hide lunar month
+  /// Tablet (500-800): medium sizing
+  /// Desktop (>800): original sizing
+  _ResponsiveSizes _getResponsiveSizes(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    
+    if (width < 500) {
+      // Mobile - compact sizing, hide lunar month text
+      // iPhone 14 Pro Max is 430px, so use 500px breakpoint
+      return _ResponsiveSizes(
+        cardMargin: 8.0,
+        dayFontSize: 12.0,
+        religiousFontSize: 7.0,
+        barFontSize: 6.5,
+        moreFontSize: 6.0,
+        avatarSize: 16.0,
+        avatarSizeMedium: 13.0,
+        avatarSizeSmall: 11.0,
+        cellPadding: 0.5,
+        maxAvatars: 3,  // Fewer avatars on mobile
+        showLunarMonth: false,  // Hide month like 十月, only show day
+        maxBars: 6,  // More rows since mobile screens are tall
+      );
+    } else if (width < 800) {
+      // Tablet (500-800px) - medium sizing
+      return _ResponsiveSizes(
+        cardMargin: 12.0,
+        dayFontSize: 13.0,
+        religiousFontSize: 8.0,
+        barFontSize: 7.0,
+        moreFontSize: 6.5,
+        avatarSize: 18.0,
+        avatarSizeMedium: 14.0,
+        avatarSizeSmall: 12.0,
+        cellPadding: 0.75,
+        maxAvatars: 6,
+        showLunarMonth: true,  // Show lunar month on tablet
+        maxBars: 2,  // Medium event bars
+      );
+    } else {
+      // Desktop - original sizing
+      return _ResponsiveSizes(
+        cardMargin: 20.0,
+        dayFontSize: 14.0,
+        religiousFontSize: 9.0,
+        barFontSize: 7.5,
+        moreFontSize: 7.0,
+        avatarSize: 20.0,
+        avatarSizeMedium: 15.0,
+        avatarSizeSmall: 13.0,
+        cellPadding: 1.0,
+        maxAvatars: 8,
+        showLunarMonth: true,  // Show lunar month on desktop
+        maxBars: 3,  // More event bars on large screens
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final sizes = _getResponsiveSizes(context);
+    
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      margin: EdgeInsets.symmetric(horizontal: sizes.cardMargin),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: SfCalendar(
@@ -216,40 +361,61 @@ class _HomeCalendarState extends State<HomeCalendar> {
                          date.day == DateTime.now().day;
           final isCurrentMonth = date.month == widget.currentViewMonth.month;
           
-          // ignore: unused_local_variable - needed for onTap handler below
-          final dayLocations = _getLocationsForDate(date);  // For detail modal
-          final dayTravelers = _getTravelersForDate(date);  // For avatar display
-          final dayHolidays = widget.holidays.where((h) => 
-            h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
-          final dayEvents = widget.events.where((e) => 
-            e.date.year == date.year && e.date.month == date.month && e.date.day == date.day).toList();
-          final dayBirthdays = _getBirthdaysForDate(date);  // Get birthdays for this date
+          // === PERFORMANCE: O(1) cached lookups instead of O(n) computations ===
+          final key = _dateKey(date);
+          final dayLocations = _cachedLocations[key] ?? [];  // For detail modal
+          final dayTravelers = _cachedTravelers[key] ?? [];  // For avatar display
+          final dayHolidays = _cachedHolidays[key] ?? [];
+          final dayEvents = _cachedEvents[key] ?? [];
+          final dayBirthdays = _cachedBirthdays[key] ?? [];
+          final religiousDates = _cachedReligiousDates[key] ?? [];
           
-          // Get religious calendar dates for this day
-          final religiousDates = ReligiousCalendarHelper.getReligiousDates(
-            date, 
-            widget.tileCalendarDisplay == 'none' ? [] : [widget.tileCalendarDisplay]
-          );
+          // Filter religious dates on narrow screens - hide month like 十月, only show day number
+          // Note: 🏮 lantern is already added by ReligiousCalendarHelper
+          final filteredReligiousDates = sizes.showLunarMonth 
+            ? religiousDates  // Keep full date with lantern from helper
+            : religiousDates.map((d) {
+                // Extract only the day portion (remove month like 十月, 腊月)
+                // Format from helper is "🏮 十月十二" - we want just "🏮十二"
+                if (d.contains('月')) {
+                  final parts = d.split('月');
+                  // Keep the lantern prefix, just remove month
+                  final prefix = d.startsWith('🏮') ? '🏮' : '';
+                  return parts.length > 1 ? '$prefix${parts[1]}' : d;
+                }
+                return d;
+              }).toList();
           
-          // Items to display as bars (Holidays, Events & Birthdays)
-          final allItems = <dynamic>[...dayHolidays, ...dayEvents, ...dayBirthdays];
-          final maxBars = 2;
-          final displayItems = allItems.take(maxBars).toList();
-          final remainingCount = allItems.length - maxBars;
-
           final isDarkMode = Theme.of(context).brightness == Brightness.dark;
           
-          return Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: isDarkMode ? Colors.white10 : Colors.grey.withOpacity(0.1)),
-              color: isToday 
-                ? Theme.of(context).colorScheme.primary.withOpacity(isDarkMode ? 0.35 : 0.2) // Higher opacity in dark mode for vibrancy
-                : (isCurrentMonth 
-                    ? Theme.of(context).colorScheme.surface 
-                    : (isDarkMode ? Colors.grey.shade900 : Colors.grey[50])),
+          // Use LayoutBuilder to calculate dynamic maxBars based on actual cell height
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // Calculate how many bars can fit
+              // Reserved space: header row (~20px) + avatar row (~24px) + padding (~10px) + safety margin
+              final reservedHeight = sizes.dayFontSize + 8 + sizes.avatarSize + 12;
+              final availableHeight = constraints.maxHeight - reservedHeight;
+              final barHeight = sizes.barFontSize + 5;  // bar font + padding + margin
+              
+              // Calculate maxBars dynamically (minimum 1, reasonable max)
+              final dynamicMaxBars = (availableHeight / barHeight).floor().clamp(1, 10);
+              
+              // Items to display as bars (Holidays, Events & Birthdays)
+              final allItems = <dynamic>[...dayHolidays, ...dayEvents, ...dayBirthdays];
+              final displayItems = allItems.take(dynamicMaxBars).toList();
+              final remainingCount = (allItems.length - dynamicMaxBars).clamp(0, 99);
+
+              return Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: isDarkMode ? Colors.white10 : Colors.grey.withOpacity(0.1)),
+                  color: isToday 
+                    ? Theme.of(context).colorScheme.primary.withOpacity(isDarkMode ? 0.35 : 0.2) // Higher opacity in dark mode for vibrancy
+                    : (isCurrentMonth 
+                        ? Theme.of(context).colorScheme.surface 
+                        : (isDarkMode ? Colors.grey.shade900 : Colors.grey[50])),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(1.0),
+              padding: EdgeInsets.all(sizes.cellPadding),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,19 +426,19 @@ class _HomeCalendarState extends State<HomeCalendar> {
                       Text(date.day.toString(), 
                         style: TextStyle(
                           fontWeight: FontWeight.bold, 
-                          fontSize: 14,
+                          fontSize: sizes.dayFontSize,
                           color: isToday 
                             ? Theme.of(context).colorScheme.primary 
                             : (isCurrentMonth 
                                 ? Theme.of(context).colorScheme.onSurface 
                                 : Theme.of(context).colorScheme.onSurface.withOpacity(0.4))
                         )),
-                      if (religiousDates.isNotEmpty)
+                      if (filteredReligiousDates.isNotEmpty)
                         Expanded(
                           child: Text(
-                            religiousDates.join(' '),
+                            filteredReligiousDates.join(' '),
                             style: TextStyle(
-                              fontSize: 9, 
+                              fontSize: sizes.religiousFontSize, 
                               color: isCurrentMonth 
                                 ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
                                 : Theme.of(context).colorScheme.onSurface.withOpacity(0.3), 
@@ -322,7 +488,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
                       width: double.infinity,
                       child: Text(
                         title,
-                        style: const TextStyle(color: Colors.white, fontSize: 7.5), // Reduced font size
+                        style: TextStyle(color: Colors.white, fontSize: sizes.barFontSize),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -334,7 +500,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
                       child: Text(
                         "+$remainingCount more",
                         style: TextStyle(
-                          fontSize: 7, // Reduced font size
+                          fontSize: sizes.moreFontSize,
                           color: isCurrentMonth ? Colors.grey : Colors.grey[300], 
                           fontWeight: FontWeight.bold
                         ),
@@ -347,18 +513,18 @@ class _HomeCalendarState extends State<HomeCalendar> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        ...dayTravelers.take(8).map((l) {
+                        ...dayTravelers.take(sizes.maxAvatars).map((l) {
                           final user = widget.allUsers.firstWhere((u) => u['uid'] == l.userId, orElse: () => {});
                           final name = user['displayName'] ?? user['email'] ?? "User";
                           final photoUrl = user['photoURL'];
                           
-                          // Dynamic sizing based on count
+                          // Dynamic sizing based on count - using responsive base sizes
                           final count = dayTravelers.length;
-                          final double avatarSize = count <= 8 
-                            ? 20.0  // Reduced from 24.0 to prevent overflow
+                          final double avatarSize = count <= sizes.maxAvatars 
+                            ? sizes.avatarSize
                             : count <= 12 
-                              ? 15.0  // Slightly smaller for medium groups
-                              : 13.0; // Small for very large groups
+                              ? sizes.avatarSizeMedium
+                              : sizes.avatarSizeSmall;
                           
                           // Use imageUrl: either photoUrl or fallback
                           final imageUrl = (photoUrl != null && photoUrl is String && photoUrl.isNotEmpty) 
@@ -416,8 +582,8 @@ class _HomeCalendarState extends State<HomeCalendar> {
                             ),
                           );
                         }).toList(),
-                        // Show +N more indicator if there are more than 8
-                        if (dayTravelers.length > 8)
+                        // Show +N more indicator if there are more than maxAvatars
+                        if (dayTravelers.length > sizes.maxAvatars)
                           Container(
                             width: 14,
                             height: 14,
@@ -427,7 +593,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
                             ),
                             child: Center(
                               child: Text(
-                                '+${dayTravelers.length - 8}',
+                                '+${dayTravelers.length - sizes.maxAvatars}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 7,
@@ -442,16 +608,18 @@ class _HomeCalendarState extends State<HomeCalendar> {
               ),
             ),
           );
+        },  // Close LayoutBuilder
+      );
         },
         onTap: (CalendarTapDetails details) {
           if (details.targetElement == CalendarElement.calendarCell && details.date != null) {
             final date = details.date!;
-            final dayLocations = _getLocationsForDate(date);
-            final dayHolidays = widget.holidays.where((h) => 
-              h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
-            final dayEvents = widget.events.where((e) => 
-              e.date.year == date.year && e.date.month == date.month && e.date.day == date.day).toList();
-            final dayBirthdays = _getBirthdaysForDate(date);
+            // Use cached data for onTap as well
+            final key = _dateKey(date);
+            final dayLocations = _cachedLocations[key] ?? _computeLocationsForDate(date);
+            final dayHolidays = _cachedHolidays[key] ?? [];
+            final dayEvents = _cachedEvents[key] ?? [];
+            final dayBirthdays = _cachedBirthdays[key] ?? _computeBirthdaysForDate(date);
 
             showModalBottomSheet(
               context: context,
@@ -486,4 +654,35 @@ class _HomeCalendarState extends State<HomeCalendar> {
         return 'th';
     }
   }
+}
+
+/// Helper class for responsive sizing
+class _ResponsiveSizes {
+  final double cardMargin;
+  final double dayFontSize;
+  final double religiousFontSize;
+  final double barFontSize;
+  final double moreFontSize;
+  final double avatarSize;
+  final double avatarSizeMedium;
+  final double avatarSizeSmall;
+  final double cellPadding;
+  final int maxAvatars;
+  final bool showLunarMonth;  // Hide month text like 十月 on narrow screens
+  final int maxBars;  // Dynamic event bar count based on cell height
+
+  const _ResponsiveSizes({
+    required this.cardMargin,
+    required this.dayFontSize,
+    required this.religiousFontSize,
+    required this.barFontSize,
+    required this.moreFontSize,
+    required this.avatarSize,
+    required this.avatarSizeMedium,
+    required this.avatarSizeSmall,
+    required this.cellPadding,
+    required this.maxAvatars,
+    required this.showLunarMonth,
+    required this.maxBars,
+  });
 }
