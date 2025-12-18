@@ -70,8 +70,7 @@
       margin: 0;
       padding: 0;
       overflow: hidden !important;
-      position: fixed;
-      /* Stop layout shifting */
+      /* Remove position: fixed; for Android stability */
       top: 0;
       left: 0;
     }
@@ -83,8 +82,7 @@
       margin: 0;
       padding: 0;
       overflow: hidden !important;
-      position: fixed !important;
-      /* Force stability */
+      /* Remove position: fixed; for Android stability */
       top: 0;
       left: 0;
     }
@@ -443,17 +441,20 @@
     })();
 
     // Robust Keyboard Dismissal Fix for Flutter PWA
-    // Using initialHeight tracking for precise recovery
+    // Using initialHeight tracking and stability guards for precise recovery
     if (window.visualViewport) {
       const initialHeight = window.visualViewport.height;
 
       window.visualViewport.addEventListener('resize', () => {
         const currentHeight = window.visualViewport.height;
 
-        // If height returned to > 95% of initial, keyboard is highly likely gone
+        // Android Stability Guard: Only trigger if viewport returned to full size
+        // and stays there for a moment (prevents the "flash" during transitions)
         if (currentHeight >= initialHeight * 0.95) {
-          // Reinforced "Quad-Kick" reset
           setTimeout(() => {
+            // Double check height to ensure it didn't shrink again (keyboard still opening)
+            if (window.visualViewport.height < initialHeight * 0.95) return;
+
             window.scrollTo(0, 0);
             document.body.scrollTop = 0;
             // Kick 1: Layout shift to trigger browser reflow
@@ -465,7 +466,7 @@
             if (window.visualViewport.dispatchEvent) {
               window.visualViewport.dispatchEvent(new Event('resize'));
             }
-          }, 150);
+          }, 300); // Slightly longer delay for Android transition stability
         }
       });
     }
