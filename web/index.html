@@ -64,18 +64,18 @@
 
     /* PWA Keyboard/Viewport Fix: Force height to fill dynamic viewport */
     html,
-    body {
+    body,
+    flt-glass-pane,
+    flt-scene-host {
       height: 100dvh !important;
-      width: 100% !important;
+      width: 100vw !important;
       margin: 0;
       padding: 0;
-      overflow: hidden;
-      /* Prevent historical scroll gaps */
-    }
-
-    #flutter-app {
-      height: 100dvh !important;
-      width: 100% !important;
+      overflow: hidden !important;
+      position: fixed;
+      /* Stop layout shifting */
+      top: 0;
+      left: 0;
     }
 
     /* Loading skeleton screen */
@@ -436,15 +436,20 @@
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', () => {
         // Detect if viewport returned to full size (keyboard hidden)
-        // We use 0.9 as a threshold to account for address bar shifts
         if (window.visualViewport.height >= window.innerHeight * 0.9) {
-          // Robust "Snap-Back" reset
+          // Reinforced "Quad-Kick" reset
           setTimeout(() => {
             window.scrollTo(0, 0);
             document.body.scrollTop = 0;
-            // Force a layout shift to kick the browser into re-calculating the flow
+            // Kick 1: Layout shift
             window.scrollBy(0, 1);
             window.scrollBy(0, -1);
+            // Kick 2: Trigger Flutter's internal metrics logic
+            window.dispatchEvent(new Event('resize'));
+            // Kick 3: Visual Viewport specific trigger
+            if (window.visualViewport.dispatchEvent) {
+              window.visualViewport.dispatchEvent(new Event('resize'));
+            }
           }, 150);
         }
       });

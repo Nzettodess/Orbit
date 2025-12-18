@@ -438,10 +438,11 @@ class _ProfileDialogState extends State<ProfileDialog> {
             );
           },
         ),
-        ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   String _formatBirthday(dynamic birthday) {
     if (birthday == null) return "Not set";
