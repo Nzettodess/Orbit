@@ -35,9 +35,10 @@ class HomeWithLogin extends StatefulWidget {
   State<HomeWithLogin> createState() => _HomeWithLoginState();
 }
 
-class _HomeWithLoginState extends State<HomeWithLogin> {
+class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserver {
   User? _user = FirebaseAuth.instance.currentUser;
   String? _photoUrl;
+  double _previousKeyboardHeight = 0;
   final FirestoreService _firestoreService = FirestoreService();
   final GoogleCalendarService _googleCalendarService = GoogleCalendarService();
   
@@ -67,6 +68,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     
     // Listen to auth state changes (login/logout)
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
@@ -93,7 +95,20 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
   }
   
   @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    // Detect when keyboard closes and unfocus to properly reset UI
+    final keyboardHeight = WidgetsBinding.instance.platformDispatcher.views.first.viewInsets.bottom;
+    if (_previousKeyboardHeight > 0 && keyboardHeight == 0) {
+      // Keyboard was open, now closed - unfocus
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+    _previousKeyboardHeight = keyboardHeight;
+  }
+  
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _cancelAllSubscriptions();
     super.dispose();
   }
