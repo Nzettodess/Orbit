@@ -313,11 +313,9 @@ class _DetailModalState extends State<DetailModal> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      builder: (sheetContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
             // Header with member name
             Container(
               padding: const EdgeInsets.fromLTRB(20, 16, 8, 0),
@@ -373,7 +371,6 @@ class _DetailModalState extends State<DetailModal> {
             ),
           ],
         ),
-      ),
     );
   }
 
@@ -568,8 +565,8 @@ class _DetailModalState extends State<DetailModal> {
 
                   trailing: Builder(builder: (context) {
                     final isNarrow = MediaQuery.of(context).size.width < 450;
-                    final iconSize = isNarrow ? 18.0 : 22.0;
-                    final btnSize = isNarrow ? 32.0 : 36.0;
+                    final iconSize = isNarrow ? 22.0 : 26.0;
+                    final btnSize = isNarrow ? 36.0 : 40.0;
                     
                     return Row(
                       mainAxisSize: MainAxisSize.min,
@@ -739,8 +736,8 @@ class _DetailModalState extends State<DetailModal> {
                             : Text("${element.nation}${element.state != null && element.state!.isNotEmpty ? ', ${element.state}' : ''}"),
                           trailing: Builder(builder: (context) {
                             final isNarrow = MediaQuery.of(context).size.width < 450;
-                            final iconSize = isNarrow ? 16.0 : 20.0;
-                            final btnSize = isNarrow ? 28.0 : 32.0;
+                            final iconSize = isNarrow ? 20.0 : 24.0;
+                            final btnSize = isNarrow ? 34.0 : 38.0;
                             final iconPadding = isNarrow ? 2.0 : 4.0;
                             return Row(
                               mainAxisSize: MainAxisSize.min,
@@ -810,11 +807,9 @@ class _DetailModalState extends State<DetailModal> {
                                     final result = await showModalBottomSheet<bool>(
                                       context: context,
                                       isScrollControlled: true,
-                                      builder: (sheetContext) => Padding(
-                                        padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
+                                      builder: (sheetContext) => Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
                                             // Header with member name
                                             Container(
                                               padding: const EdgeInsets.fromLTRB(20, 16, 8, 0),
@@ -856,7 +851,6 @@ class _DetailModalState extends State<DetailModal> {
                                             ),
                                           ],
                                         ),
-                                      ),
                                     );
                                     if (result == true && mounted) {
                                       Navigator.pop(context); // Refresh detail modal
