@@ -72,27 +72,41 @@ class _SyncfusionDatePickerDialogState extends State<SyncfusionDatePickerDialog>
               const Divider(),
               const SizedBox(height: 12),
               
-              // View mode buttons with clear labels
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.info_outline, size: 16, color: Colors.grey),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Switch view:',
-                      style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(width: 12),
-                    _buildViewButton('Years', DateRangePickerView.decade, Icons.calendar_view_month),
-                    const SizedBox(width: 8),
-                    _buildViewButton('Months', DateRangePickerView.year, Icons.grid_view),
-                    const SizedBox(width: 8),
-                    _buildViewButton('Days', DateRangePickerView.month, Icons.calendar_today),
-                  ],
-                ),
-              ),
+              // View mode buttons with clear labels - responsive
+              Builder(builder: (context) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final isVeryNarrow = screenWidth < 390;
+                return Container(
+                  padding: EdgeInsets.symmetric(vertical: isVeryNarrow ? 4 : 8),
+                  child: Column(
+                    children: [
+                      if (!isVeryNarrow)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Switch view:',
+                              style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      SizedBox(height: isVeryNarrow ? 0 : 6),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: isVeryNarrow ? 4 : 8,
+                        runSpacing: 4,
+                        children: [
+                          _buildViewButton('Years', DateRangePickerView.decade, Icons.calendar_view_month, isVeryNarrow),
+                          _buildViewButton('Months', DateRangePickerView.year, Icons.grid_view, isVeryNarrow),
+                          _buildViewButton('Days', DateRangePickerView.month, Icons.calendar_today, isVeryNarrow),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
               const SizedBox(height: 12),
               
               // Date picker - reduced height
@@ -231,18 +245,21 @@ class _SyncfusionDatePickerDialogState extends State<SyncfusionDatePickerDialog>
     }
   }
 
-  Widget _buildViewButton(String label, DateRangePickerView view, IconData icon) {
+  Widget _buildViewButton(String label, DateRangePickerView view, IconData icon, [bool isVeryNarrow = false]) {
     final isActive = currentView == view;
     return ElevatedButton.icon(
       onPressed: () => _changeView(view),
-      icon: Icon(icon, size: 16),
+      icon: Icon(icon, size: isVeryNarrow ? 14 : 16),
       label: Text(label),
       style: ElevatedButton.styleFrom(
         backgroundColor: isActive ? Colors.deepPurple : Colors.grey.shade200,
         foregroundColor: isActive ? Colors.white : Colors.black87,
         elevation: isActive ? 2 : 0,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        padding: EdgeInsets.symmetric(
+          horizontal: isVeryNarrow ? 8 : 12,
+          vertical: isVeryNarrow ? 6 : 8,
+        ),
+        textStyle: TextStyle(fontSize: isVeryNarrow ? 11 : 13, fontWeight: FontWeight.w500),
       ),
     );
   }

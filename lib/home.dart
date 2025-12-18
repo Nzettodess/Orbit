@@ -53,6 +53,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
   List<PlaceholderMember> _placeholderMembers = [];
   List<Group> _myGroups = [];
   final CalendarController _calendarController = CalendarController();
+  bool _speedDialOpen = false;
   
   // Subscription management to prevent stale data
   StreamSubscription? _groupsSubscription;
@@ -1012,22 +1013,94 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
           ],
         ],
       ),
-      floatingActionButton: loggedIn ? Column(
+      floatingActionButton: loggedIn ? _buildSpeedDial() : null,
+    );
+  }
+
+  Widget _buildSpeedDial() {
+    return AnimatedOpacity(
+      opacity: _speedDialOpen ? 1.0 : 0.5,
+      duration: const Duration(milliseconds: 200),
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // Expanded options (visible when open)
+          if (_speedDialOpen) ...[
+            _buildSpeedDialOption(
+              icon: Icons.event,
+              label: 'Add Event',
+              onTap: () {
+                setState(() => _speedDialOpen = false);
+                _openAddEventModal();
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildSpeedDialOption(
+              icon: Icons.add_location,
+              label: 'Add Location',
+              onTap: () {
+                setState(() => _speedDialOpen = false);
+                _openLocationPicker();
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+          // Main FAB
           FloatingActionButton(
-            heroTag: "event",
-            onPressed: _openAddEventModal,
-            child: const Icon(Icons.event, color: Colors.black),
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            heroTag: "location",
-            onPressed: _openLocationPicker,
-            child: const Icon(Icons.add_location, color: Colors.black),
+            heroTag: "speedDial",
+            onPressed: () => setState(() => _speedDialOpen = !_speedDialOpen),
+            child: AnimatedRotation(
+              turns: _speedDialOpen ? 0.125 : 0, // 45 degree rotation
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                _speedDialOpen ? Icons.close : Icons.add,
+                color: Colors.black,
+              ),
+            ),
           ),
         ],
-      ) : null,
+      ),
+    );
+  }
+
+  Widget _buildSpeedDialOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        FloatingActionButton.small(
+          heroTag: label,
+          onPressed: onTap,
+          child: Icon(icon, color: Colors.black, size: 20),
+        ),
+      ],
     );
   }
 }

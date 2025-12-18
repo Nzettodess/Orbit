@@ -561,67 +561,100 @@ class _DetailModalState extends State<DetailModal> {
                            return Text("Owner: ${data?['displayName'] ?? 'Unknown'}", style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Theme.of(context).hintColor));
                          }
                          return const SizedBox.shrink();
-                       },
-                     ),
-                   ],
-                 ),
+                     },
+                   ),
+                 ],  // Close Column children
+               ),  // Close Column (subtitle)
 
-                 trailing: Row(
-                   mainAxisSize: MainAxisSize.min,
-                   children: [
-                     // Edit button - all members can edit
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue),
-                        tooltip: 'Edit Event',
-                        onPressed: () {
-                          Navigator.pop(context);
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            builder: (context) => AddEventModal(
-                              currentUserId: widget.currentUserId,
-                              initialDate: e.date,
-                              eventToEdit: e,
-                            ),
-                          );
-                        },
-                      ),
-                      // History button - shows if has edit history
-                      if (e.editHistory != null && e.editHistory!.isNotEmpty)
-                        IconButton(
-                          icon: const Icon(Icons.history, color: Colors.orange),
-                          tooltip: 'View History (${e.editHistory!.length})',
-                          onPressed: () => _showVersionHistoryDialog(e),
+                  trailing: Builder(builder: (context) {
+                    final isNarrow = MediaQuery.of(context).size.width < 450;
+                    final iconSize = isNarrow ? 18.0 : 22.0;
+                    final btnSize = isNarrow ? 32.0 : 36.0;
+                    
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Edit button
+                        SizedBox(
+                          width: btnSize,
+                          height: btnSize,
+                          child: IconButton(
+                            icon: Icon(Icons.edit, color: Colors.blue, size: iconSize),
+                            tooltip: 'Edit',
+                            padding: EdgeInsets.zero,
+                            onPressed: () {
+                              Navigator.pop(context);
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                builder: (context) => AddEventModal(
+                                  currentUserId: widget.currentUserId,
+                                  initialDate: e.date,
+                                  eventToEdit: e,
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      // Delete button - only owner or admin
-                      if (isOwner || _adminGroups.contains(e.groupId))
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          tooltip: 'Delete Event',
-                          onPressed: () async {
-                            await _firestoreService.deleteEvent(e.id);
-                            if (mounted) Navigator.pop(context);
-                          },
-                        ),
-                     IconButton(
-                        icon: const Icon(Icons.bar_chart, color: Colors.deepPurple),
-                        tooltip: 'RSVP Stats',
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => RSVPManagementDialog(
-                              currentUserId: widget.currentUserId,
+                        // History button
+                        if (e.editHistory != null && e.editHistory!.isNotEmpty)
+                          SizedBox(
+                            width: btnSize,
+                            height: btnSize,
+                            child: IconButton(
+                              icon: Icon(Icons.history, color: Colors.orange, size: iconSize),
+                              tooltip: 'History',
+                              padding: EdgeInsets.zero,
+                              onPressed: () => _showVersionHistoryDialog(e),
                             ),
-                          );
-                        },
-                      ),
-                     const SizedBox(width: 8),
-                     ElevatedButton(
-                       onPressed: () => _showRSVPDialog(e),
-                       child: const Text("RSVP"),
-                     ),
-                   ],
-                 ),
+                          ),
+                        // Delete button
+                        if (isOwner || _adminGroups.contains(e.groupId))
+                          SizedBox(
+                            width: btnSize,
+                            height: btnSize,
+                            child: IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red, size: iconSize),
+                              tooltip: 'Delete',
+                              padding: EdgeInsets.zero,
+                              onPressed: () async {
+                                await _firestoreService.deleteEvent(e.id);
+                                if (mounted) Navigator.pop(context);
+                              },
+                            ),
+                          ),
+                        // RSVP Stats button
+                        SizedBox(
+                          width: btnSize,
+                          height: btnSize,
+                          child: IconButton(
+                            icon: Icon(Icons.bar_chart, color: Colors.deepPurple, size: iconSize),
+                            tooltip: 'RSVP Stats',
+                            padding: EdgeInsets.zero,
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => RSVPManagementDialog(
+                                  currentUserId: widget.currentUserId,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        // RSVP Button
+                        SizedBox(
+                          width: btnSize,
+                          height: btnSize,
+                          child: IconButton(
+                            icon: Icon(Icons.how_to_reg, color: Colors.green, size: iconSize),
+                            tooltip: 'RSVP',
+                            padding: EdgeInsets.zero,
+                            onPressed: () => _showRSVPDialog(e),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
                );
              }).toList(),
              ),
@@ -684,8 +717,9 @@ class _DetailModalState extends State<DetailModal> {
                       builder: (context, canEditSnapshot) {
                         final canEditPlaceholder = canEditSnapshot.data ?? false;
 
-                        return ListTile(
+                        return GestureDetector(
                           onTap: () => _showUserProfileDialog(element, user),
+                          child: ListTile(
                           leading: isPlaceholder
                             ? CircleAvatar(
                                 backgroundColor: Colors.grey[300],
@@ -703,20 +737,32 @@ class _DetailModalState extends State<DetailModal> {
                                 style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
                               )
                             : Text("${element.nation}${element.state != null && element.state!.isNotEmpty ? ', ${element.state}' : ''}"),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
+                          trailing: Builder(builder: (context) {
+                            final isNarrow = MediaQuery.of(context).size.width < 450;
+                            final iconSize = isNarrow ? 16.0 : 20.0;
+                            final btnSize = isNarrow ? 28.0 : 32.0;
+                            final iconPadding = isNarrow ? 2.0 : 4.0;
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                               // Edit for placeholder members (owner/admin only)
                               if (isPlaceholder && canEditPlaceholder) ...[
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 20, color: Colors.blue),
-                                  onPressed: () => _editPlaceholderLocation(element),
-                                  tooltip: 'Edit Placeholder Location',
+                                SizedBox(
+                                  width: btnSize,
+                                  height: btnSize,
+                                  child: IconButton(
+                                    icon: Icon(Icons.edit, size: iconSize, color: Colors.blue),
+                                    padding: EdgeInsets.zero,
+                                    onPressed: () => _editPlaceholderLocation(element),
+                                    tooltip: 'Edit',
+                                  ),
                                 ),
                                 // Delete for placeholder members (only when location is set)
                                 if (element.nation != "No location selected")
                                   IconButton(
-                                    icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                                    icon: Icon(Icons.delete, size: iconSize, color: Colors.red),
+                                    padding: EdgeInsets.all(iconPadding),
+                                    constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
                                     onPressed: () => _deletePlaceholderLocation(element),
                                     tooltip: 'Delete Placeholder Location',
                                   ),
@@ -724,7 +770,9 @@ class _DetailModalState extends State<DetailModal> {
                               // Edit for own location OR manageable members (always available)
                               if (isCurrentUser || _manageableMembers.contains(element.userId))
                                 IconButton(
-                                  icon: const Icon(Icons.edit, size: 20),
+                                  icon: Icon(Icons.edit, size: iconSize),
+                                  padding: EdgeInsets.all(iconPadding),
+                                  constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
                                   onPressed: () async {
                                     // Target user for editing
                                     final targetUserId = element.userId;
@@ -821,7 +869,9 @@ class _DetailModalState extends State<DetailModal> {
                               if ((isCurrentUser || _manageableMembers.contains(element.userId)) && 
                                   element.nation != "No location selected")
                                 IconButton(
-                                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                                  icon: Icon(Icons.delete, size: iconSize, color: Colors.red),
+                                  padding: EdgeInsets.all(iconPadding),
+                                  constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
                                   onPressed: () async {
                                     final targetUserId = element.userId;
                                     final targetName = _userDetails[targetUserId]?['displayName'] ?? 'this member';
@@ -875,14 +925,19 @@ class _DetailModalState extends State<DetailModal> {
                                 ),
                           // Pin button for all users
                           IconButton(
-                            icon: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+                            icon: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: iconSize),
                             color: isPinned ? Colors.blue : Colors.grey,
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
+                            splashRadius: iconSize,
                             onPressed: () => _togglePin(element.userId),
                           ),
 
                         ],
-                      ),
-                    );
+                      );
+                  }),
+                  ),  // Close GestureDetector
+                );
                   },
                 );
               },
