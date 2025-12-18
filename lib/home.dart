@@ -763,7 +763,9 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
   Widget build(BuildContext context) {
     final loggedIn = _user != null;
 
-    return Scaffold(
+    return GestureDetector(
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent, // Glassmorphism base
@@ -1014,7 +1016,8 @@ class _HomeWithLoginState extends State<HomeWithLogin> {
         ],
       ),
       floatingActionButton: loggedIn ? _buildSpeedDial() : null,
-    );
+    ),  // Close Scaffold (child of GestureDetector)
+    );  // Close GestureDetector
   }
 
   Widget _buildSpeedDial() {
