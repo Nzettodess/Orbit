@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// Centralized color definitions for the app.
 /// Change colors here to update them throughout the app.
@@ -76,8 +75,16 @@ class AppTheme {
   static const Color _darkSurface = Color(0xFF1E1E1E);
   static const Color _darkSurfaceVariant = Color(0xFF2C2C2C);
 
+  // Use system fonts for instant loading - no font flash!
+  // These are universally available on all platforms
+  static const String _fontFamily = 'Segoe UI';
+  static const List<String> _fontFallback = ['Roboto', 'Helvetica', 'Arial', 'sans-serif'];
+
   static TextTheme _buildTextTheme(TextTheme base) {
-    return GoogleFonts.notoSansTextTheme(base);
+    return base.apply(
+      fontFamily: _fontFamily,
+      fontFamilyFallback: _fontFallback,
+    );
   }
 
   static ThemeData get lightTheme {
@@ -92,12 +99,14 @@ class AppTheme {
       scaffoldBackgroundColor: Colors.grey[50], // Slightly off-white for "Clean" look
       useMaterial3: true,
       textTheme: _buildTextTheme(base.textTheme),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent, // For glassmorphism
         elevation: 0,
         centerTitle: false,
-        iconTheme: IconThemeData(color: Colors.black87),
+        iconTheme: const IconThemeData(color: Colors.black87),
         titleTextStyle: TextStyle(
+          fontFamily: _fontFamily,
+          fontFamilyFallback: _fontFallback,
           color: Colors.black87,
           fontSize: 20,
           fontWeight: FontWeight.w600, // Modern weight
@@ -148,12 +157,14 @@ class AppTheme {
         bodyColor: Colors.white,
         displayColor: Colors.white,
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         titleTextStyle: TextStyle(
+          fontFamily: _fontFamily,
+          fontFamilyFallback: _fontFallback,
           color: Colors.white,
           fontSize: 20,
           fontWeight: FontWeight.w600,

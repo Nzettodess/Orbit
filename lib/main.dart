@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -27,15 +26,6 @@ void main() async {
     persistenceEnabled: true,
     cacheSizeBytes: 15 * 1024 * 1024, // 15MB
   );
-
-  // Preload Google Fonts in background (don't block app start)
-  GoogleFonts.pendingFonts([
-    GoogleFonts.inter(),
-  ]).then((_) {
-    debugPrint('[Main] Google Fonts loaded');
-  }).catchError((e) {
-    debugPrint('[Main] Font loading error: $e');
-  });
 
   runApp(const MyApp());
 }
