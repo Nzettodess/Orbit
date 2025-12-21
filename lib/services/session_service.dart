@@ -26,17 +26,22 @@ class SessionService {
     if (_isActive) return;
     _isActive = true;
 
-    // Register this session
+    print('[SessionService] Starting session: $sessionId for user: $userId');
+
+    // Register this session with current timestamp (not server timestamp for immediate read)
+    final now = DateTime.now();
     await _sessionRef.set({
       'device': _getDeviceInfo(),
-      'lastActive': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(),
+      'lastActive': Timestamp.fromDate(now),
+      'createdAt': Timestamp.fromDate(now),
     });
+
+    print('[SessionService] Session registered');
 
     // Heartbeat every 30 seconds
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (_isActive) {
-        _sessionRef.update({'lastActive': FieldValue.serverTimestamp()});
+        _sessionRef.update({'lastActive': Timestamp.fromDate(DateTime.now())});
       }
     });
 
@@ -47,11 +52,24 @@ class SessionService {
         .collection('active_sessions')
         .snapshots()
         .listen((snapshot) {
+      print('[SessionService] Received snapshot with ${snapshot.docs.length} documents');
+      
       // Filter to sessions active in last 2 minutes
       final activeSessions = snapshot.docs.where((doc) {
-        final lastActive = doc.data()['lastActive'] as Timestamp?;
-        if (lastActive == null) return false;
-        return DateTime.now().difference(lastActive.toDate()).inMinutes < 2;
+        final data = doc.data();
+        final lastActive = data['lastActive'] as Timestamp?;
+        final createdAt = data['createdAt'] as Timestamp?;
+        
+        // Use createdAt if lastActive is null (new session)
+        final activeTime = lastActive ?? createdAt;
+        if (activeTime == null) {
+          print('[SessionService] Session ${doc.id} has no timestamp, including');
+          return true; // Include sessions without timestamp (just created)
+        }
+        
+        final isActive = DateTime.now().difference(activeTime.toDate()).inMinutes < 2;
+        print('[SessionService] Session ${doc.id}: lastActive=${activeTime.toDate()}, isActive=$isActive');
+        return isActive;
       }).map((doc) {
         return {
           'id': doc.id,
@@ -60,7 +78,10 @@ class SessionService {
         };
       }).toList();
 
+      print('[SessionService] Active sessions: ${activeSessions.length}');
+
       if (activeSessions.length > 1) {
+        print('[SessionService] Multiple sessions detected! Triggering callback');
         onMultipleSessions(activeSessions);
       }
     });
@@ -99,8 +120,6 @@ class SessionService {
   /// Get device info for display
   String _getDeviceInfo() {
     if (kIsWeb) {
-      // For web, we don't have direct access to user agent in a clean way
-      // This is a simplified detection
       return 'Web Browser';
     }
     return 'Mobile App';

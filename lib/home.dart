@@ -28,7 +28,7 @@ import 'birthday_baby_dialog.dart';
 import 'services/connectivity_service.dart';
 import 'services/session_service.dart';
 import 'services/holiday_cache_service.dart';
-
+import 'widgets/skeleton_loading.dart';
 
 class HomeWithLogin extends StatefulWidget {
   const HomeWithLogin({super.key});
@@ -71,6 +71,9 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   // Session service for multi-device detection
   SessionService? _sessionService;
   bool _hasShownMultiSessionWarning = false;
+  
+  // Offline status for persistent banner
+  bool _isOffline = false;
 
   @override
   void initState() {
@@ -108,20 +111,17 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   }
   
   void _setupConnectivityListener() {
+    // Check initial state
+    _isOffline = !ConnectivityService().isOnline;
+    
     _connectivitySubscription = ConnectivityService().onlineStatus.listen((isOnline) {
       if (!mounted) return;
       
-      if (!isOnline) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(children: [
-            const Icon(Icons.cloud_off, color: Colors.white),
-            const SizedBox(width: 12),
-            const Expanded(child: Text('You are offline. Some features may be unavailable.')),
-          ]),
-          backgroundColor: Colors.orange[800],
-          duration: const Duration(seconds: 5),
-        ));
-      } else {
+      final wasOffline = _isOffline;
+      setState(() => _isOffline = !isOnline);
+      
+      // Only show "back online" snackbar when transitioning from offline to online
+      if (wasOffline && isOnline) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Row(children: [
             const Icon(Icons.cloud_done, color: Colors.white),
@@ -1034,46 +1034,80 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
           : null,
       body: Stack(
         children: [
+          // Persistent offline banner
+          if (_isOffline)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + kToolbarHeight,
+              left: 0,
+              right: 0,
+              child: Container(
+                color: Colors.orange[800],
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cloud_off, color: Colors.white, size: 18),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'You are offline. Some features may be unavailable.',
+                        style: TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Padding(
-            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + kToolbarHeight + 16), // Glassmorphism padding
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + kToolbarHeight + 16 + (_isOffline ? 40 : 0), // Add space for banner
+            ),
             child: Column(
             children: [
                 if (loggedIn)
-                  StreamBuilder<List<Group>>(
+                  _DelayedEmptyStateWidget(
                     stream: _firestoreService.getUserGroups(_user!.uid),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return Card(
-                          // Inherits minimal style from AppTheme
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              children: [
-                                Icon(Icons.group_add, size: 40, color: Theme.of(context).colorScheme.primary),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  "No Groups Yet",
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 5),
-                                Text("Create or join a group to see events.", textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
-                                const SizedBox(height: 10),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => const GroupManagementDialog(),
-                                    );
-                                  },
-                                  child: const Text("Get Started"),
-                                ),
-                              ],
+                    delayMs: 800, // Wait 800ms before showing empty state
+                    skeletonBuilder: () => Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            SkeletonCircle(size: 40),
+                            const SizedBox(height: 10),
+                            const SkeletonBox(width: 120, height: 16),
+                            const SizedBox(height: 5),
+                            const SkeletonBox(width: 200, height: 14),
+                          ],
+                        ),
+                      ),
+                    ),
+                    emptyBuilder: () => Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            Icon(Icons.group_add, size: 40, color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(height: 10),
+                            const Text(
+                              "No Groups Yet",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
+                            const SizedBox(height: 5),
+                            Text("Create or join a group to see events.", textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => const GroupManagementDialog(),
+                                );
+                              },
+                              child: const Text("Get Started"),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 
                 // Calendar Controls
@@ -1246,5 +1280,80 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
         ),
       ],
     );
+  }
+}
+
+/// Widget that shows skeleton during loading and waits a minimum delay
+/// before showing empty state to confirm data is truly empty
+class _DelayedEmptyStateWidget extends StatefulWidget {
+  final Stream<List<Group>> stream;
+  final int delayMs;
+  final Widget Function() skeletonBuilder;
+  final Widget Function() emptyBuilder;
+
+  const _DelayedEmptyStateWidget({
+    required this.stream,
+    required this.delayMs,
+    required this.skeletonBuilder,
+    required this.emptyBuilder,
+  });
+
+  @override
+  State<_DelayedEmptyStateWidget> createState() => _DelayedEmptyStateWidgetState();
+}
+
+class _DelayedEmptyStateWidgetState extends State<_DelayedEmptyStateWidget> {
+  bool _minDelayPassed = false;
+  bool _hasData = false;
+  List<Group>? _data;
+  StreamSubscription? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Start the minimum delay timer
+    Future.delayed(Duration(milliseconds: widget.delayMs), () {
+      if (mounted) {
+        setState(() => _minDelayPassed = true);
+      }
+    });
+
+    // Subscribe to the stream
+    _subscription = widget.stream.listen((data) {
+      if (mounted) {
+        setState(() {
+          _hasData = true;
+          _data = data;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // If we have groups, hide this widget
+    if (_hasData && _data != null && _data!.isNotEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // If minimum delay hasn't passed, show skeleton (or nothing if we already have data with groups)
+    if (!_minDelayPassed) {
+      return widget.skeletonBuilder();
+    }
+
+    // Delay passed - now show empty state only if confirmed empty
+    if (_hasData && _data != null && _data!.isEmpty) {
+      return widget.emptyBuilder();
+    }
+
+    // Still waiting for data after delay - keep showing skeleton
+    return widget.skeletonBuilder();
   }
 }

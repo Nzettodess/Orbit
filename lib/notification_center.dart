@@ -43,11 +43,17 @@ class _NotificationCenterState extends State<NotificationCenter> {
               child: StreamBuilder<List<AppNotification>>(
                 stream: _firestoreService.getNotifications(widget.currentUserId),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  // Show skeleton while loading
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                     return const SkeletonDialogContent(itemCount: 3);
                   }
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  // Only show empty state when we've CONFIRMED data is loaded and empty
+                  if (snapshot.hasData && snapshot.data!.isEmpty) {
                     return const Center(child: Text("No notifications"));
+                  }
+                  // Show skeleton if data is null but not waiting (transitional state)
+                  if (!snapshot.hasData) {
+                    return const SkeletonDialogContent(itemCount: 3);
                   }
 
                   final notifications = snapshot.data!;

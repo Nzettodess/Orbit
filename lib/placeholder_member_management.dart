@@ -79,7 +79,12 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
               child: StreamBuilder<List<PlaceholderMember>>(
                 stream: _firestoreService.getGroupPlaceholderMembers(widget.group.id),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  // Show skeleton while loading
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                    return const SkeletonDialogContent(itemCount: 3);
+                  }
+                  // Show skeleton if data is null but not waiting (transitional state)
+                  if (!snapshot.hasData) {
                     return const SkeletonDialogContent(itemCount: 3);
                   }
                   

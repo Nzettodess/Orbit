@@ -99,11 +99,16 @@ class _RSVPManagementDialogState extends State<RSVPManagementDialog> {
               child: StreamBuilder<List<GroupEvent>>(
                 stream: _firestoreService.getAllUserEvents(widget.currentUserId),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  // Show skeleton while loading
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                     return const SkeletonDialogContent(itemCount: 3);
                   }
-
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  // Show skeleton if data is null but not waiting (transitional state)
+                  if (!snapshot.hasData) {
+                    return const SkeletonDialogContent(itemCount: 3);
+                  }
+                  // Only show empty state when we've CONFIRMED data is loaded and empty
+                  if (snapshot.data!.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,

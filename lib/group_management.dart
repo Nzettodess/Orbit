@@ -232,11 +232,17 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
               child: StreamBuilder<List<Group>>(
                 stream: _firestoreService.getUserGroups(_user!.uid),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  // Show skeleton while loading
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                     return const SkeletonDialogContent(itemCount: 2);
                   }
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  // Only show empty state when we've CONFIRMED data is loaded and empty
+                  if (snapshot.hasData && snapshot.data!.isEmpty) {
                     return const Center(child: Text("You haven't joined any groups yet."));
+                  }
+                  // Show skeleton if data is null but not waiting (transitional state)
+                  if (!snapshot.hasData) {
+                    return const SkeletonDialogContent(itemCount: 2);
                   }
 
                   final groups = snapshot.data!;
