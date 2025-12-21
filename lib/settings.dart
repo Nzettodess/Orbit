@@ -167,24 +167,64 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isNarrow = screenWidth < 450;
+    final isVeryNarrow = screenWidth < 380;
+    
+    // Use 95% of screen width on mobile, capped at 500 for larger screens
+    final dialogWidth = screenWidth < 550 ? screenWidth * 0.95 : 500.0;
+    
+    // Responsive text styles
+    final sectionTitleStyle = TextStyle(
+      fontSize: isVeryNarrow ? 14 : (isNarrow ? 15 : 16),
+      fontWeight: FontWeight.bold,
+    );
+    final bodyTextStyle = TextStyle(
+      fontSize: isVeryNarrow ? 12 : (isNarrow ? 13 : 14),
+    );
+    final smallTextStyle = TextStyle(
+      fontSize: isVeryNarrow ? 11 : (isNarrow ? 12 : 13),
+    );
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isVeryNarrow ? 8 : (isNarrow ? 12 : 24),
+        vertical: 24,
+      ),
       child: Container(
+        width: dialogWidth,
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.8,
-          maxWidth: 500,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // FIXED HEADER
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+              padding: EdgeInsets.fromLTRB(
+                isNarrow ? 12 : 20, 
+                isNarrow ? 12 : 20, 
+                isNarrow ? 8 : 20, 
+                isNarrow ? 8 : 10
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Settings", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                  Text("Settings", style: TextStyle(
+                    fontSize: isNarrow ? 18 : 20, 
+                    fontWeight: FontWeight.bold
+                  )),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    iconSize: isNarrow ? 20 : 24,
+                    onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(
+                      minWidth: isNarrow ? 32 : 48,
+                      minHeight: isNarrow ? 32 : 48,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -193,15 +233,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
             // SCROLLABLE CONTENT
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20.0),
+                padding: EdgeInsets.all(isVeryNarrow ? 12 : (isNarrow ? 16 : 20)),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Holiday Countries Section
-                    const Text("Public Holidays", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 5),
-                    const Text("Your default location country will be used automatically. You can add one additional country."),
-                    const SizedBox(height: 10),
+                    Text("Public Holidays", style: sectionTitleStyle),
+                    SizedBox(height: isNarrow ? 4 : 5),
+                    Text(
+                      "Your default location country will be used automatically. You can add one additional country.",
+                      style: bodyTextStyle,
+                    ),
+                    SizedBox(height: isNarrow ? 8 : 10),
                     
                     // Show what will be used
                     StreamBuilder<DocumentSnapshot>(
@@ -246,13 +289,25 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (primaryCountry != null) ...[ Text("Primary: ${_countryMap[primaryCountry] ?? primaryCountry} (from your default location)", 
-                                style: const TextStyle(fontWeight: FontWeight.w500)),
-                              const SizedBox(height: 10),
+                            if (primaryCountry != null) ...[
+                              Text(
+                                "Primary: ${_countryMap[primaryCountry] ?? primaryCountry} (from your default location)", 
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: isVeryNarrow ? 12 : (isNarrow ? 13 : 14),
+                                ),
+                              ),
+                              SizedBox(height: isNarrow ? 8 : 10),
                             ] else ...[
-                              const Text("⚠️ Set your default location in Profile to enable holidays", 
-                                style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500)),
-                              const SizedBox(height: 10),
+                              Text(
+                                "⚠️ Set your default location in Profile to enable holidays", 
+                                style: TextStyle(
+                                  color: Colors.orange, 
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: isVeryNarrow ? 12 : (isNarrow ? 13 : 14),
+                                ),
+                              ),
+                              SizedBox(height: isNarrow ? 8 : 10),
                             ],
                           ],
                         );
@@ -262,25 +317,33 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     // Additional country selection
                     if (_holidayCountries.isNotEmpty) ...[
                       Chip(
-                        label: Text("Additional: ${_countryMap[_holidayCountries[0]] ?? _holidayCountries[0]}"),
+                        label: Text(
+                          "Additional: ${_countryMap[_holidayCountries[0]] ?? _holidayCountries[0]}",
+                          style: smallTextStyle,
+                        ),
                         onDeleted: () {
                           setState(() {
                             _holidayCountries.clear();
                           });
                         },
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: isNarrow ? 8 : 10),
                     ],
                     
                     // Add additional country button
                     if (_holidayCountries.isEmpty)
                       DropdownButtonFormField<String>(
                         value: null,
-                        hint: const Text("Add Additional Country (Optional)"),
+                        hint: Text(
+                          isVeryNarrow ? "Add Country (Optional)" : "Add Additional Country (Optional)",
+                          style: smallTextStyle,
+                        ),
+                        isExpanded: true,
+                        style: bodyTextStyle.copyWith(color: Theme.of(context).colorScheme.onSurface),
                         items: _countryMap.entries
                             .map((entry) => DropdownMenuItem(
                               value: entry.key, 
-                              child: Text(entry.value)
+                              child: Text(entry.value, style: bodyTextStyle)
                             )).toList(),
                         onChanged: (value) {
                           if (value != null) {
@@ -291,19 +354,26 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         },
                       ),
 
-                    const SizedBox(height: 20),
+                    SizedBox(height: isNarrow ? 16 : 20),
                     
                     DropdownButtonFormField<String>(
                       value: _themeMode,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
                         labelText: "App Theme",
-                        prefixIcon: Icon(Icons.brightness_6),
+                        labelStyle: smallTextStyle,
+                        prefixIcon: Icon(Icons.brightness_6, size: isNarrow ? 20 : 24),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: isNarrow ? 10 : 12,
+                          vertical: isNarrow ? 12 : 16,
+                        ),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'system', child: Text('System Default')),
-                        DropdownMenuItem(value: 'light', child: Text('Light Mode')),
-                        DropdownMenuItem(value: 'dark', child: Text('Dark Mode')),
+                      isExpanded: true,
+                      style: bodyTextStyle.copyWith(color: Theme.of(context).colorScheme.onSurface),
+                      items: [
+                        DropdownMenuItem(value: 'system', child: Text('System Default', style: bodyTextStyle)),
+                        DropdownMenuItem(value: 'light', child: Text('Light Mode', style: bodyTextStyle)),
+                        DropdownMenuItem(value: 'dark', child: Text('Dark Mode', style: bodyTextStyle)),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -314,24 +384,31 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       },
                     ),
 
-                    const SizedBox(height: 20),
+                    SizedBox(height: isNarrow ? 16 : 20),
 
                     // Calendar Tile Display Setting
-                    const Text("Calendar Tile Display", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 5),
-                    const Text("Choose which calendar system to show on calendar tiles:"),
-                    const SizedBox(height: 10),
+                    Text("Calendar Tile Display", style: sectionTitleStyle),
+                    SizedBox(height: isNarrow ? 4 : 5),
+                    Text("Choose which calendar system to show on calendar tiles:", style: bodyTextStyle),
+                    SizedBox(height: isNarrow ? 8 : 10),
                     
                     DropdownButtonFormField<String>(
                       value: _tileCalendarDisplay,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
                         labelText: "Tile Calendar Display",
+                        labelStyle: smallTextStyle,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: isNarrow ? 10 : 12,
+                          vertical: isNarrow ? 12 : 16,
+                        ),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'none', child: Text('None - Gregorian only')),
-                        DropdownMenuItem(value: 'chinese', child: Text('🏮 Chinese Lunar (农历)')),
-                        DropdownMenuItem(value: 'islamic', child: Text('☪️ Islamic Hijri')),
+                      isExpanded: true,
+                      style: bodyTextStyle.copyWith(color: Theme.of(context).colorScheme.onSurface),
+                      items: [
+                        DropdownMenuItem(value: 'none', child: Text('None - Gregorian only', style: bodyTextStyle)),
+                        DropdownMenuItem(value: 'chinese', child: Text('🏮 Chinese Lunar (农历)', style: bodyTextStyle)),
+                        DropdownMenuItem(value: 'islamic', child: Text('☪️ Islamic Hijri', style: bodyTextStyle)),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -342,20 +419,22 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       },
                     ),
 
-                    const SizedBox(height: 20),
+                    SizedBox(height: isNarrow ? 16 : 20),
                     
                     // Religious Calendars for Public Holidays
-                    const Text("Religious Public Holidays (API)", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 5),
-                    const Text("Select religious calendars to fetch public holidays (Ramadan, Eid, Chinese New Year, etc.):"),
-                    const SizedBox(height: 10),
+                    Text("Religious Public Holidays (API)", style: sectionTitleStyle),
+                    SizedBox(height: isNarrow ? 4 : 5),
+                    Text("Select religious calendars to fetch public holidays (Ramadan, Eid, Chinese New Year, etc.):", style: bodyTextStyle),
+                    SizedBox(height: isNarrow ? 8 : 10),
                     
                     // Religious calendar checkboxes
                     ..._religiousCalendarMap.entries.map((entry) {
                       final isSelected = _religiousCalendars.contains(entry.key);
                       return CheckboxListTile(
-                        title: Text(entry.value),
+                        title: Text(entry.value, style: bodyTextStyle),
                         value: isSelected,
+                        dense: isNarrow,
+                        contentPadding: EdgeInsets.zero,
                         onChanged: (bool? value) {
                           setState(() {
                             if (value == true) {
@@ -368,19 +447,24 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       );
                     }),
 
-                    const SizedBox(height: 20),
+                    SizedBox(height: isNarrow ? 16 : 20),
                     
                     // Privacy Settings Section
-                    const Text("Privacy Settings", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 5),
-                    const Text("Control what group admins/owners can edit on your behalf:"),
-                    const SizedBox(height: 10),
+                    Text("Privacy Settings", style: sectionTitleStyle),
+                    SizedBox(height: isNarrow ? 4 : 5),
+                    Text("Control what group admins/owners can edit on your behalf:", style: bodyTextStyle),
+                    SizedBox(height: isNarrow ? 8 : 10),
                     
                     // Select All toggle
                     CheckboxListTile(
-                      title: const Text("Block All Admin Edits", style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text("Prevent admins/owners from editing any of your data"),
+                      title: Text("Block All Admin Edits", style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isVeryNarrow ? 13 : (isNarrow ? 14 : 15),
+                      )),
+                      subtitle: Text("Prevent admins/owners from editing any of your data", style: smallTextStyle),
                       value: _blockAllAdminEdits,
+                      dense: isNarrow,
+                      contentPadding: EdgeInsets.zero,
                       onChanged: (bool? value) {
                         setState(() {
                           _blockAllAdminEdits = value ?? false;
@@ -396,9 +480,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     
                     // Per-field toggles
                     CheckboxListTile(
-                      title: const Text("Block Default Location"),
-                      subtitle: const Text("Prevent editing your default location in profile"),
+                      title: Text("Block Default Location", style: bodyTextStyle),
+                      subtitle: Text("Prevent editing your default location in profile", style: smallTextStyle),
                       value: _blockDefaultLocation,
+                      dense: isNarrow,
+                      contentPadding: EdgeInsets.zero,
                       onChanged: (bool? value) {
                         setState(() {
                           _blockDefaultLocation = value ?? false;
@@ -408,9 +494,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     ),
                     
                     CheckboxListTile(
-                      title: const Text("Block Location for Date"),
-                      subtitle: const Text("Prevent setting your location for specific dates"),
+                      title: Text("Block Location for Date", style: bodyTextStyle),
+                      subtitle: Text("Prevent setting your location for specific dates", style: smallTextStyle),
                       value: _blockLocationDate,
+                      dense: isNarrow,
+                      contentPadding: EdgeInsets.zero,
                       onChanged: (bool? value) {
                         setState(() {
                           _blockLocationDate = value ?? false;
@@ -420,9 +508,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     ),
                     
                     CheckboxListTile(
-                      title: const Text("Block Birthday"),
-                      subtitle: const Text("Prevent editing your birthday"),
+                      title: Text("Block Birthday", style: bodyTextStyle),
+                      subtitle: Text("Prevent editing your birthday", style: smallTextStyle),
                       value: _blockBirthday,
+                      dense: isNarrow,
+                      contentPadding: EdgeInsets.zero,
                       onChanged: (bool? value) {
                         setState(() {
                           _blockBirthday = value ?? false;
@@ -432,9 +522,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     ),
                     
                     CheckboxListTile(
-                      title: const Text("Block Lunar Birthday"),
-                      subtitle: const Text("Prevent editing your lunar birthday"),
+                      title: Text("Block Lunar Birthday", style: bodyTextStyle),
+                      subtitle: Text("Prevent editing your lunar birthday", style: smallTextStyle),
                       value: _blockLunarBirthday,
+                      dense: isNarrow,
+                      contentPadding: EdgeInsets.zero,
                       onChanged: (bool? value) {
                         setState(() {
                           _blockLunarBirthday = value ?? false;
@@ -450,7 +542,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             // FIXED FOOTER - Save button stays at bottom
             const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: EdgeInsets.all(isNarrow ? 12 : 16),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -458,9 +550,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.getButtonBackground(context),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: EdgeInsets.symmetric(vertical: isNarrow ? 12 : 14),
                   ),
-                  child: const Text("Save Settings"),
+                  child: Text("Save Settings", style: TextStyle(fontSize: isNarrow ? 14 : 16)),
                 ),
               ),
             ),
