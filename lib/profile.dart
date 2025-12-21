@@ -144,22 +144,27 @@ class _ProfileDialogState extends State<ProfileDialog> {
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
-                            'displayName': _nameController.text,
-                          });
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Display name updated"))
-                            );
-                          }
+                      child: Builder(
+                        builder: (context) {
+                          final isNarrow = MediaQuery.of(context).size.width < 450;
+                          return ElevatedButton(
+                            onPressed: () async {
+                              await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                                'displayName': _nameController.text,
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Display name updated"))
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.getButtonBackground(context),
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                            ),
+                            child: Text(isNarrow ? "Update" : "Update Name"),
+                          );
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.getButtonBackground(context),
-                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                        ),
-                        child: const Text("Update Name"),
                       ),
                     ),
                     const SizedBox(width: 10),
