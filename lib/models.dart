@@ -131,6 +131,26 @@ class Holiday {
       countryCode: countryCode,
     );
   }
+
+  /// Create from cached map data
+  factory Holiday.fromMap(Map<String, dynamic> map) {
+    return Holiday(
+      localName: map['localName'] ?? '',
+      date: map['date'] is Timestamp 
+          ? (map['date'] as Timestamp).toDate()
+          : DateTime.parse(map['date'].toString()),
+      countryCode: map['countryCode'] ?? '',
+    );
+  }
+
+  /// Convert to map for caching in Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'localName': localName,
+      'date': date.toIso8601String(),
+      'countryCode': countryCode,
+    };
+  }
 }
 
 class AppNotification {

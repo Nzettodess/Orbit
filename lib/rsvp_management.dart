@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'models.dart';
 import 'firestore_service.dart';
 import 'widgets/user_avatar.dart';
+import 'widgets/skeleton_loading.dart';
 
 enum EventFilter { all, upcoming, past }
 
@@ -99,7 +100,7 @@ class _RSVPManagementDialogState extends State<RSVPManagementDialog> {
                 stream: _firestoreService.getAllUserEvents(widget.currentUserId),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const SkeletonDialogContent(itemCount: 3);
                   }
 
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -244,7 +245,7 @@ class _EventCardState extends State<EventCard> {
           return const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
+              child: SkeletonBox(width: double.infinity, height: 100, borderRadius: 8),
             ),
           );
         }
@@ -489,7 +490,7 @@ class _EventCardState extends State<EventCard> {
         if (!attendeesSnapshot.hasData) {
           return const Padding(
             padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+            child: SkeletonDialogContent(itemCount: 2),
           );
         }
 

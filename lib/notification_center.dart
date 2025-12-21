@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'firestore_service.dart';
 import 'models.dart';
+import 'widgets/skeleton_loading.dart';
 
 class NotificationCenter extends StatefulWidget {
   final String currentUserId;
@@ -43,7 +44,7 @@ class _NotificationCenterState extends State<NotificationCenter> {
                 stream: _firestoreService.getNotifications(widget.currentUserId),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const SkeletonDialogContent(itemCount: 3);
                   }
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return const Center(child: Text("No notifications"));

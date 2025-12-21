@@ -9,9 +9,7 @@ import 'models/placeholder_member.dart';
 import 'placeholder_member_management.dart';
 import 'member_management.dart';
 import 'theme.dart';
-import 'models/placeholder_member.dart';
-import 'placeholder_member_management.dart';
-import 'member_management.dart';
+import 'widgets/skeleton_loading.dart';
 
 class GroupManagementDialog extends StatefulWidget {
   const GroupManagementDialog({super.key});
@@ -235,7 +233,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                 stream: _firestoreService.getUserGroups(_user!.uid),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const SkeletonDialogContent(itemCount: 2);
                   }
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return const Center(child: Text("You haven't joined any groups yet."));

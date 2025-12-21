@@ -79,6 +79,11 @@ service cloud.firestore {
       
       // Delete not allowed (handled by account deletion flow)
       allow delete: if false;
+      
+      // Active sessions subcollection for multi-device detection
+      match /active_sessions/{sessionId} {
+        allow read, write: if isAuthenticated() && userId() == uid;
+      }
     }
     
     // ============================================

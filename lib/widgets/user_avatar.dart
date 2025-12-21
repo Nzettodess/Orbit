@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'skeleton_loading.dart';
 
 /// Reusable avatar widget that handles user photos from Firestore
 /// Uses caching to reduce network requests and avoid rate limiting
@@ -33,7 +34,7 @@ class UserAvatar extends StatelessWidget {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Referer': 'https://google.com',
           },
-          placeholder: (context, url) => const CircularProgressIndicator(strokeWidth: 2),
+          placeholder: (context, url) => SkeletonCircle(size: radius * 2),
           errorWidget: (context, url, error) {
             // Fallback to ui-avatars on error
             return Image.network(

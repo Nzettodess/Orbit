@@ -6,6 +6,7 @@ import 'login.dart';
 import 'widgets/default_location_picker.dart';
 import 'widgets/syncfusion_date_picker.dart';
 import 'widgets/lunar_date_picker.dart';
+import 'widgets/skeleton_loading.dart';
 import 'theme.dart';
 
 class ProfileDialog extends StatefulWidget {
@@ -57,7 +58,7 @@ class _ProfileDialogState extends State<ProfileDialog> {
           stream: FirebaseFirestore.instance.collection('users').doc(widget.user.uid).snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return const SkeletonProfile();
             }
 
             final data = snapshot.data!.data() as Map<String, dynamic>?;
@@ -100,12 +101,7 @@ class _ProfileDialogState extends State<ProfileDialog> {
                         },
                         placeholder: (context, url) {
                           print('[Profile Avatar] Loading placeholder');
-                          return Container(
-                            width: 80,
-                            height: 80,
-                            color: Colors.grey[200],
-                            child: const CircularProgressIndicator(),
-                          );
+                          return const SkeletonCircle(size: 80);
                         },
                         errorWidget: (context, url, error) {
                           print('[Profile Avatar] Error: $error');
@@ -432,6 +428,8 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     
                     if (confirm == true) {
                       await FirebaseAuth.instance.signOut();
+                      // Clear Firestore cache to prevent stale data access
+                      await FirebaseFirestore.instance.clearPersistence();
                       if (mounted) {
                         // Close profile dialog and return to login screen
                         // The auth state listener in home.dart will handle showing login

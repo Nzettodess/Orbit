@@ -8,6 +8,7 @@ import 'widgets/default_location_picker.dart';
 import 'widgets/lunar_date_picker.dart';
 import 'widgets/syncfusion_date_picker.dart';
 import 'widgets/user_profile_dialog.dart';
+import 'widgets/skeleton_loading.dart';
 import 'edit_member_dialog.dart';
 import 'theme.dart';
 
@@ -79,7 +80,7 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
                 stream: _firestoreService.getGroupPlaceholderMembers(widget.group.id),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const SkeletonDialogContent(itemCount: 3);
                   }
                   
                   final placeholders = snapshot.data ?? [];

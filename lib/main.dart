@@ -22,8 +22,11 @@ void main() async {
   
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Disable persistence to avoid "Unexpected state" errors from corrupted cache
-  FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
+  // Enable offline persistence with 15MB cache for PWA support
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: 15 * 1024 * 1024, // 15MB
+  );
 
   runApp(const MyApp());
 }

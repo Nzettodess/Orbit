@@ -9,6 +9,7 @@ import 'religious_calendar_helper.dart';
 import 'location_picker.dart';
 import 'add_event_modal.dart';
 import 'widgets/user_avatar.dart';
+import 'widgets/skeleton_loading.dart';
 import 'rsvp_management.dart';
 import 'edit_member_dialog.dart';
 import 'widgets/user_profile_dialog.dart';
@@ -1080,7 +1081,7 @@ class _DetailModalState extends State<DetailModal> {
                         if (!snapshot.hasData) {
                           return const Center(child: Padding(
                             padding: EdgeInsets.all(16),
-                            child: CircularProgressIndicator(),
+                            child: SkeletonListTile(),
                           ));
                         }
                         final members = snapshot.data![0] as List<Map<String, dynamic>>;

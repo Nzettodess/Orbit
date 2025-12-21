@@ -25,7 +25,9 @@ import 'upcoming_summary_dialog.dart';
 import 'detail_modal.dart';
 import 'widgets/credits_feedback_dialog.dart';
 import 'birthday_baby_dialog.dart';
-
+import 'services/connectivity_service.dart';
+import 'services/session_service.dart';
+import 'services/holiday_cache_service.dart';
 
 
 class HomeWithLogin extends StatefulWidget {
@@ -64,11 +66,20 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   StreamSubscription? _placeholderMembersSubscription;
   StreamSubscription? _eventsSubscription;
   StreamSubscription? _settingsSubscription;
+  StreamSubscription<bool>? _connectivitySubscription;
+  
+  // Session service for multi-device detection
+  SessionService? _sessionService;
+  bool _hasShownMultiSessionWarning = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    
+    // Initialize connectivity service
+    ConnectivityService().init();
+    _setupConnectivityListener();
     
     // Listen to auth state changes (login/logout)
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
@@ -80,8 +91,10 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
         // User logged in
         _loadUserProfile();
         _loadData();
+        _startSessionTracking(user.uid);
       } else {
         // User logged out - clear data and cancel subscriptions
+        _endSessionTracking();
         _cancelAllSubscriptions();
         setState(() {
           _photoUrl = null;
@@ -92,6 +105,110 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
         });
       }
     });
+  }
+  
+  void _setupConnectivityListener() {
+    _connectivitySubscription = ConnectivityService().onlineStatus.listen((isOnline) {
+      if (!mounted) return;
+      
+      if (!isOnline) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Row(children: [
+            const Icon(Icons.cloud_off, color: Colors.white),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('You are offline. Some features may be unavailable.')),
+          ]),
+          backgroundColor: Colors.orange[800],
+          duration: const Duration(seconds: 5),
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Row(children: [
+            const Icon(Icons.cloud_done, color: Colors.white),
+            const SizedBox(width: 12),
+            const Text('Back online!'),
+          ]),
+          backgroundColor: Colors.green[700],
+          duration: const Duration(seconds: 2),
+        ));
+      }
+    });
+  }
+  
+  void _startSessionTracking(String userId) {
+    _sessionService = SessionService(userId);
+    _hasShownMultiSessionWarning = false;
+    _sessionService?.startSession(
+      onMultipleSessions: (sessions) {
+        if (!_hasShownMultiSessionWarning && mounted) {
+          _hasShownMultiSessionWarning = true;
+          _showMultiSessionWarning(sessions);
+        }
+      },
+    );
+  }
+  
+  void _endSessionTracking() {
+    _sessionService?.endSession();
+    _sessionService = null;
+  }
+  
+  void _showMultiSessionWarning(List<Map<String, dynamic>> sessions) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(children: [
+          Icon(Icons.devices, color: Colors.orange[700]),
+          const SizedBox(width: 12),
+          const Text('Multiple Sessions'),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Your account is open on ${sessions.length} devices:'),
+            const SizedBox(height: 12),
+            ...sessions.map((s) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(children: [
+                Icon(
+                  Icons.circle,
+                  size: 8,
+                  color: s['isCurrentSession'] == true ? Colors.green : Colors.orange,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${s['device']}${s['isCurrentSession'] == true ? ' (this device)' : ''}',
+                ),
+              ]),
+            )),
+            const SizedBox(height: 16),
+            Text(
+              'If you don\'t recognize a session, please log out from all devices.',
+              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await _sessionService?.terminateOtherSessions();
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Other sessions terminated')),
+                );
+              }
+            },
+            child: const Text('LOG OUT OTHERS', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
   
   @override
@@ -122,6 +239,8 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _endSessionTracking();
+    _connectivitySubscription?.cancel();
     _cancelAllSubscriptions();
     super.dispose();
   }
@@ -483,17 +602,11 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   }
 
   void _fetchHolidays(List<String> calendarIds) async {
-    // Fetch holidays from beginning of current year to end of next year
-    // This covers the full 365-day upcoming range with just 1 API call per calendar
-    final now = DateTime.now();
-    final startDate = DateTime(now.year, 1, 1); // Start of current year
-    final endDate = DateTime(now.year + 1, 12, 31); // End of next year
+    if (_user == null) return;
     
-    final holidays = await _googleCalendarService.fetchMultipleCalendarsDateRange(
-      calendarIds, 
-      startDate, 
-      endDate
-    );
+    // Use holiday cache service for 7-day caching (reduces API calls by ~87%)
+    final cacheService = HolidayCacheService(_user!.uid);
+    final holidays = await cacheService.getHolidays(calendarIds);
     
     if (mounted) {
       setState(() {
