@@ -158,42 +158,75 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       context: context,
       builder: (context) => AlertDialog(
         title: Row(children: [
-          Icon(Icons.devices, color: Colors.orange[700]),
-          const SizedBox(width: 12),
-          const Text('Multiple Sessions'),
+          Icon(Icons.info_outline, color: Colors.blue[700], size: 22),
+          const SizedBox(width: 8),
+          const Flexible(child: Text('Multiple Sessions', overflow: TextOverflow.ellipsis)),
         ]),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Your account is open on ${sessions.length} devices:'),
-            const SizedBox(height: 12),
-            ...sessions.map((s) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(children: [
-                Icon(
-                  Icons.circle,
-                  size: 8,
-                  color: s['isCurrentSession'] == true ? Colors.green : Colors.orange,
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 300, maxWidth: 300),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'You are logged in on multiple devices or tabs.',
+                  style: TextStyle(fontSize: 14),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '${s['device']}${s['isCurrentSession'] == true ? ' (this device)' : ''}',
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 18),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'This may cause data sync conflicts.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ]),
-            )),
-            const SizedBox(height: 16),
-            Text(
-              'If you don\'t recognize a session, please log out from all devices.',
-              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                const SizedBox(height: 12),
+                Text('Sessions (${sessions.length}):', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                const SizedBox(height: 6),
+                ...sessions.take(5).map((s) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(children: [
+                    Icon(
+                      Icons.circle,
+                      size: 6,
+                      color: s['isCurrentSession'] == true ? Colors.green : Colors.grey,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${s['device']}${s['isCurrentSession'] == true ? ' (current)' : ''}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: s['isCurrentSession'] == true ? FontWeight.w500 : FontWeight.normal,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ]),
+                )),
+                if (sessions.length > 5)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text('...and ${sessions.length - 5} more', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  ),
+              ],
             ),
-          ],
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
           TextButton(
             onPressed: () async {
               await _sessionService?.terminateOtherSessions();
@@ -204,7 +237,11 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
                 );
               }
             },
-            child: const Text('LOG OUT OTHERS', style: TextStyle(color: Colors.red)),
+            child: Text('Log out others', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
           ),
         ],
       ),

@@ -13,11 +13,12 @@ class SessionService {
 
   SessionService(this.userId);
 
-  DocumentReference get _sessionRef => FirebaseFirestore.instance
+  CollectionReference get _sessionsCollection => FirebaseFirestore.instance
       .collection('users')
       .doc(userId)
-      .collection('active_sessions')
-      .doc(sessionId);
+      .collection('active_sessions');
+
+  DocumentReference get _sessionRef => _sessionsCollection.doc(sessionId);
 
   /// Start tracking this session
   Future<void> startSession({
@@ -26,79 +27,110 @@ class SessionService {
     if (_isActive) return;
     _isActive = true;
 
-    print('[SessionService] Starting session: $sessionId for user: $userId');
+    print('[SessionService] Starting session: $sessionId');
 
-    // Register this session with current timestamp (not server timestamp for immediate read)
+    // First, clean up stale sessions (older than 2 minutes)
+    await _cleanupStaleSessions();
+
+    // Register this session
     final now = DateTime.now();
-    await _sessionRef.set({
-      'device': _getDeviceInfo(),
-      'lastActive': Timestamp.fromDate(now),
-      'createdAt': Timestamp.fromDate(now),
-    });
-
-    print('[SessionService] Session registered');
+    try {
+      await _sessionRef.set({
+        'device': _getDeviceInfo(),
+        'lastActive': Timestamp.fromDate(now),
+        'createdAt': Timestamp.fromDate(now),
+      });
+    } catch (e) {
+      print('[SessionService] Error creating session: $e');
+      _isActive = false;
+      return;
+    }
 
     // Heartbeat every 30 seconds
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
       if (_isActive) {
-        _sessionRef.update({'lastActive': Timestamp.fromDate(DateTime.now())});
+        try {
+          await _sessionRef.update({'lastActive': Timestamp.fromDate(DateTime.now())});
+        } catch (e) {
+          print('[SessionService] Heartbeat error: $e');
+        }
       }
     });
 
     // Listen for other sessions
-    _sessionListener = FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('active_sessions')
-        .snapshots()
-        .listen((snapshot) {
-      print('[SessionService] Received snapshot with ${snapshot.docs.length} documents');
-      
-      // Filter to sessions active in last 2 minutes
-      final activeSessions = snapshot.docs.where((doc) {
-        final data = doc.data();
-        final lastActive = data['lastActive'] as Timestamp?;
-        final createdAt = data['createdAt'] as Timestamp?;
+    _sessionListener = _sessionsCollection.snapshots().listen(
+      (snapshot) {
+        final now = DateTime.now();
+        final activeSessions = <Map<String, dynamic>>[];
         
-        // Use createdAt if lastActive is null (new session)
-        final activeTime = lastActive ?? createdAt;
-        if (activeTime == null) {
-          print('[SessionService] Session ${doc.id} has no timestamp, including');
-          return true; // Include sessions without timestamp (just created)
+        for (final doc in snapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final lastActive = data['lastActive'] as Timestamp?;
+          final createdAt = data['createdAt'] as Timestamp?;
+          final device = data['device'] ?? 'Unknown';
+          
+          final activeTime = lastActive ?? createdAt;
+          if (activeTime == null) {
+            activeSessions.add({
+              'id': doc.id,
+              'device': device,
+              'isCurrentSession': doc.id == sessionId,
+            });
+          } else {
+            final isActive = now.difference(activeTime.toDate()).inMinutes < 2;
+            if (isActive) {
+              activeSessions.add({
+                'id': doc.id,
+                'device': device,
+                'isCurrentSession': doc.id == sessionId,
+              });
+            }
+          }
         }
+
+        if (activeSessions.length > 1) {
+          print('[SessionService] Multiple sessions detected: ${activeSessions.length}');
+          onMultipleSessions(activeSessions);
+        }
+      },
+      onError: (e) => print('[SessionService] Listener error: $e'),
+    );
+  }
+
+  /// Clean up stale sessions (older than 2 minutes)
+  Future<void> _cleanupStaleSessions() async {
+    try {
+      final snapshot = await _sessionsCollection.get();
+      final now = DateTime.now();
+      
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final lastActive = data['lastActive'] as Timestamp?;
         
-        final isActive = DateTime.now().difference(activeTime.toDate()).inMinutes < 2;
-        print('[SessionService] Session ${doc.id}: lastActive=${activeTime.toDate()}, isActive=$isActive');
-        return isActive;
-      }).map((doc) {
-        return {
-          'id': doc.id,
-          'device': doc.data()['device'] ?? 'Unknown device',
-          'isCurrentSession': doc.id == sessionId,
-        };
-      }).toList();
-
-      print('[SessionService] Active sessions: ${activeSessions.length}');
-
-      if (activeSessions.length > 1) {
-        print('[SessionService] Multiple sessions detected! Triggering callback');
-        onMultipleSessions(activeSessions);
+        if (lastActive != null) {
+          final age = now.difference(lastActive.toDate());
+          if (age.inMinutes >= 2) {
+            await doc.reference.delete();
+            print('[SessionService] Cleaned up stale session: ${doc.id}');
+          }
+        }
       }
-    });
+    } catch (e) {
+      print('[SessionService] Cleanup error: $e');
+    }
   }
 
   /// Terminate all other sessions except current one
   Future<void> terminateOtherSessions() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('active_sessions')
-        .get();
-
-    for (final doc in snapshot.docs) {
-      if (doc.id != sessionId) {
-        await doc.reference.delete();
+    try {
+      final snapshot = await _sessionsCollection.get();
+      for (final doc in snapshot.docs) {
+        if (doc.id != sessionId) {
+          await doc.reference.delete();
+        }
       }
+    } catch (e) {
+      print('[SessionService] Terminate error: $e');
     }
   }
 
@@ -113,15 +145,11 @@ class SessionService {
     try {
       await _sessionRef.delete();
     } catch (e) {
-      // Ignore errors when deleting (might already be gone)
+      // Ignore
     }
   }
 
-  /// Get device info for display
   String _getDeviceInfo() {
-    if (kIsWeb) {
-      return 'Web Browser';
-    }
-    return 'Mobile App';
+    return kIsWeb ? 'Web Browser' : 'Mobile App';
   }
 }
