@@ -2,6 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 import '../models.dart';
 
 /// Service for managing push notifications (FCM) and in-app notifications
@@ -16,10 +20,14 @@ class NotificationService {
   static const String _pushEnabledKey = 'push_notifications_enabled';
   static const String _lastBirthdayCheckKey = 'last_birthday_check_date';
   static const String _lastMonthlyBirthdayKey = 'last_monthly_birthday_check';
+  
+  // OneSignal Push API - Vercel serverless function path
+  static const String _pushApiUrl = '/api/send-notification';
 
   bool _initialized = false;
   String? _currentUserId;
   String? _fcmToken;
+  String? _oneSignalPlayerId;
 
   /// Initialize the notification service
   Future<void> initialize(String userId) async {
@@ -43,6 +51,11 @@ class NotificationService {
 
     // Handle background/terminated message taps
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+    
+    // Get OneSignal player ID and save to Firestore (web only)
+    if (kIsWeb) {
+      await _getAndSaveOneSignalPlayerId();
+    }
     
     _initialized = true;
     debugPrint('NotificationService initialized for user: $userId');
@@ -119,9 +132,122 @@ class NotificationService {
       debugPrint('Error removing FCM token: $e');
     }
     
+    // Also remove OneSignal player ID
+    if (_oneSignalPlayerId != null) {
+      try {
+        await _db.collection('users').doc(_currentUserId).update({
+          'oneSignalPlayerIds': FieldValue.arrayRemove([_oneSignalPlayerId]),
+        });
+        debugPrint('OneSignal player ID removed for user: $_currentUserId');
+      } catch (e) {
+        debugPrint('Error removing OneSignal player ID: $e');
+      }
+    }
+    
     _currentUserId = null;
     _fcmToken = null;
+    _oneSignalPlayerId = null;
     _initialized = false;
+  }
+
+  // ============= OneSignal Integration =============
+
+  /// Get OneSignal player ID from JavaScript and save to Firestore
+  Future<void> _getAndSaveOneSignalPlayerId() async {
+    if (!kIsWeb) return;
+    
+    try {
+      // Call JavaScript function exposed in index.html
+      final playerId = await _callJsGetPlayerId();
+      
+      if (playerId != null && playerId.isNotEmpty) {
+        _oneSignalPlayerId = playerId;
+        await _saveOneSignalPlayerIdToFirestore(playerId);
+      }
+    } catch (e) {
+      debugPrint('Error getting OneSignal player ID: $e');
+    }
+  }
+
+  /// Call JavaScript getOneSignalPlayerId function
+  Future<String?> _callJsGetPlayerId() async {
+    if (!kIsWeb) return null;
+    
+    try {
+      final result = (web.window as dynamic).getOneSignalPlayerId?.call();
+      if (result != null) {
+        // Await the Promise
+        final jsPromise = result as JSPromise;
+        final value = await jsPromise.toDart;
+        return value?.toString();
+      }
+    } catch (e) {
+      debugPrint('JS getOneSignalPlayerId error: $e');
+    }
+    return null;
+  }
+
+  /// Save OneSignal player ID to Firestore
+  Future<void> _saveOneSignalPlayerIdToFirestore(String playerId) async {
+    if (_currentUserId == null) return;
+    
+    try {
+      await _db.collection('users').doc(_currentUserId).update({
+        'oneSignalPlayerIds': FieldValue.arrayUnion([playerId]),
+        'lastOneSignalUpdate': FieldValue.serverTimestamp(),
+      });
+      debugPrint('OneSignal player ID saved for user: $_currentUserId');
+    } catch (e) {
+      debugPrint('Error saving OneSignal player ID: $e');
+    }
+  }
+
+  /// Send push notification via Netlify serverless function
+  Future<void> _sendPushNotification({
+    required List<String> playerIds,
+    required String message,
+    String? title,
+    Map<String, dynamic>? data,
+  }) async {
+    if (playerIds.isEmpty) return;
+    
+    try {
+      final response = await http.post(
+        Uri.parse(_pushApiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'playerIds': playerIds,
+          'title': title ?? 'Orbit',
+          'message': message,
+          'data': data,
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        debugPrint('Push notification sent successfully');
+      } else {
+        debugPrint('Push notification failed: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error sending push notification: $e');
+    }
+  }
+
+  /// Get OneSignal player IDs for a user
+  Future<List<String>> _getPlayerIdsForUser(String userId) async {
+    try {
+      final userDoc = await _db.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        final playerIds = data?['oneSignalPlayerIds'];
+        if (playerIds != null && playerIds is List) {
+          return List<String>.from(playerIds);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting player IDs for user $userId: $e');
+    }
+    return [];
   }
 
   /// Handle foreground messages
@@ -199,8 +325,26 @@ class NotificationService {
       // Create new notification
       await _db.collection('notifications').add(notificationData);
       debugPrint('Created notification for $userId: $message');
+      
+      // Send push notification via OneSignal (don't await to avoid blocking)
+      _sendPushToUser(userId, message, type.name);
     } catch (e) {
       debugPrint('Error sending notification: $e');
+    }
+  }
+
+  /// Send push notification to a specific user
+  Future<void> _sendPushToUser(String userId, String message, String type) async {
+    // Don't send push to self
+    if (userId == _currentUserId) return;
+    
+    final playerIds = await _getPlayerIdsForUser(userId);
+    if (playerIds.isNotEmpty) {
+      await _sendPushNotification(
+        playerIds: playerIds,
+        message: message,
+        data: {'type': type},
+      );
     }
   }
 

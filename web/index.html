@@ -485,6 +485,43 @@
     }
   </script>
 
+  <!-- OneSignal Web Push SDK -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "YOUR_ONESIGNAL_APP_ID", // Replace with your OneSignal App ID
+        notifyButton: {
+          enable: false, // We use Flutter UI for notifications
+        },
+        allowLocalhostAsSecureOrigin: true, // For local development
+      });
+      
+      // Expose function to get player ID for Flutter
+      window.getOneSignalPlayerId = async function() {
+        try {
+          const playerId = await OneSignal.User.PushSubscription.id;
+          return playerId;
+        } catch (e) {
+          console.error('Error getting OneSignal player ID:', e);
+          return null;
+        }
+      };
+      
+      // Expose function to request permission
+      window.requestPushPermission = async function() {
+        try {
+          await OneSignal.Notifications.requestPermission();
+          return await window.getOneSignalPlayerId();
+        } catch (e) {
+          console.error('Error requesting push permission:', e);
+          return null;
+        }
+      };
+    });
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 
