@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
 import '../models.dart';
 // ignore: avoid_web_libraries_in_flutter
@@ -16,6 +17,7 @@ class CreditsAndFeedbackDialog extends StatefulWidget {
 
 class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
   final TextEditingController _feedbackController = TextEditingController();
+  final TextEditingController _targetUidController = TextEditingController(); // Added
   bool _isSending = false;
   String? _pushStatus;
 
@@ -26,8 +28,19 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
   static const String _repoUrl = 'https://github.com/Nzettodess/Orbit';
 
   @override
+  void initState() {
+    super.initState();
+    // Pre-fill with current user ID for easy self-testing
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+        _targetUidController.text = user.uid;
+    }
+  }
+
+  @override
   void dispose() {
     _feedbackController.dispose();
+    _targetUidController.dispose(); // Added
     super.dispose();
   }
 
@@ -279,6 +292,7 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildDebugRow('App ID:', NotificationService().oneSignalAppId),
+                  _buildDebugRow('Ext. ID:', NotificationService().oneSignalExternalId),
                   _buildDebugRow('Browser Support:', NotificationService().isNotificationSupported ? '✅ YES' : '❌ NO'),
                   _buildDebugRow('SDK Loaded:', NotificationService().isOneSignalJSLoaded ? '✅ YES' : '❌ NO'),
                   FutureBuilder<String>(
@@ -300,8 +314,25 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                     },
                   ),
                   _buildDebugRow('Player ID:', NotificationService().oneSignalPlayerId ?? "None"),
+                  
+                  const SizedBox(height: 8),
+                  // Target UID Field for testing manual sends
+                  TextField(
+                    controller: _targetUidController,
+                    decoration: const InputDecoration(
+                      labelText: 'Target UID (Legacy or Ext)',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                    style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                  ),
+
                   if (_pushStatus != null)
-                    _buildDebugRow('API Status:', _pushStatus!),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: _buildDebugRow('API Status:', _pushStatus!),
+                    ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -323,13 +354,13 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () async {
-                            final user = FirebaseAuth.instance.currentUser;
-                            if (user != null) {
+                            final targetUid = _targetUidController.text.trim();
+                            if (targetUid.isNotEmpty) {
                               setState(() => _pushStatus = 'Sending...');
                               try {
                                 final result = await NotificationService().sendNotification(
-                                  userId: user.uid,
-                                  message: "🔔 Test notification! OneSignal is working.",
+                                  userId: targetUid,
+                                  message: "🔔 Test notification from Debug Panel!",
                                   type: NotificationType.general,
                                 );
                                 setState(() => _pushStatus = result ?? '✅ Triggered');
@@ -359,10 +390,27 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                             foregroundColor: Colors.red.shade300,
                             padding: const EdgeInsets.symmetric(vertical: 4),
                           ),
-                          child: const Text('Clear All IDs', style: TextStyle(fontSize: 10, decoration: TextDecoration.underline)),
+                          child: const Text('Clear IDs', style: TextStyle(fontSize: 10, decoration: TextDecoration.underline)),
                         ),
                       ),
                     ],
+                  ),
+                  Center(
+                    child: TextButton(
+                        onPressed: () async {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.remove('last_birthday_check_date');
+                            await prefs.remove('last_monthly_birthday_check');
+                            if (mounted) setState(() => _pushStatus = 'Daily Checks Reset');
+                        },
+                        style: TextButton.styleFrom(
+                            foregroundColor: Colors.orange.shade300,
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Reset Daily Checks', style: TextStyle(fontSize: 10)),
+                    ),
                   ),
                 ],
               ),

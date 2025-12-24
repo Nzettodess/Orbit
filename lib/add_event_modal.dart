@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'models.dart';
 import 'firestore_service.dart';
 import 'widgets/syncfusion_date_picker.dart';
+import 'services/notification_service.dart';
 
 class AddEventModal extends StatefulWidget {
   final String currentUserId;
@@ -95,6 +96,20 @@ class _AddEventModalState extends State<AddEventModal> {
           rsvps: widget.eventToEdit!.rsvps,
         );
         await _firestoreService.updateEvent(updatedEvent, widget.currentUserId);
+        
+        // --- Trigger Notification ---
+        try {
+          final selectedGroup = _userGroups.firstWhere((g) => g.id == _selectedGroupId!);
+          await NotificationService().notifyEventUpdated(
+            memberIds: selectedGroup.members,
+            editorId: widget.currentUserId,
+            eventId: updatedEvent.id,
+            eventTitle: updatedEvent.title,
+            groupId: selectedGroup.id,
+          );
+        } catch (e) {
+            debugPrint('Error sending update notification: $e');
+        }
       } else {
         // Create new event
         final event = GroupEvent(
@@ -109,6 +124,23 @@ class _AddEventModalState extends State<AddEventModal> {
           rsvps: {widget.currentUserId: 'Yes'},
         );
         await _firestoreService.createEvent(event);
+        
+        // --- Trigger Notification ---
+        try {
+          // Get group details to send notifications
+          final selectedGroup = _userGroups.firstWhere((g) => g.id == _selectedGroupId!);
+          
+          await NotificationService().notifyEventCreated(
+            memberIds: selectedGroup.members,
+            creatorId: widget.currentUserId,
+            eventId: event.id,
+            eventTitle: event.title,
+            groupId: selectedGroup.id,
+            groupName: selectedGroup.name,
+          );
+        } catch (e) {
+          debugPrint('Error sending event notification: $e');
+        }
       }
       
       if (mounted) Navigator.pop(context);

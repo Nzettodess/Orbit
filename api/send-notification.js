@@ -26,8 +26,11 @@ export default async function handler(req, res) {
     try {
         const payload = {
             app_id: appId,
-            // Use include_subscription_ids for modern OneSignal V16 Subscription IDs (UUIDs)
-            include_subscription_ids: playerIds,
+            // Target by External ID (Firebase UID) using User Model
+            include_aliases: {
+                external_id: playerIds
+            },
+            target_channel: 'push',
             headings: { en: title || 'Orbit' },
             contents: { en: message },
             data: data || {},

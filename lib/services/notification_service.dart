@@ -59,6 +59,18 @@ class NotificationService {
     return 'Not Found';
   }
 
+  String get oneSignalExternalId {
+    if (!kIsWeb) return 'N/A';
+    try {
+      final jsWindow = web.window as JSObject;
+      if (jsWindow.hasProperty('getOneSignalExternalId'.toJS).toDart) {
+        final result = jsWindow.callMethod('getOneSignalExternalId'.toJS);
+        return result?.toString() ?? 'None';
+      }
+    } catch (_) {}
+    return 'Error';
+  }
+
   Future<bool> checkOneSignalSubscription() async {
     if (!kIsWeb) return false;
     try {
@@ -99,6 +111,9 @@ class NotificationService {
 
     // Get OneSignal player ID and save to Firestore (web only)
     if (kIsWeb) {
+      // Login to OneSignal to associate device with Firebase UID
+      await _callJsLoginOneSignal(userId);
+
       await _getAndSaveOneSignalPlayerId();
       
       // Sync push status to OneSignal
@@ -175,6 +190,20 @@ class NotificationService {
     }
   }
 
+  /// Call JavaScript loginOneSignal function
+  Future<void> _callJsLoginOneSignal(String externalId) async {
+    if (!kIsWeb) return;
+    try {
+      final jsWindow = web.window as JSObject;
+      if (jsWindow.hasProperty('loginOneSignal'.toJS).toDart) {
+        jsWindow.callMethod('loginOneSignal'.toJS, externalId.toJS);
+        debugPrint('Logged in to OneSignal with External ID: $externalId');
+      }
+    } catch (e) {
+      debugPrint('Error calling JS loginOneSignal: $e');
+    }
+  }
+
   /// Call JavaScript requestPushPermission function
   Future<String?> _callJsRequestPermission() async {
     if (!kIsWeb) return null;
@@ -211,10 +240,18 @@ class NotificationService {
       }
 
       final result = jsWindow.callMethod('getOneSignalPlayerId'.toJS);
+      
       if (result != null) {
         final jsPromise = result as JSPromise;
-        final value = await jsPromise.toDart.timeout(const Duration(seconds: 5));
-        return value?.toString();
+        final playerId = await jsPromise.toDart.timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+              debugPrint('JS getOneSignalPlayerId timed out on Dart side (10s limit).');
+              return null;
+          }
+        );
+        debugPrint('JS getOneSignalPlayerId returned: $playerId');
+        return playerId?.toString();
       }
     } catch (e) {
       debugPrint('JS getOneSignalPlayerId error: $e');
@@ -396,15 +433,13 @@ class NotificationService {
 
   /// Send push notification to a specific user
   Future<String?> _sendPushToUser(String userId, String message, String type) async {
-    final playerIds = await _getPlayerIdsForUser(userId);
-    if (playerIds.isNotEmpty) {
-      return await _sendPushNotification(
-        playerIds: playerIds,
-        message: message,
-        data: {'type': type},
-      );
-    }
-    return 'No Player IDs found';
+    // Target user by External ID (Firebase UID)
+    // The backend now uses include_aliases: { external_id: ... }
+    return await _sendPushNotification(
+      playerIds: [userId],
+      message: message,
+      data: {'type': type},
+    );
   }
 
   /// Send notifications to multiple users
