@@ -160,16 +160,26 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                 color: Theme.of(context).hintColor,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
             
-            // Repo link - separated
-            TextButton.icon(
+            // Star on GitHub CTA - prominent button
+            ElevatedButton.icon(
               onPressed: () => _openUrl(_repoUrl),
-              icon: const Icon(Icons.open_in_new, size: 14),
-              label: const Text('View on GitHub', style: TextStyle(fontSize: 12)),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              icon: const Icon(Icons.star, color: Colors.amber, size: 18),
+              label: const Text('Star on GitHub', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.grey.shade800 
+                    : Colors.grey.shade200,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'If you find Orbit useful, please consider starring!',
+              style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor),
             ),
 
             const Divider(height: 16),
