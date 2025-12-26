@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_performance/firebase_performance.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'theme.dart';
 import 'home.dart';
+
+// Global analytics instance for use throughout the app
+final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +26,17 @@ void main() async {
   }
   
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Enable Firebase App Check for API Security
+  await FirebaseAppCheck.instance.activate(
+    webProvider: ReCaptchaV3Provider('6LecyDcsAAAAAH1E16_m85mrrAodiAdM9nWWfGRu'),
+  );
+
+  // Enable Firebase Performance Monitoring
+  FirebasePerformance.instance.setPerformanceCollectionEnabled(true);
+
+  // Enable Firebase Analytics
+  await analytics.setAnalyticsCollectionEnabled(true);
 
   // Enable offline persistence with 15MB cache for PWA support
   FirebaseFirestore.instance.settings = const Settings(
