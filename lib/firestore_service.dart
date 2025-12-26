@@ -231,12 +231,19 @@ class FirestoreService {
     }
   }
 
-  Stream<List<Group>> getUserGroups(String userId) {
+  Stream<List<Group>> getUserGroups(String userId) async* {
+    if (_lastGroupsCache.containsKey(userId)) {
+      yield _lastGroupsCache[userId]!;
+    }
+    yield* _getUserGroupsShared(userId);
+  }
+
+  Stream<List<Group>> _getUserGroupsShared(String userId) {
     if (_groupsStreamCache.containsKey(userId)) {
       return _groupsStreamCache[userId]!;
     }
 
-    final stream = _getUserGroupsStream(userId).asBroadcastStream();
+    final stream = _getUserGroupsInternal(userId).asBroadcastStream();
     _groupsStreamCache[userId] = stream;
     return stream;
   }
@@ -246,7 +253,7 @@ class FirestoreService {
     return _lastGroupsCache[userId];
   }
 
-  Stream<List<Group>> _getUserGroupsStream(String userId) async* {
+  Stream<List<Group>> _getUserGroupsInternal(String userId) async* {
     if (_lastGroupsCache.containsKey(userId)) {
       yield _lastGroupsCache[userId]!;
     }
@@ -710,13 +717,19 @@ class FirestoreService {
   }
 
   /// Get all events user has access to (from groups they're a member of)
-  Stream<List<GroupEvent>> getAllUserEvents(String userId) {
-    // If we already have an active stream for this user, return it
+  Stream<List<GroupEvent>> getAllUserEvents(String userId) async* {
+    if (_lastEventsCache.containsKey(userId)) {
+      yield _lastEventsCache[userId]!;
+    }
+    yield* _getAllUserEventsShared(userId);
+  }
+
+  Stream<List<GroupEvent>> _getAllUserEventsShared(String userId) {
     if (_eventsStreamCache.containsKey(userId)) {
       return _eventsStreamCache[userId]!;
     }
 
-    final stream = _getAllUserEventsStream(userId).asBroadcastStream();
+    final stream = _getAllUserEventsInternal(userId).asBroadcastStream();
     _eventsStreamCache[userId] = stream;
     return stream;
   }
@@ -726,7 +739,7 @@ class FirestoreService {
     return _lastEventsCache[userId];
   }
 
-  Stream<List<GroupEvent>> _getAllUserEventsStream(String userId) async* {
+  Stream<List<GroupEvent>> _getAllUserEventsInternal(String userId) async* {
     // Yield last seen data immediately if available (Cache First)
     if (_lastEventsCache.containsKey(userId)) {
       yield _lastEventsCache[userId]!;
@@ -888,12 +901,19 @@ class FirestoreService {
 
   // --- User Profiles ---
 
-  Stream<Map<String, dynamic>> getUserProfileStream(String userId) {
+  Stream<Map<String, dynamic>> getUserProfileStream(String userId) async* {
+    if (_lastProfileCache.containsKey(userId)) {
+      yield _lastProfileCache[userId]!;
+    }
+    yield* _getUserProfileShared(userId);
+  }
+
+  Stream<Map<String, dynamic>> _getUserProfileShared(String userId) {
     if (_profileStreamCache.containsKey(userId)) {
       return _profileStreamCache[userId]!;
     }
 
-    final stream = _getUserProfileStream(userId).asBroadcastStream();
+    final stream = _getUserProfileInternal(userId).asBroadcastStream();
     _profileStreamCache[userId] = stream;
     return stream;
   }
@@ -902,7 +922,7 @@ class FirestoreService {
     return _lastProfileCache[userId];
   }
 
-  Stream<Map<String, dynamic>> _getUserProfileStream(String userId) async* {
+  Stream<Map<String, dynamic>> _getUserProfileInternal(String userId) async* {
     if (_lastProfileCache.containsKey(userId)) {
       yield _lastProfileCache[userId]!;
     }
@@ -923,13 +943,21 @@ class FirestoreService {
 
   // --- Users and Global Locations ---
 
-  Stream<List<Map<String, dynamic>>> getAllUsersStream() {
+  Stream<List<Map<String, dynamic>>> getAllUsersStream() async* {
+    const cacheKey = 'global_users';
+    if (_lastUsersCache.containsKey(cacheKey)) {
+      yield _lastUsersCache[cacheKey]!;
+    }
+    yield* _getAllUsersShared();
+  }
+
+  Stream<List<Map<String, dynamic>>> _getAllUsersShared() {
     const cacheKey = 'global_users';
     if (_usersStreamCache.containsKey(cacheKey)) {
       return _usersStreamCache[cacheKey]!;
     }
 
-    final stream = _getAllUsersStream().asBroadcastStream();
+    final stream = _getAllUsersInternal().asBroadcastStream();
     _usersStreamCache[cacheKey] = stream;
     return stream;
   }
@@ -938,7 +966,7 @@ class FirestoreService {
     return _lastUsersCache['global_users'];
   }
 
-  Stream<List<Map<String, dynamic>>> _getAllUsersStream() async* {
+  Stream<List<Map<String, dynamic>>> _getAllUsersInternal() async* {
     if (_lastUsersCache.containsKey('global_users')) {
       yield _lastUsersCache['global_users']!;
     }
@@ -950,13 +978,21 @@ class FirestoreService {
     }
   }
 
-  Stream<List<UserLocation>> getAllUserLocationsStream() {
+  Stream<List<UserLocation>> getAllUserLocationsStream() async* {
+    const cacheKey = 'global_locations';
+    if (_lastGlobalLocationsCache.containsKey(cacheKey)) {
+      yield _lastGlobalLocationsCache[cacheKey]!;
+    }
+    yield* _getAllUserLocationsShared();
+  }
+
+  Stream<List<UserLocation>> _getAllUserLocationsShared() {
     const cacheKey = 'global_locations';
     if (_globalLocationsStreamCache.containsKey(cacheKey)) {
       return _globalLocationsStreamCache[cacheKey]!;
     }
 
-    final stream = _getAllUserLocationsStream().asBroadcastStream();
+    final stream = _getAllUserLocationsInternal().asBroadcastStream();
     _globalLocationsStreamCache[cacheKey] = stream;
     return stream;
   }
@@ -965,7 +1001,7 @@ class FirestoreService {
     return _lastGlobalLocationsCache['global_locations'];
   }
 
-  Stream<List<UserLocation>> _getAllUserLocationsStream() async* {
+  Stream<List<UserLocation>> _getAllUserLocationsInternal() async* {
     if (_lastGlobalLocationsCache.containsKey('global_locations')) {
       yield _lastGlobalLocationsCache['global_locations']!;
     }
@@ -982,12 +1018,19 @@ class FirestoreService {
   // --- Placeholder Members ---
   // --- Placeholder Members and Locations (Streams) ---
 
-  Stream<List<PlaceholderMember>> getPlaceholderMembersStream(String userId, List<String> groupIds) {
+  Stream<List<PlaceholderMember>> getPlaceholderMembersStream(String userId, List<String> groupIds) async* {
+    if (_lastPlaceholderMembersCache.containsKey(userId)) {
+      yield _lastPlaceholderMembersCache[userId]!;
+    }
+    yield* _getPlaceholderMembersShared(userId, groupIds);
+  }
+
+  Stream<List<PlaceholderMember>> _getPlaceholderMembersShared(String userId, List<String> groupIds) {
     if (_placeholderMembersStreamCache.containsKey(userId)) {
       return _placeholderMembersStreamCache[userId]!;
     }
 
-    final stream = _getPlaceholderMembersStream(userId, groupIds).asBroadcastStream();
+    final stream = _getPlaceholderMembersInternal(userId, groupIds).asBroadcastStream();
     _placeholderMembersStreamCache[userId] = stream;
     return stream;
   }
@@ -996,7 +1039,7 @@ class FirestoreService {
     return _lastPlaceholderMembersCache[userId];
   }
 
-  Stream<List<PlaceholderMember>> _getPlaceholderMembersStream(String userId, List<String> groupIds) async* {
+  Stream<List<PlaceholderMember>> _getPlaceholderMembersInternal(String userId, List<String> groupIds) async* {
     if (_lastPlaceholderMembersCache.containsKey(userId)) {
       yield _lastPlaceholderMembersCache[userId]!;
     }
@@ -1020,12 +1063,19 @@ class FirestoreService {
     }
   }
 
-  Stream<List<UserLocation>> getPlaceholderLocationsStream(String userId, List<String> groupIds) {
+  Stream<List<UserLocation>> getPlaceholderLocationsStream(String userId, List<String> groupIds) async* {
+    if (_lastPlaceholderLocationsCache.containsKey(userId)) {
+      yield _lastPlaceholderLocationsCache[userId]!;
+    }
+    yield* _getPlaceholderLocationsShared(userId, groupIds);
+  }
+
+  Stream<List<UserLocation>> _getPlaceholderLocationsShared(String userId, List<String> groupIds) {
     if (_placeholderLocationsStreamCache.containsKey(userId)) {
       return _placeholderLocationsStreamCache[userId]!;
     }
 
-    final stream = _getPlaceholderLocationsStream(userId, groupIds).asBroadcastStream();
+    final stream = _getPlaceholderLocationsInternal(userId, groupIds).asBroadcastStream();
     _placeholderLocationsStreamCache[userId] = stream;
     return stream;
   }
@@ -1034,7 +1084,7 @@ class FirestoreService {
     return _lastPlaceholderLocationsCache[userId];
   }
 
-  Stream<List<UserLocation>> _getPlaceholderLocationsStream(String userId, List<String> groupIds) async* {
+  Stream<List<UserLocation>> _getPlaceholderLocationsInternal(String userId, List<String> groupIds) async* {
     if (_lastPlaceholderLocationsCache.containsKey(userId)) {
       yield _lastPlaceholderLocationsCache[userId]!;
     }
