@@ -21,15 +21,16 @@ class RSVPManagementDialog extends StatefulWidget {
   @override
   State<RSVPManagementDialog> createState() => _RSVPManagementDialogState();
 }
-
 class _RSVPManagementDialogState extends State<RSVPManagementDialog> {
   final FirestoreService _firestoreService = FirestoreService();
   EventFilter _currentFilter = EventFilter.upcoming;
   Map<String, String> _userGroupRoles = {};
+  late Stream<List<GroupEvent>> _eventsStream;
 
   @override
   void initState() {
     super.initState();
+    _eventsStream = _firestoreService.getAllUserEvents(widget.currentUserId);
     _loadUserRoles();
   }
 
@@ -130,7 +131,8 @@ class _RSVPManagementDialogState extends State<RSVPManagementDialog> {
             // Events List
             Expanded(
               child: StreamBuilder<List<GroupEvent>>(
-                stream: _firestoreService.getAllUserEvents(widget.currentUserId),
+                stream: _eventsStream,
+                initialData: _firestoreService.getLastSeenEvents(widget.currentUserId),
                 builder: (context, snapshot) {
                   // Show skeleton while loading
                   if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {

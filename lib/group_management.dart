@@ -272,6 +272,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
             Expanded(
               child: StreamBuilder<List<Group>>(
                 stream: _firestoreService.getUserGroups(_user!.uid),
+                initialData: _firestoreService.getLastSeenGroups(_user!.uid),
                 builder: (context, snapshot) {
                   // Show skeleton while loading
                   if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {

@@ -7,6 +7,7 @@ import 'widgets/default_location_picker.dart';
 import 'widgets/syncfusion_date_picker.dart';
 import 'widgets/lunar_date_picker.dart';
 import 'widgets/skeleton_loading.dart';
+import 'firestore_service.dart';
 import 'theme.dart';
 
 class ProfileDialog extends StatefulWidget {
@@ -19,23 +20,17 @@ class ProfileDialog extends StatefulWidget {
 }
 
 class _ProfileDialogState extends State<ProfileDialog> {
+  final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _nameController = TextEditingController();
   String? _photoUrl;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
-  }
-
-  Future<void> _loadProfile() async {
-    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).get();
-    if (doc.exists) {
-      final data = doc.data();
-      setState(() {
-        _nameController.text = data?['displayName'] ?? '';
-        _photoUrl = data?['photoURL'];
-      });
+    final cached = _firestoreService.getLastSeenProfile(widget.user.uid);
+    if (cached != null) {
+      _nameController.text = cached['displayName'] ?? '';
+      _photoUrl = cached['photoURL'];
     }
   }
 
@@ -54,14 +49,15 @@ class _ProfileDialogState extends State<ProfileDialog> {
             minHeight: 200,
           ),
           padding: const EdgeInsets.all(20.0),
-        child: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('users').doc(widget.user.uid).snapshots(),
+        child: StreamBuilder<Map<String, dynamic>>(
+          stream: _firestoreService.getUserProfileStream(widget.user.uid),
+          initialData: _firestoreService.getLastSeenProfile(widget.user.uid),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
               return const SkeletonProfile();
             }
 
-            final data = snapshot.data!.data() as Map<String, dynamic>?;
+            final data = snapshot.data;
             final photoUrl = data?['photoURL'];
 
             return SingleChildScrollView(

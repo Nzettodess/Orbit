@@ -7,8 +7,37 @@ import 'models/join_request.dart';
 import 'services/notification_service.dart';
 
 class FirestoreService {
+  static final FirestoreService _instance = FirestoreService._internal();
+  factory FirestoreService() => _instance;
+  FirestoreService._internal();
+
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final Uuid _uuid = const Uuid();
+
+  // Cache for streams to prevent redundant listeners and support "cache-first" behavior
+  final Map<String, Stream<List<GroupEvent>>> _eventsStreamCache = {};
+  final Map<String, List<GroupEvent>> _lastEventsCache = {};
+  
+  final Map<String, Stream<List<Group>>> _groupsStreamCache = {};
+  final Map<String, List<Group>> _lastGroupsCache = {};
+
+  final Map<String, Stream<List<UserLocation>>> _locationsStreamCache = {};
+  final Map<String, List<UserLocation>> _lastLocationsCache = {};
+
+  final Map<String, Stream<Map<String, dynamic>>> _profileStreamCache = {};
+  final Map<String, Map<String, dynamic>> _lastProfileCache = {};
+
+  final Map<String, Stream<List<Map<String, dynamic>>>> _usersStreamCache = {};
+  final Map<String, List<Map<String, dynamic>>> _lastUsersCache = {};
+
+  final Map<String, Stream<List<UserLocation>>> _globalLocationsStreamCache = {};
+  final Map<String, List<UserLocation>> _lastGlobalLocationsCache = {};
+
+  final Map<String, Stream<List<PlaceholderMember>>> _placeholderMembersStreamCache = {};
+  final Map<String, List<PlaceholderMember>> _lastPlaceholderMembersCache = {};
+
+  final Map<String, Stream<List<UserLocation>>> _placeholderLocationsStreamCache = {};
+  final Map<String, List<UserLocation>> _lastPlaceholderLocationsCache = {};
 
   // --- Groups ---
 
@@ -203,12 +232,33 @@ class FirestoreService {
   }
 
   Stream<List<Group>> getUserGroups(String userId) {
-    return _db
+    if (_groupsStreamCache.containsKey(userId)) {
+      return _groupsStreamCache[userId]!;
+    }
+
+    final stream = _getUserGroupsStream(userId).asBroadcastStream();
+    _groupsStreamCache[userId] = stream;
+    return stream;
+  }
+
+  /// Get last seen groups from cache
+  List<Group>? getLastSeenGroups(String userId) {
+    return _lastGroupsCache[userId];
+  }
+
+  Stream<List<Group>> _getUserGroupsStream(String userId) async* {
+    if (_lastGroupsCache.containsKey(userId)) {
+      yield _lastGroupsCache[userId]!;
+    }
+
+    await for (final snapshot in _db
         .collection('groups')
         .where('members', arrayContains: userId)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Group.fromFirestore(doc)).toList());
+        .snapshots()) {
+      final groups = snapshot.docs.map((doc) => Group.fromFirestore(doc)).toList();
+      _lastGroupsCache[userId] = groups;
+      yield groups;
+    }
   }
 
   // Helper method to get user groups as list (synchronous)
@@ -660,7 +710,28 @@ class FirestoreService {
   }
 
   /// Get all events user has access to (from groups they're a member of)
-  Stream<List<GroupEvent>> getAllUserEvents(String userId) async* {
+  Stream<List<GroupEvent>> getAllUserEvents(String userId) {
+    // If we already have an active stream for this user, return it
+    if (_eventsStreamCache.containsKey(userId)) {
+      return _eventsStreamCache[userId]!;
+    }
+
+    final stream = _getAllUserEventsStream(userId).asBroadcastStream();
+    _eventsStreamCache[userId] = stream;
+    return stream;
+  }
+
+  /// Get the last seen events from cache for immediate UI display
+  List<GroupEvent>? getLastSeenEvents(String userId) {
+    return _lastEventsCache[userId];
+  }
+
+  Stream<List<GroupEvent>> _getAllUserEventsStream(String userId) async* {
+    // Yield last seen data immediately if available (Cache First)
+    if (_lastEventsCache.containsKey(userId)) {
+      yield _lastEventsCache[userId]!;
+    }
+
     // First get all groups the user is a member of
     final groupsSnapshot = await _db
         .collection('groups')
@@ -670,16 +741,17 @@ class FirestoreService {
     final groupIds = groupsSnapshot.docs.map((doc) => doc.id).toList();
     
     if (groupIds.isEmpty) {
+      _lastEventsCache[userId] = [];
       yield [];
       return;
     }
     
     // Listen to events from all user's groups
-    // Note: Firestore 'in' queries are limited to 10 items
-    // If user is in more than 10 groups, we need to batch the queries
     const batchSize = 10;
     final allEvents = <GroupEvent>[];
     
+    // For simplicity with Multiple batches, we use a single combined list
+    // In a real app with many groups, you'd use rxdart CombineLatest
     for (var i = 0; i < groupIds.length; i += batchSize) {
       final batch = groupIds.skip(i).take(batchSize).toList();
       
@@ -693,14 +765,20 @@ class FirestoreService {
         
         // Merge with existing events (avoid duplicates)
         for (final event in events) {
-          if (!allEvents.any((e) => e.id == event.id)) {
-            allEvents.add(event);
+          final index = allEvents.indexWhere((e) => e.id == event.id);
+          if (index != -1) {
+            allEvents[index] = event; // Update existing
+          } else {
+            allEvents.add(event); // Add new
           }
         }
         
         // Sort by date (most recent first)
         allEvents.sort((a, b) => b.date.compareTo(a.date));
-        yield List.from(allEvents);
+        
+        // Update cache and yield
+        _lastEventsCache[userId] = List.from(allEvents);
+        yield _lastEventsCache[userId]!;
       }
     }
   }
@@ -808,7 +886,187 @@ class FirestoreService {
     }
   }
 
+  // --- User Profiles ---
+
+  Stream<Map<String, dynamic>> getUserProfileStream(String userId) {
+    if (_profileStreamCache.containsKey(userId)) {
+      return _profileStreamCache[userId]!;
+    }
+
+    final stream = _getUserProfileStream(userId).asBroadcastStream();
+    _profileStreamCache[userId] = stream;
+    return stream;
+  }
+
+  Map<String, dynamic>? getLastSeenProfile(String userId) {
+    return _lastProfileCache[userId];
+  }
+
+  Stream<Map<String, dynamic>> _getUserProfileStream(String userId) async* {
+    if (_lastProfileCache.containsKey(userId)) {
+      yield _lastProfileCache[userId]!;
+    }
+
+    await for (final snapshot in _db.collection('users').doc(userId).snapshots()) {
+      final data = snapshot.data();
+      if (data != null) {
+        _lastProfileCache[userId] = data;
+        yield data;
+      }
+    }
+  }
+
+  Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
+    await _db.collection('users').doc(userId).set(data, SetOptions(merge: true));
+    // Cache will be updated by the stream listener
+  }
+
+  // --- Users and Global Locations ---
+
+  Stream<List<Map<String, dynamic>>> getAllUsersStream() {
+    const cacheKey = 'global_users';
+    if (_usersStreamCache.containsKey(cacheKey)) {
+      return _usersStreamCache[cacheKey]!;
+    }
+
+    final stream = _getAllUsersStream().asBroadcastStream();
+    _usersStreamCache[cacheKey] = stream;
+    return stream;
+  }
+
+  List<Map<String, dynamic>>? getLastSeenUsers() {
+    return _lastUsersCache['global_users'];
+  }
+
+  Stream<List<Map<String, dynamic>>> _getAllUsersStream() async* {
+    if (_lastUsersCache.containsKey('global_users')) {
+      yield _lastUsersCache['global_users']!;
+    }
+
+    await for (final snapshot in _db.collection('users').snapshots()) {
+      final users = snapshot.docs.map((doc) => doc.data()).toList();
+      _lastUsersCache['global_users'] = users;
+      yield users;
+    }
+  }
+
+  Stream<List<UserLocation>> getAllUserLocationsStream() {
+    const cacheKey = 'global_locations';
+    if (_globalLocationsStreamCache.containsKey(cacheKey)) {
+      return _globalLocationsStreamCache[cacheKey]!;
+    }
+
+    final stream = _getAllUserLocationsStream().asBroadcastStream();
+    _globalLocationsStreamCache[cacheKey] = stream;
+    return stream;
+  }
+
+  List<UserLocation>? getLastSeenAllLocations() {
+    return _lastGlobalLocationsCache['global_locations'];
+  }
+
+  Stream<List<UserLocation>> _getAllUserLocationsStream() async* {
+    if (_lastGlobalLocationsCache.containsKey('global_locations')) {
+      yield _lastGlobalLocationsCache['global_locations']!;
+    }
+
+    await for (final snapshot in _db.collection('user_locations').snapshots()) {
+      final locations = snapshot.docs
+          .map((doc) => UserLocation.fromFirestore(doc.data()))
+          .toList();
+      _lastGlobalLocationsCache['global_locations'] = locations;
+      yield locations;
+    }
+  }
+
   // --- Placeholder Members ---
+  // --- Placeholder Members and Locations (Streams) ---
+
+  Stream<List<PlaceholderMember>> getPlaceholderMembersStream(String userId, List<String> groupIds) {
+    if (_placeholderMembersStreamCache.containsKey(userId)) {
+      return _placeholderMembersStreamCache[userId]!;
+    }
+
+    final stream = _getPlaceholderMembersStream(userId, groupIds).asBroadcastStream();
+    _placeholderMembersStreamCache[userId] = stream;
+    return stream;
+  }
+
+  List<PlaceholderMember>? getLastSeenPlaceholderMembers(String userId) {
+    return _lastPlaceholderMembersCache[userId];
+  }
+
+  Stream<List<PlaceholderMember>> _getPlaceholderMembersStream(String userId, List<String> groupIds) async* {
+    if (_lastPlaceholderMembersCache.containsKey(userId)) {
+      yield _lastPlaceholderMembersCache[userId]!;
+    }
+
+    if (groupIds.isEmpty) {
+      _lastPlaceholderMembersCache[userId] = [];
+      yield [];
+      return;
+    }
+
+    // Use first 10 groups for limit
+    final batch = groupIds.length > 10 ? groupIds.take(10).toList() : groupIds;
+
+    await for (final snapshot in _db
+        .collection('placeholder_members')
+        .where('groupId', whereIn: batch)
+        .snapshots()) {
+      final members = snapshot.docs.map((doc) => PlaceholderMember.fromFirestore(doc)).toList();
+      _lastPlaceholderMembersCache[userId] = members;
+      yield members;
+    }
+  }
+
+  Stream<List<UserLocation>> getPlaceholderLocationsStream(String userId, List<String> groupIds) {
+    if (_placeholderLocationsStreamCache.containsKey(userId)) {
+      return _placeholderLocationsStreamCache[userId]!;
+    }
+
+    final stream = _getPlaceholderLocationsStream(userId, groupIds).asBroadcastStream();
+    _placeholderLocationsStreamCache[userId] = stream;
+    return stream;
+  }
+
+  List<UserLocation>? getLastSeenPlaceholderLocations(String userId) {
+    return _lastPlaceholderLocationsCache[userId];
+  }
+
+  Stream<List<UserLocation>> _getPlaceholderLocationsStream(String userId, List<String> groupIds) async* {
+    if (_lastPlaceholderLocationsCache.containsKey(userId)) {
+      yield _lastPlaceholderLocationsCache[userId]!;
+    }
+
+    if (groupIds.isEmpty) {
+      _lastPlaceholderLocationsCache[userId] = [];
+      yield [];
+      return;
+    }
+
+    // Use first 10 groups for limit
+    final batch = groupIds.length > 10 ? groupIds.take(10).toList() : groupIds;
+
+    await for (final snapshot in _db
+        .collection('placeholder_member_locations')
+        .where('groupId', whereIn: batch)
+        .snapshots()) {
+      final locations = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return UserLocation(
+          userId: data['placeholderMemberId'] ?? '',
+          groupId: data['groupId'] ?? 'global',
+          date: (data['date'] as Timestamp).toDate(),
+          nation: data['nation'] ?? '',
+          state: data['state'],
+        );
+      }).toList();
+      
+      _lastPlaceholderLocationsCache[userId] = locations;
+      yield locations;
+    }
+  }
 
   /// Create a new placeholder member
   Future<String> createPlaceholderMember(PlaceholderMember member) async {

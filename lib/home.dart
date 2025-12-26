@@ -664,322 +664,258 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   void _loadData() {
     if (_user == null) return;
     
-    // Cancel existing subscriptions before creating new ones
+    // Cancel existing subscriptions
     _cancelAllSubscriptions();
 
-    // Get current user's groups to filter locations, users, and events
-    _groupsSubscription = _firestoreService.getUserGroups(_user!.uid).listen((userGroups) {
-      // Cancel previous data subscriptions when groups change
-      _cancelDataSubscriptions();
+    final userId = _user!.uid;
+
+    // --- 1. Cache First: Immediate UI Update ---
+    final cachedGroups = _firestoreService.getLastSeenGroups(userId);
+    if (cachedGroups != null) {
+      print('[Home] Applying cached groups');
+      _myGroups = cachedGroups;
+      final groupIds = cachedGroups.map((g) => g.id).toList();
+      _loadDataFromCache(userId, groupIds);
+    }
+
+    // --- 2. Live Listeners: Background Updates ---
+    _groupsSubscription = _firestoreService.getUserGroups(userId).listen((userGroups) {
+      if (!mounted) return;
       
-      _myGroups = userGroups;
-      final myGroupIds = userGroups.map((g) => g.id).toList();
+      // Update groups and re-setup data listeners if group list changed
+      final oldGroupIds = _myGroups.map((g) => g.id).toSet();
+      final newGroupIds = userGroups.map((g) => g.id).toSet();
       
-      // Build a set of all member IDs across all my groups (for filtering)
-      final myGroupMemberIds = <String>{};
-      for (final group in userGroups) {
-        myGroupMemberIds.addAll(group.members);
-      }
-      
-      // Listen to events - filter by user's groups
-      // Firestore 'whereIn' is limited to 10 items, so batch if needed
-      if (myGroupIds.isNotEmpty) {
-        _eventsSubscription?.cancel();
-        if (myGroupIds.length <= 10) {
-          _eventsSubscription = FirebaseFirestore.instance
-              .collection('events')
-              .where('groupId', whereIn: myGroupIds)
-              .snapshots()
-              .listen((snapshot) {
-            setState(() {
-              _events = snapshot.docs.map((doc) => GroupEvent.fromFirestore(doc)).toList();
-            });
-          });
-        } else {
-          // For more than 10 groups, query in batches and merge
-          _loadEventsBatched(myGroupIds);
-        }
+      setState(() {
+        _myGroups = userGroups;
+      });
+
+      // If group IDs changed, we must restart data subscriptions to get correct filtering
+      if (oldGroupIds.length != newGroupIds.length || !oldGroupIds.containsAll(newGroupIds)) {
+        print('[Home] Groups changed, resetting data listeners');
+        _setupDataListeners(userId, newGroupIds.toList());
       } else {
-        setState(() {
-          _events = [];
-        });
-      }
-      
-      // Listen to user_locations - filter to only my group members
-      _locationsSubscription = FirebaseFirestore.instance.collection('user_locations').snapshots().listen((userLocSnapshot) {
-        final userLocations = userLocSnapshot.docs
-          .map((doc) => UserLocation.fromFirestore(doc.data()))
-          .where((loc) => myGroupMemberIds.contains(loc.userId)) // Filter by group members
-          .toList();
-        
-        // Also listen to placeholder_member_locations - filter to my groups (max 10 for now due to Firestore limit)
-        _placeholderLocationsSubscription?.cancel();
-        if (myGroupIds.isNotEmpty) {
-          // Take first 10 groups to comply with Firestore 'whereIn' limit
-          final groupBatch = myGroupIds.take(10).toList();
-          
-          _placeholderLocationsSubscription = FirebaseFirestore.instance
-              .collection('placeholder_member_locations')
-              .where('groupId', whereIn: groupBatch)
-              .snapshots()
-              .listen((placeholderLocSnapshot) {
-            final placeholderLocations = placeholderLocSnapshot.docs
-              .map((doc) {
-                final data = doc.data();
-                return UserLocation(
-                  userId: data['placeholderMemberId'] ?? '',
-                  groupId: data['groupId'] ?? 'global',
-                  date: (data['date'] as Timestamp).toDate(),
-                  nation: data['nation'] ?? '',
-                  state: data['state'],
-                );
-              })
-              .toList(); // Already filtered by query
-            
-            setState(() {
-              // Remove old placeholder locations and add new ones
-              // Note: If we had multiple batches, we'd need more complex merging. 
-              // For now, this replaces all placeholder locations with the result of this query.
-              _locations = [...userLocations, ...placeholderLocations];
-            });
-          });
-        }
-      });
-      
-      // Listen to all users but filter to only those in my groups
-      _usersSubscription = FirebaseFirestore.instance.collection('users').snapshots().listen((snapshot) {
-        final allUsers = snapshot.docs.map((doc) => doc.data()..['uid'] = doc.id).toList();
-        
-        // Filter to only my group members and DEDUPLICATE by userId
-        // Each user should appear only once, not per-group
-        final userIdToGroupId = <String, String>{}; // First group the user is found in
-        for (final user in allUsers) {
-          final userId = user['uid'] as String;
-          if (myGroupMemberIds.contains(userId) && !userIdToGroupId.containsKey(userId)) {
-            // Use first group found for this user
-            final matchingGroups = userGroups.where((g) => g.members.contains(userId)).toList();
-            if (matchingGroups.isNotEmpty) {
-              userIdToGroupId[userId] = matchingGroups.first.id;
-            }
-          }
-        }
-        
-        // Create deduplicated user list with single groupId per user
-        final filteredUsersWithGroups = <Map<String, dynamic>>[];
-        for (final user in allUsers) {
-          final userId = user['uid'] as String;
-          if (userIdToGroupId.containsKey(userId)) {
-            final userWithGroup = Map<String, dynamic>.from(user);
-            userWithGroup['groupId'] = userIdToGroupId[userId];
-            filteredUsersWithGroups.add(userWithGroup);
-          }
-        }
-        
-        setState(() {
-          _allUsers = filteredUsersWithGroups;
-        }); // Update users state
-        
-        // Also listen to placeholder members (filter by my groups - max 10)
-        _placeholderMembersSubscription?.cancel();
-        if (myGroupIds.isNotEmpty) {
-          final groupBatch = myGroupIds.take(10).toList();
-          
-          _placeholderMembersSubscription = FirebaseFirestore.instance
-              .collection('placeholder_members')
-              .where('groupId', whereIn: groupBatch)
-              .snapshots()
-              .listen((placeholderSnapshot) {
-            final allPlaceholders = placeholderSnapshot.docs.map((doc) {
-              final data = doc.data();
-              return PlaceholderMember(
-                id: doc.id,
-                groupId: data['groupId'],
-                displayName: data['displayName'] ?? 'Placeholder',
-                createdBy: data['createdBy'] ?? '',
-                createdAt: (data['createdAt'] as Timestamp).toDate(),
-                defaultLocation: data['defaultLocation'],
-                birthday: data['birthday'] != null ? (data['birthday'] as Timestamp).toDate() : null,
-                hasLunarBirthday: data['hasLunarBirthday'] ?? false,
-                lunarBirthdayMonth: data['lunarBirthdayMonth'],
-                lunarBirthdayDay: data['lunarBirthdayDay'],
-              );
-            }).toList();
-            
-            setState(() {
-              _placeholderMembers = allPlaceholders;
-            });
-          });
-        } else {
-             setState(() {
-              _placeholderMembers = [];
-            });
-        }
-
-      });
-    });
-
-    // Listen to user settings for Holiday changes
-    FirebaseFirestore.instance.collection('users').doc(_user!.uid).snapshots().listen((snapshot) {
-      if (snapshot.exists) {
-        final data = snapshot.data();
-        
-        // Load religious calendars
-        final religious = data?['religiousCalendars'];
-        if (religious != null && religious is List) {
-          setState(() {
-            _religiousCalendars = List<String>.from(religious);
-          });
-        }
-
-        // Load tile calendar display preference
-        final tileDisplay = data?['tileCalendarDisplay'];
-        if (tileDisplay != null && tileDisplay is String) {
-          setState(() {
-            _tileCalendarDisplay = tileDisplay;
-          });
-        }
-        
-        // Gather calendar IDs for holiday fetching
-        final calendarIds = <String>[];
-        
-        // Primary country from default location
-        final defaultLocation = data?['defaultLocation'];
-        if (defaultLocation != null && defaultLocation is String && defaultLocation.isNotEmpty) {
-
-          // Map country name to code
-          final countryCodeMap = {
-            "United States": "US",
-            "United Kingdom": "GB",
-            "Canada": "CA",
-            "Australia": "AU",
-            "New Zealand": "NZ",
-            "Singapore": "SG",
-            "Malaysia": "MY",
-            "Indonesia": "ID",
-            "Thailand": "TH",
-            "Philippines": "PH",
-            "Vietnam": "VN",
-            "Japan": "JP",
-            "South Korea": "KR",
-            "China": "CN",
-            "Hong Kong": "HK",
-            "Taiwan": "TW",
-            "India": "IN",
-            "Germany": "DE",
-            "France": "FR",
-            "Italy": "IT",
-            "Spain": "ES",
-            "Netherlands": "NL",
-            "Belgium": "BE",
-            "Switzerland": "CH",
-            "Austria": "AT",
-            "Sweden": "SE",
-            "Norway": "NO",
-            "Denmark": "DK",
-            "Finland": "FI",
-            "Poland": "PL",
-            "Ireland": "IE",
-            "Portugal": "PT",
-            "Greece": "GR",
-            "Brazil": "BR",
-            "Mexico": "MX",
-            "Argentina": "AR",
-            "Chile": "CL",
-            "Colombia": "CO",
-            "South Africa": "ZA",
-            "Egypt": "EG",
-            "Nigeria": "NG",
-            "Russia": "RU",
-            "Turkey": "TR",
-            "Saudi Arabia": "SA",
-            "United Arab Emirates": "AE",
-            "Israel": "IL",
-          };
-
-          // Default location format: "State, Country" or "Country"
-          // We'll split by comma and check each part to see if it's a valid country
-          final parts = defaultLocation.split(',');
-          String? foundCountryCode;
-          
-          for (var part in parts) {
-            var cleanPart = part.trim();
-            // Remove emojis/flags if present (simple regex for non-ascii might be too aggressive, 
-            // so let's just try to match the name directly first)
-            
-            // Check exact match
-            if (countryCodeMap.containsKey(cleanPart)) {
-              foundCountryCode = countryCodeMap[cleanPart];
-              break;
-            }
-            
-            // Check if part contains country name (e.g. "🇲🇾 Malaysia")
-            final match = countryCodeMap.keys.firstWhere(
-              (k) => cleanPart.contains(k), 
-              orElse: () => ''
-            );
-            if (match.isNotEmpty) {
-              foundCountryCode = countryCodeMap[match];
-              break;
-            }
-          }
-          
-          if (foundCountryCode != null) {
-            final calendarId = GoogleCalendarService.countryCalendars[foundCountryCode];
-            if (calendarId != null) {
-              calendarIds.add(calendarId);
-            }
-          }
-        }
-        
-        // Additional country from settings
-        final additional = data?['additionalHolidayCountry'];
-        if (additional != null && additional is String && additional.isNotEmpty) {
-          final calendarId = GoogleCalendarService.countryCalendars[additional];
-          if (calendarId != null && !calendarIds.contains(calendarId)) {
-            calendarIds.add(calendarId);
-          }
-        }
-        
-        // Religious calendars from state (already loaded above)
-        for (final religionKey in _religiousCalendars) {
-          final calendarId = GoogleCalendarService.religiousCalendars[religionKey];
-          if (calendarId != null && !calendarIds.contains(calendarId)) {
-            calendarIds.add(calendarId);
-          }
-        }
-        
-        // Fetch holidays from all selected calendars
-        if (calendarIds.isNotEmpty) {
-          _fetchHolidays(calendarIds);
-        } else {
-          setState(() {
-            _holidays = [];
-          });
+        // Just ensure listeners are running if they weren't
+        if (_eventsSubscription == null) {
+          _setupDataListeners(userId, newGroupIds.toList());
         }
       }
     });
   }
 
-  // Load events in batches when user is in more than 10 groups
-  void _loadEventsBatched(List<String> groupIds) async {
-    const batchSize = 10;
-    final allEvents = <GroupEvent>[];
-    
-    for (var i = 0; i < groupIds.length; i += batchSize) {
-      final batch = groupIds.skip(i).take(batchSize).toList();
-      final snapshot = await FirebaseFirestore.instance
-          .collection('events')
-          .where('groupId', whereIn: batch)
-          .get();
-      
-      allEvents.addAll(snapshot.docs.map((doc) => GroupEvent.fromFirestore(doc)));
+  void _loadDataFromCache(String userId, List<String> groupIds) {
+    // Events
+    final cachedEvents = _firestoreService.getLastSeenEvents(userId);
+    if (cachedEvents != null) {
+      _events = cachedEvents;
     }
-    
-    if (mounted) {
+
+    // Users
+    final cachedUsers = _firestoreService.getLastSeenUsers();
+    if (cachedUsers != null) {
+      // Filter to only my group members and DEDUPLICATE by userId
+      final myGroupMemberIds = <String>{};
+      for (final group in _myGroups) {
+        myGroupMemberIds.addAll(group.members);
+      }
+
+      final userIdToGroupId = <String, String>{}; // First group the user is found in
+      for (final user in cachedUsers) {
+        final userId = user['uid'] as String;
+        if (myGroupMemberIds.contains(userId) && !userIdToGroupId.containsKey(userId)) {
+          // Use first group found for this user
+          final matchingGroups = _myGroups.where((g) => g.members.contains(userId)).toList();
+          if (matchingGroups.isNotEmpty) {
+            userIdToGroupId[userId] = matchingGroups.first.id;
+          }
+        }
+      }
+      
+      final filteredUsersWithGroups = <Map<String, dynamic>>[];
+      for (final user in cachedUsers) {
+        final userId = user['uid'] as String;
+        if (userIdToGroupId.containsKey(userId)) {
+          final userWithGroup = Map<String, dynamic>.from(user);
+          userWithGroup['groupId'] = userIdToGroupId[userId];
+          filteredUsersWithGroups.add(userWithGroup);
+        }
+      }
+      _allUsers = filteredUsersWithGroups;
+    }
+
+    // Own Locations
+    final cachedLocs = _firestoreService.getLastSeenAllLocations();
+    if (cachedLocs != null) {
+      // Logic from _setupDataListeners for merging
+      final myGroupMemberIds = <String>{};
+      for (final group in _myGroups) {
+        myGroupMemberIds.addAll(group.members);
+      }
+      final filteredLocs = cachedLocs.where((loc) => myGroupMemberIds.contains(loc.userId)).toList();
+      
+      // Placeholder Locations
+      final cachedPlaceholderLocs = _firestoreService.getLastSeenPlaceholderLocations(userId);
+      if (cachedPlaceholderLocs != null) {
+        _locations = [...filteredLocs, ...cachedPlaceholderLocs];
+      } else {
+        _locations = filteredLocs;
+      }
+    }
+
+    // Placeholder Members
+    final cachedPlaceholderMembers = _firestoreService.getLastSeenPlaceholderMembers(userId);
+    if (cachedPlaceholderMembers != null) {
+      _placeholderMembers = cachedPlaceholderMembers;
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  void _setupDataListeners(String userId, List<String> groupIds) {
+    _cancelDataSubscriptions();
+
+    final myGroupMemberIds = <String>{};
+    for (final group in _myGroups) {
+      myGroupMemberIds.addAll(group.members);
+    }
+
+    // 1. Events
+    _eventsSubscription = _firestoreService.getAllUserEvents(userId).listen((events) {
+      if (mounted) setState(() => _events = events);
+    });
+
+    // 2. Locations (Real Users)
+    _locationsSubscription = _firestoreService.getAllUserLocationsStream().listen((allLocs) {
+      if (!mounted) return;
+      
+      // Filter by group members
+      final userLocations = allLocs.where((loc) => myGroupMemberIds.contains(loc.userId)).toList();
+      
+      // Merge with placeholder locations (if we have them)
       setState(() {
-        _events = allEvents;
+        final placeholderLocs = _locations.where((l) => l.userId.startsWith('placeholder_')).toList();
+        _locations = [...userLocations, ...placeholderLocs];
+      });
+    });
+
+    // 3. Placeholder Locations
+    if (groupIds.isNotEmpty) {
+      _placeholderLocationsSubscription = _firestoreService.getPlaceholderLocationsStream(userId, groupIds).listen((pLocs) {
+        if (!mounted) return;
+        setState(() {
+          final realUserLocs = _locations.where((l) => !l.userId.startsWith('placeholder_')).toList();
+          _locations = [...realUserLocs, ...pLocs];
+        });
       });
     }
+
+    // 4. Users
+    _usersSubscription = _firestoreService.getAllUsersStream().listen((allUsers) {
+      if (!mounted) return;
+      
+      // Filter to only my group members and DEDUPLICATE by userId
+      final userIdToGroupId = <String, String>{}; 
+      for (final user in allUsers) {
+        final uid = user['uid'] as String? ?? '';
+        if (myGroupMemberIds.contains(uid) && !userIdToGroupId.containsKey(uid)) {
+          final matchingGroups = _myGroups.where((g) => g.members.contains(uid)).toList();
+          if (matchingGroups.isNotEmpty) {
+            userIdToGroupId[uid] = matchingGroups.first.id;
+          }
+        }
+      }
+      
+      final filteredUsersWithGroups = <Map<String, dynamic>>[];
+      for (final user in allUsers) {
+        final uid = user['uid'] as String? ?? '';
+        if (userIdToGroupId.containsKey(uid)) {
+          final userWithGroup = Map<String, dynamic>.from(user);
+          userWithGroup['groupId'] = userIdToGroupId[uid];
+          filteredUsersWithGroups.add(userWithGroup);
+        }
+      }
+
+      setState(() {
+        _allUsers = filteredUsersWithGroups;
+      });
+    });
+
+    // 5. Placeholder Members
+    if (groupIds.isNotEmpty) {
+      _placeholderMembersSubscription = _firestoreService.getPlaceholderMembersStream(userId, groupIds).listen((members) {
+        if (mounted) setState(() => _placeholderMembers = members);
+      });
+    }
+    
+    // 6. Settings and Holidays
+    _settingsSubscription = FirebaseFirestore.instance.collection('users').doc(userId).snapshots().listen((snapshot) {
+      if (!mounted || !snapshot.exists) return;
+      final data = snapshot.data();
+      if (data == null) return;
+      
+      setState(() {
+        _religiousCalendars = List<String>.from(data['religiousCalendars'] ?? []);
+        _tileCalendarDisplay = data['tileCalendarDisplay'] ?? 'none';
+        _photoUrl = data['photoURL'];
+      });
+      
+      _loadHolidaysFromData(data);
+    });
+  }
+
+  void _loadHolidaysFromData(Map<String, dynamic> data) {
+    final calendarIds = <String>[];
+    final defaultLocation = data['defaultLocation'];
+    
+    if (defaultLocation != null && defaultLocation is String && defaultLocation.isNotEmpty) {
+      final countryCodeMap = {
+        "United States": "US", "United Kingdom": "GB", "Canada": "CA", "Australia": "AU",
+        "New Zealand": "NZ", "Singapore": "SG", "Malaysia": "MY", "Indonesia": "ID",
+        "Thailand": "TH", "Philippines": "PH", "Vietnam": "VN", "Japan": "JP",
+        "South Korea": "KR", "China": "CN", "Hong Kong": "HK", "Taiwan": "TW",
+        "India": "IN", "Germany": "DE", "France": "FR", "Italy": "IT",
+        "Spain": "ES", "Netherlands": "NL", "Belgium": "BE", "Switzerland": "CH",
+        "Austria": "AT", "Sweden": "SE", "Norway": "NO", "Denmark": "DK",
+        "Finland": "FI", "Poland": "PL", "Ireland": "IE", "Portugal": "PT",
+        "Greece": "GR", "Brazil": "BR", "Mexico": "MX", "Argentina": "AR",
+        "Chile": "CL", "Colombia": "CO", "South Africa": "ZA", "Egypt": "EG",
+        "Nigeria": "NG", "Russia": "RU", "Turkey": "TR", "Saudi Arabia": "SA",
+        "United Arab Emirates": "AE", "Israel": "IL",
+      };
+
+      final parts = defaultLocation.split(',');
+      String? foundCountryCode;
+      for (var part in parts) {
+        var cleanPart = part.trim();
+        if (countryCodeMap.containsKey(cleanPart)) {
+          foundCountryCode = countryCodeMap[cleanPart];
+          break;
+        }
+        final match = countryCodeMap.keys.firstWhere((k) => cleanPart.contains(k), orElse: () => '');
+        if (match.isNotEmpty) {
+          foundCountryCode = countryCodeMap[match];
+          break;
+        }
+      }
+      
+      if (foundCountryCode != null) {
+        final calendarId = GoogleCalendarService.countryCalendars[foundCountryCode];
+        if (calendarId != null) calendarIds.add(calendarId);
+      }
+    }
+    
+    final additional = data['additionalHolidayCountry'];
+    if (additional != null && additional is String && additional.isNotEmpty) {
+      final calendarId = GoogleCalendarService.countryCalendars[additional];
+      if (calendarId != null && !calendarIds.contains(calendarId)) calendarIds.add(calendarId);
+    }
+    
+    for (final religionKey in _religiousCalendars) {
+      final calendarId = GoogleCalendarService.religiousCalendars[religionKey];
+      if (calendarId != null && !calendarIds.contains(calendarId)) calendarIds.add(calendarId);
+    }
+    
+    _fetchHolidays(calendarIds);
   }
 
   void _fetchHolidays(List<String> calendarIds) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme.dart';
+import 'firestore_service.dart';
 import 'services/notification_service.dart';
 
 class SettingsDialog extends StatefulWidget {
@@ -14,6 +15,7 @@ class SettingsDialog extends StatefulWidget {
 }
 
 class _SettingsDialogState extends State<SettingsDialog> {
+  final FirestoreService _firestoreService = FirestoreService();
   List<String> _holidayCountries = [];
   List<String> _religiousCalendars = [];
   String _tileCalendarDisplay = 'none'; // none, chinese, islamic
@@ -260,13 +262,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     SizedBox(height: isNarrow ? 8 : 10),
                     
                     // Show what will be used
-                    StreamBuilder<DocumentSnapshot>(
-                      stream: FirebaseFirestore.instance.collection('users').doc(widget.currentUserId).snapshots(),
+                    StreamBuilder<Map<String, dynamic>>(
+                      stream: _firestoreService.getUserProfileStream(widget.currentUserId),
+                      initialData: _firestoreService.getLastSeenProfile(widget.currentUserId),
                       builder: (context, snapshot) {
+                        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                        final data = snapshot.data;
                         String? defaultLocation;
-                        if (snapshot.hasData && snapshot.data!.exists) {
-                          final data = snapshot.data!.data() as Map<String, dynamic>?;
-                          defaultLocation = data?['defaultLocation'];
+                        if (data != null) {
+                          defaultLocation = data['defaultLocation'];
                         }
                         
                         String? primaryCountry;
