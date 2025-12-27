@@ -30,6 +30,8 @@ import 'services/session_service.dart';
 import 'services/holiday_cache_service.dart';
 import 'services/notification_service.dart';
 import 'widgets/skeleton_loading.dart';
+import 'widgets/delayed_empty_state.dart';
+import 'widgets/home_speed_dial.dart';
 
 class HomeWithLogin extends StatefulWidget {
   const HomeWithLogin({super.key});
@@ -38,30 +40,31 @@ class HomeWithLogin extends StatefulWidget {
   State<HomeWithLogin> createState() => _HomeWithLoginState();
 }
 
-class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserver {
+class _HomeWithLoginState extends State<HomeWithLogin>
+    with WidgetsBindingObserver {
   User? _user = FirebaseAuth.instance.currentUser;
   String? _photoUrl;
   String? _displayName;
   double _previousKeyboardHeight = 0;
   final FirestoreService _firestoreService = FirestoreService();
   final GoogleCalendarService _googleCalendarService = GoogleCalendarService();
-  
+
   List<UserLocation> _locations = [];
   List<UserLocation> _realUserLocations = [];
   List<UserLocation> _placeholderUserLocations = [];
   List<GroupEvent> _events = [];
   List<Holiday> _holidays = [];
   List<String> _religiousCalendars = []; // Enabled religious calendars
-  String _tileCalendarDisplay = 'none'; // For tile display: none, chinese, islamic
-  
+  String _tileCalendarDisplay =
+      'none'; // For tile display: none, chinese, islamic
+
   String _currentMonthTitle = "Calendar";
   DateTime _currentViewMonth = DateTime.now();
   List<Map<String, dynamic>> _allUsers = [];
   List<PlaceholderMember> _placeholderMembers = [];
   List<Group> _myGroups = [];
   final CalendarController _calendarController = CalendarController();
-  bool _speedDialOpen = false;
-  
+
   // Subscription management to prevent stale data
   StreamSubscription? _groupsSubscription;
   StreamSubscription? _locationsSubscription;
@@ -72,15 +75,16 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   StreamSubscription? _settingsSubscription;
   StreamSubscription? _profileSubscription;
   StreamSubscription<bool>? _connectivitySubscription;
-  
+
   // Session service for multi-device detection
   SessionService? _sessionService;
   Set<String> _knownSessionIds = {};
-  final ValueNotifier<List<Map<String, dynamic>>> _sessionsNotifier = ValueNotifier([]);
+  final ValueNotifier<List<Map<String, dynamic>>> _sessionsNotifier =
+      ValueNotifier([]);
   bool _silenceMultiSessionWarning = false;
   bool _isMultiSessionWarningOpen = false;
   bool _isSessionTerminated = false;
-  
+
   // Offline status for persistent banner
   bool _isOffline = false;
 
@@ -88,11 +92,11 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
+
     // Initialize connectivity service
     ConnectivityService().init();
     _setupConnectivityListener();
-    
+
     // Listen to auth state changes (login/logout)
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (mounted) {
@@ -100,11 +104,11 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
           _user = user;
         });
       }
-      
+
       if (user != null) {
         // User logged in - end any previous session first (for account switching)
         _endSessionTracking();
-        
+
         _loadUserProfile(); // Sets up real-time sync
         _loadData();
         _startSessionTracking(user.uid);
@@ -130,32 +134,38 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       }
     });
   }
-  
+
   void _setupConnectivityListener() {
     // Check initial state
     _isOffline = !ConnectivityService().isOnline;
-    
-    _connectivitySubscription = ConnectivityService().onlineStatus.listen((isOnline) {
+
+    _connectivitySubscription = ConnectivityService().onlineStatus.listen((
+      isOnline,
+    ) {
       if (!mounted) return;
-      
+
       final wasOffline = _isOffline;
       setState(() => _isOffline = !isOnline);
-      
+
       // Only show "back online" snackbar when transitioning from offline to online
       if (wasOffline && isOnline) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(children: [
-            const Icon(Icons.cloud_done, color: Colors.white),
-            const SizedBox(width: 12),
-            const Text('Back online!'),
-          ]),
-          backgroundColor: Colors.green[700],
-          duration: const Duration(seconds: 2),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.cloud_done, color: Colors.white),
+                const SizedBox(width: 12),
+                const Text('Back online!'),
+              ],
+            ),
+            backgroundColor: Colors.green[700],
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     });
   }
-  
+
   void _startSessionTracking(String userId) {
     _sessionService = SessionService(userId);
     _knownSessionIds = {};
@@ -165,44 +175,51 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
         if (mounted) {
           final currentSessionId = _sessionService?.currentSessionId;
           final sessionIds = sessions.map((s) => s['id'] as String).toSet();
-          
+
           // Identify "new" session IDs (IDs present in current stream but not in _knownSessionIds)
           final newSessionIds = sessionIds.difference(_knownSessionIds);
-          
+
           // Always update the notifier so open dialogs see current data
           _sessionsNotifier.value = sessions;
-          
-          final hasRealNewSessions = newSessionIds.any((id) => id != currentSessionId);
+
+          final hasRealNewSessions = newSessionIds.any(
+            (id) => id != currentSessionId,
+          );
 
           // Only trigger warning if silenced is false, has new sessions, not already open, AND count > 1
-          if (!_silenceMultiSessionWarning && hasRealNewSessions && !_isMultiSessionWarningOpen && sessions.length > 1) {
+          if (!_silenceMultiSessionWarning &&
+              hasRealNewSessions &&
+              !_isMultiSessionWarningOpen &&
+              sessions.length > 1) {
             _showMultiSessionWarning();
           }
-          
+
           // Always update the known IDs
           _knownSessionIds = sessionIds;
         }
       },
       onSessionTerminated: () {
-      if (mounted) {
-        // Clear navigation stack (close all dialogs/sheets)
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        _showSessionTerminatedDialog();
-      }
-    },
+        if (mounted) {
+          // Clear navigation stack (close all dialogs/sheets)
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          _showSessionTerminatedDialog();
+        }
+      },
     );
   }
-  
+
   void _showSessionTerminatedDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Row(children: [
-          Icon(Icons.cancel_outlined, color: Colors.orange[700], size: 22),
-          const SizedBox(width: 8),
-          const Flexible(child: Text('Session Terminated')),
-        ]),
+        title: Row(
+          children: [
+            Icon(Icons.cancel_outlined, color: Colors.orange[700], size: 22),
+            const SizedBox(width: 8),
+            const Flexible(child: Text('Session Terminated')),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,26 +266,28 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       ),
     );
   }
-  
+
   void _endSessionTracking() {
     _sessionService?.endSession();
     _sessionService = null;
   }
-  
+
   /// Check if writes are allowed (session is active)
   bool get _canWrite => !_isSessionTerminated;
-  
+
   /// Show dialog when write is blocked and return false
   bool _checkCanWrite() {
     if (_isSessionTerminated) {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Row(children: [
-            Icon(Icons.block, color: Colors.red[700], size: 22),
-            const SizedBox(width: 8),
-            const Text('Read-Only Mode'),
-          ]),
+          title: Row(
+            children: [
+              Icon(Icons.block, color: Colors.red[700], size: 22),
+              const SizedBox(width: 8),
+              const Text('Read-Only Mode'),
+            ],
+          ),
           content: const Text(
             'This session was terminated. You cannot make changes.\n\nClick "Resume" in the banner to start a new session.',
             style: TextStyle(fontSize: 14),
@@ -285,10 +304,10 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
     }
     return true;
   }
-  
+
   void _showMultiSessionWarning() {
     _isMultiSessionWarningOpen = true;
-    
+
     // Using a slightly longer delay (500ms) on Web to avoid engine/window.dart assertions
     // which happen when dialogs are shown before window metrics have settled.
     Future.delayed(const Duration(milliseconds: 500), () {
@@ -296,16 +315,27 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
         _isMultiSessionWarningOpen = false;
         return;
       }
-      
+
       showDialog(
         context: context,
         builder: (context) => StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-            title: Row(children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 22),
-              const SizedBox(width: 8),
-              const Flexible(child: Text('Multiple Sessions', overflow: TextOverflow.ellipsis)),
-            ]),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange[700],
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                const Flexible(
+                  child: Text(
+                    'Multiple Sessions',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
             content: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 400, maxWidth: 300),
               child: SingleChildScrollView(
@@ -326,7 +356,11 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 18),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: Colors.orange[700],
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           const Expanded(
                             child: Text(
@@ -345,50 +379,74 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Sessions (${currentSessions.length}):', 
-                              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                            Text(
+                              'Sessions (${currentSessions.length}):',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                            ),
                             const SizedBox(height: 6),
-                            ...currentSessions.take(5).map((s) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 3),
-                              child: Row(children: [
-                                Icon(
-                                  Icons.circle,
-                                  size: 6,
-                                  color: s['isCurrentSession'] == true ? Colors.green : Colors.grey,
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    '${s['device']}${s['isCurrentSession'] == true ? ' (current)' : ''}',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: s['isCurrentSession'] == true ? FontWeight.w500 : FontWeight.normal,
+                            ...currentSessions
+                                .take(5)
+                                .map(
+                                  (s) => Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 3,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.circle,
+                                          size: 6,
+                                          color: s['isCurrentSession'] == true
+                                              ? Colors.green
+                                              : Colors.grey,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            '${s['device']}${s['isCurrentSession'] == true ? ' (current)' : ''}',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight:
+                                                  s['isCurrentSession'] == true
+                                                  ? FontWeight.w500
+                                                  : FontWeight.normal,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ]),
-                            )),
                             if (currentSessions.length > 5)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
-                                child: Text('...and ${currentSessions.length - 5} more', 
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                child: Text(
+                                  '...and ${currentSessions.length - 5} more',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
                               ),
                           ],
                         );
-                      }
+                      },
                     ),
-                    
+
                     const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 8),
-                    
+
                     // Silent checkbox
                     InkWell(
                       onTap: () {
                         setDialogState(() {
-                          _silenceMultiSessionWarning = !_silenceMultiSessionWarning;
+                          _silenceMultiSessionWarning =
+                              !_silenceMultiSessionWarning;
                         });
                       },
                       child: Row(
@@ -409,7 +467,10 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
                           const Expanded(
                             child: Text(
                               "Don't show again for this session",
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
                             ),
                           ),
                         ],
@@ -426,11 +487,16 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
                   if (mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Other sessions terminated')),
+                      const SnackBar(
+                        content: Text('Other sessions terminated'),
+                      ),
                     );
                   }
                 },
-                child: Text('Terminate others', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                child: Text(
+                  'Terminate others',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                ),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -444,13 +510,19 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       });
     });
   }
-  
+
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
     // Use both viewInsets and platformDispatcher for better compatibility across platforms (App/Web)
-    final keyboardHeight = WidgetsBinding.instance.platformDispatcher.views.first.viewInsets.bottom;
-    
+    final keyboardHeight = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .views
+        .first
+        .viewInsets
+        .bottom;
+
     // If keyboard was present and is now gone
     if (_previousKeyboardHeight > 0 && keyboardHeight == 0) {
       // Small delay to let the OS/Browser finish its transition
@@ -469,7 +541,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
     }
     _previousKeyboardHeight = keyboardHeight;
   }
-  
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -478,7 +550,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
     _cancelAllSubscriptions();
     super.dispose();
   }
-  
+
   void _cancelAllSubscriptions() {
     _groupsSubscription?.cancel();
     _groupsSubscription = null;
@@ -497,7 +569,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
     _profileSubscription?.cancel();
     _profileSubscription = null;
   }
-  
+
   void _cancelDataSubscriptions() {
     // Cancel inner data subscriptions (not groups subscription)
     _locationsSubscription?.cancel();
@@ -523,7 +595,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
 
   void _loadUserProfile() {
     if (_user == null) return;
-    
+
     // Cache-First: yield last seen profile immediately if available
     final cached = _firestoreService.getLastSeenProfile(_user!.uid);
     if (cached != null) {
@@ -532,61 +604,63 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
     }
 
     _profileSubscription?.cancel();
-    _profileSubscription = _firestoreService.getUserProfileStream(_user!.uid).listen((data) {
-      if (!mounted) return;
-      setState(() {
-        _photoUrl = data['photoURL'];
-        _displayName = data['displayName'];
-      });
-    });
+    _profileSubscription = _firestoreService
+        .getUserProfileStream(_user!.uid)
+        .listen((data) {
+          if (!mounted) return;
+          setState(() {
+            _photoUrl = data['photoURL'];
+            _displayName = data['displayName'];
+          });
+        });
   }
 
   /// Check and send birthday notifications (day-of and monthly summary)
   /// Called once on app load, with deduplication to prevent spam
   Future<void> _checkBirthdayNotifications(String userId) async {
     final notificationService = NotificationService();
-    
+
     // Check if we should run birthday checks today
     if (!await notificationService.shouldCheckBirthdaysToday()) {
       return; // Already checked today
     }
-    
+
     try {
       // Get user's groups
       final groupsSnapshot = await FirebaseFirestore.instance
           .collection('groups')
           .where('members', arrayContains: userId)
           .get();
-      
+
       if (groupsSnapshot.docs.isEmpty) return;
-      
+
       final today = DateTime.now();
       final todayNormalized = DateTime(today.year, today.month, today.day);
-      
+
       // Collect all member IDs across all groups
       final allMemberIds = <String>{};
       final groupMemberMap = <String, List<String>>{}; // groupId -> memberIds
-      
+
       for (final groupDoc in groupsSnapshot.docs) {
         final members = List<String>.from(groupDoc.data()['members'] ?? []);
         allMemberIds.addAll(members);
         groupMemberMap[groupDoc.id] = members;
       }
-      
+
       // Fetch all users' birthday data
       final usersToCheck = allMemberIds.where((id) => id != userId).toList();
-      
+
       for (final memberId in usersToCheck) {
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(memberId)
             .get();
-        
+
         if (!userDoc.exists) continue;
-        
+
         final userData = userDoc.data()!;
         userData['uid'] = memberId;
-        
+
         // Check solar birthday
         final solarBirthday = Birthday.getSolarBirthday(userData, today.year);
         if (solarBirthday != null) {
@@ -595,7 +669,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
             solarBirthday.occurrenceDate.month,
             solarBirthday.occurrenceDate.day,
           );
-          
+
           if (birthdayNormalized == todayNormalized) {
             // It's their birthday today!
             // Find which group(s) this member belongs to
@@ -613,9 +687,13 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
             }
           }
         }
-        
+
         // Check lunar birthday
-        final lunarBirthday = Birthday.getLunarBirthday(userData, today.year, today);
+        final lunarBirthday = Birthday.getLunarBirthday(
+          userData,
+          today.year,
+          today,
+        );
         if (lunarBirthday != null) {
           // Lunar birthday matches today
           for (final entry in groupMemberMap.entries) {
@@ -632,42 +710,54 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
           }
         }
       }
-      
+
       // Check for monthly birthday summary (1st of month)
       if (await notificationService.shouldShowMonthlyBirthdaySummary()) {
         final birthdayPeopleThisMonth = <String>[];
-        
+
         for (final memberId in usersToCheck) {
           final userDoc = await FirebaseFirestore.instance
               .collection('users')
               .doc(memberId)
               .get();
-          
+
           if (!userDoc.exists) continue;
-          
+
           final userData = userDoc.data()!;
           userData['uid'] = memberId;
           final displayName = userData['displayName'] ?? 'User';
-          
+
           // Check solar birthday
           final solarBirthday = Birthday.getSolarBirthday(userData, today.year);
-          if (solarBirthday != null && 
+          if (solarBirthday != null &&
               solarBirthday.occurrenceDate.month == today.month) {
             final day = solarBirthday.occurrenceDate.day;
-            birthdayPeopleThisMonth.add('$displayName (${day}${_getDaySuffix(day)})');
+            birthdayPeopleThisMonth.add(
+              '$displayName (${day}${_getDaySuffix(day)})',
+            );
           }
-          
+
           // Check lunar birthday - iterate through all days of this month to find lunar birthdays
-          for (int day = 1; day <= DateTime(today.year, today.month + 1, 0).day; day++) {
+          for (
+            int day = 1;
+            day <= DateTime(today.year, today.month + 1, 0).day;
+            day++
+          ) {
             final checkDate = DateTime(today.year, today.month, day);
-            final lunarBirthday = Birthday.getLunarBirthday(userData, today.year, checkDate);
+            final lunarBirthday = Birthday.getLunarBirthday(
+              userData,
+              today.year,
+              checkDate,
+            );
             if (lunarBirthday != null) {
-              birthdayPeopleThisMonth.add('$displayName [lunar] (${day}${_getDaySuffix(day)})');
+              birthdayPeopleThisMonth.add(
+                '$displayName [lunar] (${day}${_getDaySuffix(day)})',
+              );
               break; // Only add once per person
             }
           }
         }
-        
+
         if (birthdayPeopleThisMonth.isNotEmpty) {
           await notificationService.notifyMonthlyBirthdays(
             userId: userId,
@@ -675,39 +765,43 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
             month: today.month,
           );
         }
-        
+
         await notificationService.markMonthlyBirthdaySummaryDone();
       }
-      
+
       // Mark birthday check as done for today
       await notificationService.markBirthdayCheckDone();
-      
     } catch (e) {
       debugPrint('Error checking birthday notifications: $e');
     }
   }
-  
+
   /// Helper to get day suffix (1st, 2nd, 3rd, etc.)
   String _getDaySuffix(int day) {
     if (day >= 11 && day <= 13) return 'th';
     switch (day % 10) {
-      case 1: return 'st';
-      case 2: return 'nd';
-      case 3: return 'rd';
-      default: return 'th';
+      case 1:
+        return 'st';
+      case 2:
+        return 'nd';
+      case 3:
+        return 'rd';
+      default:
+        return 'th';
     }
   }
 
   void _updateCombinedLocations() {
     if (!mounted) return;
-    
+
     final all = [..._realUserLocations, ..._placeholderUserLocations];
-    
+
     // Deduplicate: If a user has multiple entries for the same day (due to multiple shared groups),
     // we only keep one to avoid calendar clutter.
     final Map<String, UserLocation> deduped = {};
     for (final loc in all) {
-      final dateStr = "${loc.date.year}-${loc.date.month.toString().padLeft(2, '0')}-${loc.date.day.toString().padLeft(2, '0')}";
+      final dateStr =
+          "${loc.date.year}-${loc.date.month.toString().padLeft(2, '0')}-${loc.date.day.toString().padLeft(2, '0')}";
       final key = "${loc.userId}_$dateStr";
       if (!deduped.containsKey(key)) {
         deduped[key] = loc;
@@ -721,7 +815,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
 
   void _loadData() {
     if (_user == null) return;
-    
+
     // Cancel existing subscriptions
     _cancelAllSubscriptions();
 
@@ -737,14 +831,20 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
     }
 
     // --- 2. Live Listeners: Background Updates ---
-    _groupsSubscription = _firestoreService.getUserGroups(userId).listen((userGroups) {
+    _groupsSubscription = _firestoreService.getUserGroups(userId).listen((
+      userGroups,
+    ) {
       if (!mounted) return;
-      
+
       // Calculate member signatures to detect content changes (not just list changes)
       // This ensures that if someone joins/leaves a group, our data filters update.
-      final oldSignature = _myGroups.map((g) => '${g.id}:${g.members.join(',')}').join('|');
-      final newSignature = userGroups.map((g) => '${g.id}:${g.members.join(',')}').join('|');
-      
+      final oldSignature = _myGroups
+          .map((g) => '${g.id}:${g.members.join(',')}')
+          .join('|');
+      final newSignature = userGroups
+          .map((g) => '${g.id}:${g.members.join(',')}')
+          .join('|');
+
       setState(() {
         _myGroups = userGroups;
       });
@@ -773,18 +873,22 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
         myGroupMemberIds.addAll(group.members);
       }
 
-      final userIdToGroupId = <String, String>{}; // First group the user is found in
+      final userIdToGroupId =
+          <String, String>{}; // First group the user is found in
       for (final user in cachedUsers) {
         final userId = user['uid'] as String;
-        if (myGroupMemberIds.contains(userId) && !userIdToGroupId.containsKey(userId)) {
+        if (myGroupMemberIds.contains(userId) &&
+            !userIdToGroupId.containsKey(userId)) {
           // Use first group found for this user
-          final matchingGroups = _myGroups.where((g) => g.members.contains(userId)).toList();
+          final matchingGroups = _myGroups
+              .where((g) => g.members.contains(userId))
+              .toList();
           if (matchingGroups.isNotEmpty) {
             userIdToGroupId[userId] = matchingGroups.first.id;
           }
         }
       }
-      
+
       final filteredUsersWithGroups = <Map<String, dynamic>>[];
       for (final user in cachedUsers) {
         final userId = user['uid'] as String;
@@ -805,10 +909,13 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       for (final group in _myGroups) {
         myGroupMemberIds.addAll(group.members);
       }
-      final filteredLocs = cachedLocs.where((loc) => myGroupMemberIds.contains(loc.userId)).toList();
-      
+      final filteredLocs = cachedLocs
+          .where((loc) => myGroupMemberIds.contains(loc.userId))
+          .toList();
+
       // Placeholder Locations
-      final cachedPlaceholderLocs = _firestoreService.getLastSeenPlaceholderLocations(userId);
+      final cachedPlaceholderLocs = _firestoreService
+          .getLastSeenPlaceholderLocations(userId);
       if (cachedPlaceholderLocs != null) {
         _locations = [...filteredLocs, ...cachedPlaceholderLocs];
       } else {
@@ -817,7 +924,8 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
     }
 
     // Placeholder Members
-    final cachedPlaceholderMembers = _firestoreService.getLastSeenPlaceholderMembers(userId);
+    final cachedPlaceholderMembers = _firestoreService
+        .getLastSeenPlaceholderMembers(userId);
     if (cachedPlaceholderMembers != null) {
       _placeholderMembers = cachedPlaceholderMembers;
     }
@@ -834,104 +942,162 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
     }
 
     // 1. Events
-    _eventsSubscription = _firestoreService.getAllUserEvents(userId).listen((events) {
+    _eventsSubscription = _firestoreService.getAllUserEvents(userId).listen((
+      events,
+    ) {
       if (mounted) setState(() => _events = events);
     });
 
     // 2. Locations (Real Users) - Now passing groupIds for targeted fetching
-    _locationsSubscription = _firestoreService.getAllUserLocationsStream(userId, groupIds).listen((allLocs) {
-      if (!mounted) return;
-      
-      // Filter by group members (Secondary filter for local safety)
-      final userLocations = allLocs.where((loc) => myGroupMemberIds.contains(loc.userId)).toList();
-      
-      _realUserLocations = userLocations;
-      _updateCombinedLocations();
-    });
+    _locationsSubscription = _firestoreService
+        .getAllUserLocationsStream(userId, groupIds)
+        .listen((allLocs) {
+          if (!mounted) return;
+
+          // Filter by group members (Secondary filter for local safety)
+          final userLocations = allLocs
+              .where((loc) => myGroupMemberIds.contains(loc.userId))
+              .toList();
+
+          _realUserLocations = userLocations;
+          _updateCombinedLocations();
+        });
 
     // 3. Placeholder Locations
     if (groupIds.isNotEmpty) {
-      _placeholderLocationsSubscription = _firestoreService.getPlaceholderLocationsStream(userId, groupIds).listen((pLocs) {
-        if (!mounted) return;
-        _placeholderUserLocations = pLocs;
-        _updateCombinedLocations();
-      });
+      _placeholderLocationsSubscription = _firestoreService
+          .getPlaceholderLocationsStream(userId, groupIds)
+          .listen((pLocs) {
+            if (!mounted) return;
+            _placeholderUserLocations = pLocs;
+            _updateCombinedLocations();
+          });
     }
 
     // 4. Users - Only fetch users who are in my groups (security rule compliant)
     final memberIdsList = myGroupMemberIds.toList();
-    _usersSubscription = _firestoreService.getUsersByIdsStream(memberIdsList).listen((allUsers) {
-      if (!mounted) return;
-      
-      // Assign each user to their first matching group (for display purposes)
-      final userIdToGroupId = <String, String>{}; 
-      for (final user in allUsers) {
-        final uid = user['uid'] as String? ?? '';
-        if (!userIdToGroupId.containsKey(uid)) {
-          final matchingGroups = _myGroups.where((g) => g.members.contains(uid)).toList();
-          if (matchingGroups.isNotEmpty) {
-            userIdToGroupId[uid] = matchingGroups.first.id;
-          }
-        }
-      }
-      
-      final filteredUsersWithGroups = <Map<String, dynamic>>[];
-      for (final user in allUsers) {
-        final uid = user['uid'] as String? ?? '';
-        if (userIdToGroupId.containsKey(uid)) {
-          final userWithGroup = Map<String, dynamic>.from(user);
-          userWithGroup['groupId'] = userIdToGroupId[uid];
-          filteredUsersWithGroups.add(userWithGroup);
-        }
-      }
+    _usersSubscription = _firestoreService
+        .getUsersByIdsStream(memberIdsList)
+        .listen((allUsers) {
+          if (!mounted) return;
 
-      setState(() {
-        _allUsers = filteredUsersWithGroups;
-      });
-    });
+          // Assign each user to their first matching group (for display purposes)
+          final userIdToGroupId = <String, String>{};
+          for (final user in allUsers) {
+            final uid = user['uid'] as String? ?? '';
+            if (!userIdToGroupId.containsKey(uid)) {
+              final matchingGroups = _myGroups
+                  .where((g) => g.members.contains(uid))
+                  .toList();
+              if (matchingGroups.isNotEmpty) {
+                userIdToGroupId[uid] = matchingGroups.first.id;
+              }
+            }
+          }
+
+          final filteredUsersWithGroups = <Map<String, dynamic>>[];
+          for (final user in allUsers) {
+            final uid = user['uid'] as String? ?? '';
+            if (userIdToGroupId.containsKey(uid)) {
+              final userWithGroup = Map<String, dynamic>.from(user);
+              userWithGroup['groupId'] = userIdToGroupId[uid];
+              filteredUsersWithGroups.add(userWithGroup);
+            }
+          }
+
+          setState(() {
+            _allUsers = filteredUsersWithGroups;
+          });
+        });
 
     // 5. Placeholder Members
     if (groupIds.isNotEmpty) {
-      _placeholderMembersSubscription = _firestoreService.getPlaceholderMembersStream(userId, groupIds).listen((members) {
-        if (mounted) setState(() => _placeholderMembers = members);
-      });
+      _placeholderMembersSubscription = _firestoreService
+          .getPlaceholderMembersStream(userId, groupIds)
+          .listen((members) {
+            if (mounted) setState(() => _placeholderMembers = members);
+          });
     }
-    
+
     // 6. Settings and Holidays
-    _settingsSubscription = FirebaseFirestore.instance.collection('users').doc(userId).snapshots().listen((snapshot) {
-      if (!mounted || !snapshot.exists) return;
-      final data = snapshot.data();
-      if (data == null) return;
-      
-      debugPrint('[Home] Settings Update: tileCalendarDisplay=${data['tileCalendarDisplay']}, religiousCalendars=${data['religiousCalendars']}');
-      setState(() {
-        _religiousCalendars = List<String>.from(data['religiousCalendars'] ?? []);
-        _tileCalendarDisplay = data['tileCalendarDisplay'] ?? 'none';
-        _photoUrl = data['photoURL'];
-      });
-      
-      _loadHolidaysFromData(data);
-    });
+    _settingsSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .snapshots()
+        .listen((snapshot) {
+          if (!mounted || !snapshot.exists) return;
+          final data = snapshot.data();
+          if (data == null) return;
+
+          debugPrint(
+            '[Home] Settings Update: tileCalendarDisplay=${data['tileCalendarDisplay']}, religiousCalendars=${data['religiousCalendars']}',
+          );
+          setState(() {
+            _religiousCalendars = List<String>.from(
+              data['religiousCalendars'] ?? [],
+            );
+            _tileCalendarDisplay = data['tileCalendarDisplay'] ?? 'none';
+            _photoUrl = data['photoURL'];
+          });
+
+          _loadHolidaysFromData(data);
+        });
   }
 
   void _loadHolidaysFromData(Map<String, dynamic> data) {
     final calendarIds = <String>[];
     final defaultLocation = data['defaultLocation'];
-    
-    if (defaultLocation != null && defaultLocation is String && defaultLocation.isNotEmpty) {
+
+    if (defaultLocation != null &&
+        defaultLocation is String &&
+        defaultLocation.isNotEmpty) {
       final countryCodeMap = {
-        "United States": "US", "United Kingdom": "GB", "Canada": "CA", "Australia": "AU",
-        "New Zealand": "NZ", "Singapore": "SG", "Malaysia": "MY", "Indonesia": "ID",
-        "Thailand": "TH", "Philippines": "PH", "Vietnam": "VN", "Japan": "JP",
-        "South Korea": "KR", "China": "CN", "Hong Kong": "HK", "Taiwan": "TW",
-        "India": "IN", "Germany": "DE", "France": "FR", "Italy": "IT",
-        "Spain": "ES", "Netherlands": "NL", "Belgium": "BE", "Switzerland": "CH",
-        "Austria": "AT", "Sweden": "SE", "Norway": "NO", "Denmark": "DK",
-        "Finland": "FI", "Poland": "PL", "Ireland": "IE", "Portugal": "PT",
-        "Greece": "GR", "Brazil": "BR", "Mexico": "MX", "Argentina": "AR",
-        "Chile": "CL", "Colombia": "CO", "South Africa": "ZA", "Egypt": "EG",
-        "Nigeria": "NG", "Russia": "RU", "Turkey": "TR", "Saudi Arabia": "SA",
-        "United Arab Emirates": "AE", "Israel": "IL",
+        "United States": "US",
+        "United Kingdom": "GB",
+        "Canada": "CA",
+        "Australia": "AU",
+        "New Zealand": "NZ",
+        "Singapore": "SG",
+        "Malaysia": "MY",
+        "Indonesia": "ID",
+        "Thailand": "TH",
+        "Philippines": "PH",
+        "Vietnam": "VN",
+        "Japan": "JP",
+        "South Korea": "KR",
+        "China": "CN",
+        "Hong Kong": "HK",
+        "Taiwan": "TW",
+        "India": "IN",
+        "Germany": "DE",
+        "France": "FR",
+        "Italy": "IT",
+        "Spain": "ES",
+        "Netherlands": "NL",
+        "Belgium": "BE",
+        "Switzerland": "CH",
+        "Austria": "AT",
+        "Sweden": "SE",
+        "Norway": "NO",
+        "Denmark": "DK",
+        "Finland": "FI",
+        "Poland": "PL",
+        "Ireland": "IE",
+        "Portugal": "PT",
+        "Greece": "GR",
+        "Brazil": "BR",
+        "Mexico": "MX",
+        "Argentina": "AR",
+        "Chile": "CL",
+        "Colombia": "CO",
+        "South Africa": "ZA",
+        "Egypt": "EG",
+        "Nigeria": "NG",
+        "Russia": "RU",
+        "Turkey": "TR",
+        "Saudi Arabia": "SA",
+        "United Arab Emirates": "AE",
+        "Israel": "IL",
       };
 
       final parts = defaultLocation.split(',');
@@ -942,44 +1108,56 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
           foundCountryCode = countryCodeMap[cleanPart];
           break;
         }
-        final match = countryCodeMap.keys.firstWhere((k) => cleanPart.contains(k), orElse: () => '');
+        final match = countryCodeMap.keys.firstWhere(
+          (k) => cleanPart.contains(k),
+          orElse: () => '',
+        );
         if (match.isNotEmpty) {
           foundCountryCode = countryCodeMap[match];
           break;
         }
       }
-      
+
       if (foundCountryCode != null) {
-        final calendarId = GoogleCalendarService.countryCalendars[foundCountryCode];
-        debugPrint('[Home] Mapping Public Holiday (PH): $defaultLocation -> $foundCountryCode -> $calendarId');
+        final calendarId =
+            GoogleCalendarService.countryCalendars[foundCountryCode];
+        debugPrint(
+          '[Home] Mapping Public Holiday (PH): $defaultLocation -> $foundCountryCode -> $calendarId',
+        );
         if (calendarId != null) calendarIds.add(calendarId);
       } else {
-        debugPrint('[Home] No Public Holiday (PH) mapping found for location: $defaultLocation');
+        debugPrint(
+          '[Home] No Public Holiday (PH) mapping found for location: $defaultLocation',
+        );
       }
     }
-    
+
     final additional = data['additionalHolidayCountry'];
     if (additional != null && additional is String && additional.isNotEmpty) {
       final calendarId = GoogleCalendarService.countryCalendars[additional];
-      if (calendarId != null && !calendarIds.contains(calendarId)) calendarIds.add(calendarId);
+      if (calendarId != null && !calendarIds.contains(calendarId))
+        calendarIds.add(calendarId);
     }
-    
+
     for (final religionKey in _religiousCalendars) {
       final calendarId = GoogleCalendarService.religiousCalendars[religionKey];
-      if (calendarId != null && !calendarIds.contains(calendarId)) calendarIds.add(calendarId);
+      if (calendarId != null && !calendarIds.contains(calendarId))
+        calendarIds.add(calendarId);
     }
-    
+
     _fetchHolidays(calendarIds);
   }
 
   void _fetchHolidays(List<String> calendarIds) async {
     if (_user == null) return;
-    
+
     final cacheService = HolidayCacheService(_user!.uid);
-    debugPrint('[Home] Fetching holidays for ${calendarIds.length} calendars: $calendarIds');
+    debugPrint(
+      '[Home] Fetching holidays for ${calendarIds.length} calendars: $calendarIds',
+    );
     final holidays = await cacheService.getHolidays(calendarIds);
     // debugPrint('[Home] Fetched ${holidays.length} Public Holiday (PH) total for $calendarIds');
-    
+
     if (mounted) {
       setState(() {
         _holidays = holidays;
@@ -1003,16 +1181,18 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
 
   void _openUpcomingSummary() async {
     if (_user == null) return;
-    
+
     // Build group names map
     final groupNames = <String, String>{};
-    final groupsSnapshot = await _firestoreService.getUserGroups(_user!.uid).first;
+    final groupsSnapshot = await _firestoreService
+        .getUserGroups(_user!.uid)
+        .first;
     for (final group in groupsSnapshot) {
       groupNames[group.id] = group.name;
     }
-    
+
     if (!mounted) return;
-    
+
     showDialog(
       context: context,
       builder: (dialogContext) => UpcomingSummaryDialog(
@@ -1027,12 +1207,24 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
         onDateTap: (date) {
           // Get data for the selected date
           final dayLocations = _getLocationsForDate(date);
-          final dayEvents = _events.where((e) => 
-            e.date.year == date.year && e.date.month == date.month && e.date.day == date.day).toList();
-          final dayHolidays = _holidays.where((h) => 
-            h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
+          final dayEvents = _events
+              .where(
+                (e) =>
+                    e.date.year == date.year &&
+                    e.date.month == date.month &&
+                    e.date.day == date.day,
+              )
+              .toList();
+          final dayHolidays = _holidays
+              .where(
+                (h) =>
+                    h.date.year == date.year &&
+                    h.date.month == date.month &&
+                    h.date.day == date.day,
+              )
+              .toList();
           final dayBirthdays = _getBirthdaysForDate(date);
-          
+
           // Open detail modal
           showModalBottomSheet(
             context: context,
@@ -1056,9 +1248,9 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   void _openBirthdayBabyDialog() {
     // Map group IDs to names for the dialog
     final groupNames = <String, String>{};
-    // Need access to current groups, but they are in stream. 
+    // Need access to current groups, but they are in stream.
     // We can infer group names if needed or pass empty if not used for display.
-    
+
     showDialog(
       context: context,
       builder: (context) => BirthdayBabyDialog(
@@ -1073,7 +1265,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   void _openLocationPicker() async {
     if (!_checkCanWrite()) return;
     if (_user == null) return;
-    
+
     // Check if user has any groups or placeholders to manage
     if (_myGroups.isEmpty && _placeholderMembers.isEmpty) {
       if (mounted) {
@@ -1081,7 +1273,9 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('No Groups'),
-            content: const Text('You need to belong to at least one group to set a location context.'),
+            content: const Text(
+              'You need to belong to at least one group to set a location context.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -1093,36 +1287,47 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       }
       return;
     }
-    
+
     // Fetch user's default location
-    final doc = await FirebaseFirestore.instance.collection('users').doc(_user!.uid).get();
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_user!.uid)
+        .get();
     final defaultLocation = doc.data()?['defaultLocation'] as String?;
-    
+
     // Helper function to remove emoji flags
     String stripEmojis(String text) {
       // Remove emojis (including flag emojis) and extra whitespace
-      return text.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F', unicode: true), '').trim();
+      return text
+          .replaceAll(
+            RegExp(
+              r'[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F',
+              unicode: true,
+            ),
+            '',
+          )
+          .trim();
     }
-    
+
     // Parse country and state from default location
     String? defaultCountry;
     String? defaultState;
-    
+
     if (defaultLocation != null && defaultLocation.isNotEmpty) {
       final parts = defaultLocation.split(',');
-      
+
       if (parts.length == 2) {
         // Format: "🇲🇾 Country, State" (e.g., "🇲🇾 Malaysia, Penang")
-        defaultCountry = stripEmojis(parts[0].trim());  // First part is COUNTRY
-        defaultState = stripEmojis(parts[1].trim());     // Second part is STATE
+        defaultCountry = stripEmojis(parts[0].trim()); // First part is COUNTRY
+        defaultState = stripEmojis(parts[1].trim()); // Second part is STATE
       } else {
         // Format: "🇺🇸 Country" only
         defaultCountry = stripEmojis(parts[0].trim());
       }
     }
-    
+
     if (!mounted) return;
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1131,22 +1336,25 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
         // Exclude current user, exclude placeholders, only real members
         final editableMembers = _allUsers.where((user) {
           final uid = user['uid'] as String?;
-          if (uid == null || uid == _user!.uid) return false;  // Skip self
-          if (uid.startsWith('placeholder_')) return false;  // Skip placeholders
-          
+          if (uid == null || uid == _user!.uid) return false; // Skip self
+          if (uid.startsWith('placeholder_')) return false; // Skip placeholders
+
           // Check privacy settings - if blockLocationDate is true, exclude
-          final privacySettings = user['privacySettings'] as Map<String, dynamic>?;
-          if (privacySettings != null && privacySettings['blockLocationDate'] == true) {
+          final privacySettings =
+              user['privacySettings'] as Map<String, dynamic>?;
+          if (privacySettings != null &&
+              privacySettings['blockLocationDate'] == true) {
             return false;
           }
           return true;
         }).toList();
-        
+
         // Check if current user is owner or admin of any group
         // We'll check this based on groups data we already have
         // For simplicity, pass true if we have editable members or placeholders
-        final canManageOthers = editableMembers.isNotEmpty || _placeholderMembers.isNotEmpty;
-        
+        final canManageOthers =
+            editableMembers.isNotEmpty || _placeholderMembers.isNotEmpty;
+
         return LocationPicker(
           defaultCountry: defaultCountry,
           defaultState: defaultState,
@@ -1155,60 +1363,65 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
           groupMembers: editableMembers,
           isOwnerOrAdmin: canManageOthers,
           onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {
-          try {
-            // Set location for each selected member
-            for (final memberId in selectedMemberIds) {
-              if (memberId.startsWith('placeholder_')) {
-                // Placeholder member - use placeholder location service
-                await _firestoreService.setPlaceholderMemberLocationRange(
-                  memberId,
-                  // Find the group ID from placeholder
-                  _placeholderMembers.firstWhere((p) => p.id == memberId).groupId,
-                  startDate,
-                  endDate,
-                  country,
-                  state,
-                );
-              } else {
-                // Regular user
-                await _firestoreService.setLocationRange(
-                  memberId,
-                  "global",
-                  startDate,
-                  endDate,
-                  country,
-                  state,
-                );
-                // Notification is handled internally by FirestoreService now
-              }
-            } // end for loop
-            
-            if (mounted) {
-              final dayCount = endDate.difference(startDate).inDays + 1;
-              final memberCount = selectedMemberIds.length;
-              final dateRange = dayCount == 1 
-                  ? DateFormat('MMM dd, yyyy').format(startDate)
-                  : "${DateFormat('MMM dd').format(startDate)} - ${DateFormat('MMM dd, yyyy').format(endDate)}";
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    "Location set for $memberCount member${memberCount > 1 ? 's' : ''} " 
-                    "to ${state != null ? '$state, ' : ''}$country for $dateRange"
+            try {
+              // Set location for each selected member
+              for (final memberId in selectedMemberIds) {
+                if (memberId.startsWith('placeholder_')) {
+                  // Placeholder member - use placeholder location service
+                  await _firestoreService.setPlaceholderMemberLocationRange(
+                    memberId,
+                    // Find the group ID from placeholder
+                    _placeholderMembers
+                        .firstWhere((p) => p.id == memberId)
+                        .groupId,
+                    startDate,
+                    endDate,
+                    country,
+                    state,
+                  );
+                } else {
+                  // Regular user
+                  await _firestoreService.setLocationRange(
+                    memberId,
+                    "global",
+                    startDate,
+                    endDate,
+                    country,
+                    state,
+                  );
+                  // Notification is handled internally by FirestoreService now
+                }
+              } // end for loop
+
+              if (mounted) {
+                final dayCount = endDate.difference(startDate).inDays + 1;
+                final memberCount = selectedMemberIds.length;
+                final dateRange = dayCount == 1
+                    ? DateFormat('MMM dd, yyyy').format(startDate)
+                    : "${DateFormat('MMM dd').format(startDate)} - ${DateFormat('MMM dd, yyyy').format(endDate)}";
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      "Location set for $memberCount member${memberCount > 1 ? 's' : ''} "
+                      "to ${state != null ? '$state, ' : ''}$country for $dateRange",
+                    ),
+                    backgroundColor: Colors.green,
                   ),
-                  backgroundColor: Colors.green,
-                )
-              );
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Error saving location: $e"),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Error saving location: $e"), backgroundColor: Colors.red)
-              );
-            }
-          }
-        },
-      );
+          },
+        );
       },
     );
   }
@@ -1216,9 +1429,15 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   // Helper to get locations for a specific date (for DetailModal from Upcoming)
   List<UserLocation> _getLocationsForDate(DateTime date) {
     // Get explicit locations for this date
-    final explicit = _locations.where((l) => 
-      l.date.year == date.year && l.date.month == date.month && l.date.day == date.day).toList();
-    
+    final explicit = _locations
+        .where(
+          (l) =>
+              l.date.year == date.year &&
+              l.date.month == date.month &&
+              l.date.day == date.day,
+        )
+        .toList();
+
     final explicitUserIds = explicit.map((l) => l.userId).toSet();
 
     // Add default locations for users without explicit entries
@@ -1227,27 +1446,31 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       if (!explicitUserIds.contains(user['uid'])) {
         final defaultLoc = user['defaultLocation'] as String?;
         final userGroupId = user['groupId'] as String? ?? 'global';
-        
+
         if (defaultLoc != null && defaultLoc.isNotEmpty) {
           final parts = defaultLoc.split(', ');
           final country = parts[0];
           final state = parts.length > 1 ? parts[1] : null;
-          
-          others.add(UserLocation(
-            userId: user['uid'],
-            groupId: userGroupId,
-            date: date,
-            nation: country,
-            state: state,
-          ));
+
+          others.add(
+            UserLocation(
+              userId: user['uid'],
+              groupId: userGroupId,
+              date: date,
+              nation: country,
+              state: state,
+            ),
+          );
         } else {
-          others.add(UserLocation(
-            userId: user['uid'],
-            groupId: userGroupId,
-            date: date,
-            nation: "No location selected",
-            state: null,
-          ));
+          others.add(
+            UserLocation(
+              userId: user['uid'],
+              groupId: userGroupId,
+              date: date,
+              nation: "No location selected",
+              state: null,
+            ),
+          );
         }
       }
     }
@@ -1258,24 +1481,24 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   // Helper to get birthdays for a specific date
   List<Birthday> _getBirthdaysForDate(DateTime date) {
     final birthdays = <Birthday>[];
-    
+
     for (final user in _allUsers) {
       // Get solar birthday
       final solarBirthday = Birthday.getSolarBirthday(user, date.year);
       if (solarBirthday != null) {
-        if (solarBirthday.occurrenceDate.month == date.month && 
+        if (solarBirthday.occurrenceDate.month == date.month &&
             solarBirthday.occurrenceDate.day == date.day) {
           birthdays.add(solarBirthday);
         }
       }
-      
+
       // Get lunar birthday
       final lunarBirthday = Birthday.getLunarBirthday(user, date.year, date);
       if (lunarBirthday != null) {
         birthdays.add(lunarBirthday);
       }
     }
-    
+
     return birthdays;
   }
 
@@ -1283,9 +1506,9 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   List<GroupEvent> _getEventsForDate(DateTime date) {
     return _events.where((e) {
       final eventDate = e.date;
-      return eventDate.year == date.year && 
-             eventDate.month == date.month && 
-             eventDate.day == date.day;
+      return eventDate.year == date.year &&
+          eventDate.month == date.month &&
+          eventDate.day == date.day;
     }).toList();
   }
 
@@ -1293,9 +1516,9 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   List<Holiday> _getHolidaysForDate(DateTime date) {
     return _holidays.where((h) {
       final holidayDate = h.date;
-      return holidayDate.year == date.year && 
-             holidayDate.month == date.month && 
-             holidayDate.day == date.day;
+      return holidayDate.year == date.year &&
+          holidayDate.month == date.month &&
+          holidayDate.day == date.day;
     }).toList();
   }
 
@@ -1313,7 +1536,9 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
               child: Container(
-                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -1322,7 +1547,12 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
             children: [
               SvgPicture.asset("assets/orbit_logo.svg", height: 40),
               const SizedBox(width: 8),
-              Text("Orbit", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                "Orbit",
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
             ],
           ),
         ),
@@ -1347,9 +1577,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
             Positioned.fill(
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.1),
-                ),
+                child: Container(color: Colors.black.withValues(alpha: 0.1)),
               ),
             ),
             // Login overlay on top
@@ -1362,273 +1590,324 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent, // Glassmorphism base
-        elevation: 0,
-        flexibleSpace: ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7), // Translucent using theme surface
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent, // Glassmorphism base
+          elevation: 0,
+          flexibleSpace: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                color: Theme.of(context).colorScheme.surface.withValues(
+                  alpha: 0.7,
+                ), // Translucent using theme surface
+              ),
             ),
           ),
-        ),
-        title: GestureDetector(
-          onTap: () {
-            showDialog(
-              context: context,
-              builder: (context) => const CreditsAndFeedbackDialog(),
-            );
-          },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SvgPicture.asset("assets/orbit_logo.svg", height: 40),
-              const SizedBox(width: 8),
-              Text("Orbit", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.event_note, color: Colors.deepPurple),
-            tooltip: 'Upcoming',
-            onPressed: _openUpcomingSummary,
-          ),
-          IconButton(
-            icon: const Icon(Icons.cake, color: Colors.pink),
-            tooltip: 'Birthday Baby',
-            onPressed: _openBirthdayBabyDialog,
-          ),
-
-          // Notification bell with unread badge
-          StreamBuilder<int>(
-            stream: NotificationService().getUnreadCount(_user!.uid),
-            builder: (context, snapshot) {
-              final unreadCount = snapshot.data ?? 0;
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications, color: Colors.orange),
-                    tooltip: 'Notifications',
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (dialogContext) => NotificationCenter(
-                          currentUserId: _user!.uid,
-                          canWrite: _canWrite,
-                          onNavigateToDate: (date) {
-                            // Close the notification dialog first (already handled in NotificationCenter)
-                            // Open detail modal for the specified date
-                            final normalizedDate = DateTime(date.year, date.month, date.day);
-                            final locations = _getLocationsForDate(normalizedDate);
-                            final events = _getEventsForDate(normalizedDate);
-                            final holidays = _getHolidaysForDate(normalizedDate);
-                            final birthdays = _getBirthdaysForDate(normalizedDate);
-                            
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                              ),
-                              builder: (sheetContext) => DetailModal(
-                                date: normalizedDate,
-                                locations: locations,
-                                events: events,
-                                holidays: holidays,
-                                birthdays: birthdays,
-                                currentUserId: _user!.uid,
-                                canWrite: _canWrite,
-                                allUsers: _allUsers,
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                  if (unreadCount > 0)
-                    Positioned(
-                      right: 4,
-                      top: 4,
-                      child: IgnorePointer(
-                        child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 18,
-                          minHeight: 18,
-                        ),
-                        child: Text(
-                          unreadCount > 9 ? '9+' : unreadCount.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      ),
-                    ),
-                ],
+          title: GestureDetector(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => const CreditsAndFeedbackDialog(),
               );
             },
-          ),
-          
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0, left: 8.0),
-            child: GestureDetector(
-              onTap: () {
-                if (!_checkCanWrite()) return;
-                showDialog(
-                  context: context,
-                  builder: (_) => ProfileDialog(user: _user!),
-                );
-              },
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.grey[200],
-                child: ClipOval(
-                  child: Image.network(
-                    _photoUrl ?? _user?.photoURL ?? "https://ui-avatars.com/api/?name=${Uri.encodeComponent(_displayName ?? _user?.displayName ?? 'User')}",
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.network(
-                        "https://ui-avatars.com/api/?name=${Uri.encodeComponent(_displayName ?? _user?.displayName ?? 'User')}",
-                        width: 36,
-                        height: 36,
-                        fit: BoxFit.cover,
-                      );
-                    },
-                  ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SvgPicture.asset("assets/orbit_logo.svg", height: 40),
+                const SizedBox(width: 8),
+                Text(
+                  "Orbit",
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
-      ),
-      drawer: HomeDrawer(
-              user: _user,
-              displayName: _displayName,
-              photoUrl: _photoUrl,
-              onProfileTap: () {
-                if (!_checkCanWrite()) return;
-                showDialog(
-                  context: context,
-                  builder: (_) => ProfileDialog(user: _user!),
-                );
-              },
-              onManageGroupsTap: () {
-                if (!_checkCanWrite()) return;
-                showDialog(
-                  context: context,
-                  builder: (context) => const GroupManagementDialog(),
-                );
-              },
-              onUpcomingTap: _openUpcomingSummary,
-              onBirthdayBabyTap: _openBirthdayBabyDialog,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.event_note, color: Colors.deepPurple),
+              tooltip: 'Upcoming',
+              onPressed: _openUpcomingSummary,
+            ),
+            IconButton(
+              icon: const Icon(Icons.cake, color: Colors.pink),
+              tooltip: 'Birthday Baby',
+              onPressed: _openBirthdayBabyDialog,
+            ),
 
-              onRSVPManagementTap: () {
-                if (!_checkCanWrite()) return;
-                showDialog(
-                  context: context,
-                  builder: (context) => RSVPManagementDialog(
-                    currentUserId: _user!.uid,
-                  ),
+            // Notification bell with unread badge
+            StreamBuilder<int>(
+              stream: NotificationService().getUnreadCount(_user!.uid),
+              builder: (context, snapshot) {
+                final unreadCount = snapshot.data ?? 0;
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.notifications,
+                        color: Colors.orange,
+                      ),
+                      tooltip: 'Notifications',
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (dialogContext) => NotificationCenter(
+                            currentUserId: _user!.uid,
+                            canWrite: _canWrite,
+                            onNavigateToDate: (date) {
+                              // Close the notification dialog first (already handled in NotificationCenter)
+                              // Open detail modal for the specified date
+                              final normalizedDate = DateTime(
+                                date.year,
+                                date.month,
+                                date.day,
+                              );
+                              final locations = _getLocationsForDate(
+                                normalizedDate,
+                              );
+                              final events = _getEventsForDate(normalizedDate);
+                              final holidays = _getHolidaysForDate(
+                                normalizedDate,
+                              );
+                              final birthdays = _getBirthdaysForDate(
+                                normalizedDate,
+                              );
+
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(20),
+                                  ),
+                                ),
+                                builder: (sheetContext) => DetailModal(
+                                  date: normalizedDate,
+                                  locations: locations,
+                                  events: events,
+                                  holidays: holidays,
+                                  birthdays: birthdays,
+                                  currentUserId: _user!.uid,
+                                  canWrite: _canWrite,
+                                  allUsers: _allUsers,
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: IgnorePointer(
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 18,
+                              minHeight: 18,
+                            ),
+                            child: Text(
+                              unreadCount > 9 ? '9+' : unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 );
               },
-              onSettingsTap: () {
-                if (!_checkCanWrite()) return;
-                if (_user != null) {
+            ),
+
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0, left: 8.0),
+              child: GestureDetector(
+                onTap: () {
+                  if (!_checkCanWrite()) return;
                   showDialog(
                     context: context,
-                    builder: (context) => SettingsDialog(currentUserId: _user!.uid),
-                  ).then((_) {
-                    // Force refresh data after settings change (holidays, calendars, etc.)
-                    _loadData();
-                    if (mounted) setState(() {});
-                  });
-                }
-              },
-            ),
-      body: Stack(
-        children: [
-          // Persistent offline banner
-          if (_isOffline)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + kToolbarHeight,
-              left: 0,
-              right: 0,
-              child: Container(
-                color: Colors.orange[800],
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.cloud_off, color: Colors.white, size: 18),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'You are offline. Some features may be unavailable.',
-                        style: TextStyle(color: Colors.white, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          // Session terminated banner
-          if (_isSessionTerminated)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + kToolbarHeight + (_isOffline ? 40 : 0),
-              left: 0,
-              right: 0,
-              child: Container(
-                color: Colors.grey[700],
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.cancel_outlined, color: Colors.white, size: 18),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'Session terminated. You can safely close this tab.',
-                        style: TextStyle(color: Colors.white, fontSize: 13),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() => _isSessionTerminated = false);
-                        if (_user != null) {
-                          _startSessionTracking(_user!.uid);
-                        }
+                    builder: (_) => ProfileDialog(user: _user!),
+                  );
+                },
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.grey[200],
+                  child: ClipOval(
+                    child: Image.network(
+                      _photoUrl ??
+                          _user?.photoURL ??
+                          "https://ui-avatars.com/api/?name=${Uri.encodeComponent(_displayName ?? _user?.displayName ?? 'User')}",
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.network(
+                          "https://ui-avatars.com/api/?name=${Uri.encodeComponent(_displayName ?? _user?.displayName ?? 'User')}",
+                          width: 36,
+                          height: 36,
+                          fit: BoxFit.cover,
+                        );
                       },
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: Size.zero,
-                      ),
-                      child: const Text('Resume', style: TextStyle(color: Colors.white, fontSize: 12)),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          Padding(
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + kToolbarHeight + 16 + (_isOffline ? 40 : 0) + (_isSessionTerminated ? 40 : 0),
-            ),
-            child: Column(
-            children: [
-                  _DelayedEmptyStateWidget(
+          ],
+        ),
+        drawer: HomeDrawer(
+          user: _user,
+          displayName: _displayName,
+          photoUrl: _photoUrl,
+          onProfileTap: () {
+            if (!_checkCanWrite()) return;
+            showDialog(
+              context: context,
+              builder: (_) => ProfileDialog(user: _user!),
+            );
+          },
+          onManageGroupsTap: () {
+            if (!_checkCanWrite()) return;
+            showDialog(
+              context: context,
+              builder: (context) => const GroupManagementDialog(),
+            );
+          },
+          onUpcomingTap: _openUpcomingSummary,
+          onBirthdayBabyTap: _openBirthdayBabyDialog,
+
+          onRSVPManagementTap: () {
+            if (!_checkCanWrite()) return;
+            showDialog(
+              context: context,
+              builder: (context) =>
+                  RSVPManagementDialog(currentUserId: _user!.uid),
+            );
+          },
+          onSettingsTap: () {
+            if (!_checkCanWrite()) return;
+            if (_user != null) {
+              showDialog(
+                context: context,
+                builder: (context) => SettingsDialog(currentUserId: _user!.uid),
+              ).then((_) {
+                // Force refresh data after settings change (holidays, calendars, etc.)
+                _loadData();
+                if (mounted) setState(() {});
+              });
+            }
+          },
+        ),
+        body: Stack(
+          children: [
+            // Persistent offline banner
+            if (_isOffline)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + kToolbarHeight,
+                left: 0,
+                right: 0,
+                child: Container(
+                  color: Colors.orange[800],
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.cloud_off,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'You are offline. Some features may be unavailable.',
+                          style: TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            // Session terminated banner
+            if (_isSessionTerminated)
+              Positioned(
+                top:
+                    MediaQuery.of(context).padding.top +
+                    kToolbarHeight +
+                    (_isOffline ? 40 : 0),
+                left: 0,
+                right: 0,
+                child: Container(
+                  color: Colors.grey[700],
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.cancel_outlined,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Session terminated. You can safely close this tab.',
+                          style: TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() => _isSessionTerminated = false);
+                          if (_user != null) {
+                            _startSessionTracking(_user!.uid);
+                          }
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                        ),
+                        child: const Text(
+                          'Resume',
+                          style: TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Padding(
+              padding: EdgeInsets.only(
+                top:
+                    MediaQuery.of(context).padding.top +
+                    kToolbarHeight +
+                    16 +
+                    (_isOffline ? 40 : 0) +
+                    (_isSessionTerminated ? 40 : 0),
+              ),
+              child: Column(
+                children: [
+                  DelayedEmptyStateWidget(
                     stream: _firestoreService.getUserGroups(_user!.uid),
                     delayMs: 800, // Wait 800ms before showing empty state
                     skeletonBuilder: () => Card(
@@ -1650,22 +1929,46 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
                         padding: const EdgeInsets.all(20),
                         child: Column(
                           children: [
-                            Icon(Icons.group_add, size: 40, color: Theme.of(context).colorScheme.primary),
+                            Icon(
+                              Icons.group_add,
+                              size: 40,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                             const SizedBox(height: 10),
                             const Text(
                               "No Groups Yet",
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             const SizedBox(height: 5),
-                            Text("Create or join a group to see events.", textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+                            Text(
+                              "Create or join a group to see events.",
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
                             const SizedBox(height: 10),
                             ElevatedButton(
                               onPressed: () {
                                 showDialog(
                                   context: context,
-                                  builder: (context) => const GroupManagementDialog(),
+                                  builder: (context) =>
+                                      const GroupManagementDialog(),
                                 );
                               },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepPurple,
+                                foregroundColor: Colors.white,
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
+                              ),
                               child: const Text("Get Started"),
                             ),
                           ],
@@ -1673,243 +1976,96 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
                       ),
                     ),
                   ),
-                
-                // Calendar Controls
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(_currentMonthTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.chevron_left),
-                            onPressed: () {
-                              _calendarController.backward!();
-                            },
+
+                  // Calendar Controls
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _currentMonthTitle,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              _calendarController.displayDate = DateTime.now();
-                            },
-                            icon: const Icon(Icons.today, size: 16),
-                            label: const Text('Today'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.deepPurple, // Solid purple
-                              foregroundColor: Colors.white, // White text/icon
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.chevron_left),
+                              onPressed: () {
+                                _calendarController.backward!();
+                              },
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.chevron_right),
-                            onPressed: () {
-                              _calendarController.forward!();
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                _calendarController.displayDate =
+                                    DateTime.now();
+                              },
+                              icon: const Icon(Icons.today, size: 16),
+                              label: const Text('Today'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    Colors.deepPurple, // Solid purple
+                                foregroundColor:
+                                    Colors.white, // White text/icon
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.chevron_right),
+                              onPressed: () {
+                                _calendarController.forward!();
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                
-                // Calendar
-                Expanded(
-                  child: HomeCalendar(
-                    controller: _calendarController,
-                    locations: _locations,
-                    events: _events,
-                    holidays: _holidays,
-                    allUsers: _allUsers,
-                    placeholderMembers: _placeholderMembers,
-                    tileCalendarDisplay: _tileCalendarDisplay,
-                    religiousCalendars: _religiousCalendars,
-                    currentUserId: _user?.uid ?? '',
-                    currentViewMonth: _currentViewMonth,
-                    canWrite: _canWrite,
-                    onMonthChanged: (title, date) {
-                      setState(() {
-                        _currentMonthTitle = title;
-                        _currentViewMonth = date;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20), // Space for FAB
-              ],
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: _buildSpeedDial(),
-    ),
-    );
-  }
+                  const SizedBox(height: 10),
 
-  Widget _buildSpeedDial() {
-    return AnimatedOpacity(
-      opacity: _speedDialOpen ? 1.0 : 0.5,
-      duration: const Duration(milliseconds: 200),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Expanded options (visible when open)
-          if (_speedDialOpen) ...[
-            _buildSpeedDialOption(
-              icon: Icons.event,
-              label: 'Add Event',
-              onTap: () {
-                setState(() => _speedDialOpen = false);
-                _openAddEventModal();
-              },
+                  // Calendar
+                  Expanded(
+                    child: HomeCalendar(
+                      controller: _calendarController,
+                      locations: _locations,
+                      events: _events,
+                      holidays: _holidays,
+                      allUsers: _allUsers,
+                      placeholderMembers: _placeholderMembers,
+                      tileCalendarDisplay: _tileCalendarDisplay,
+                      religiousCalendars: _religiousCalendars,
+                      currentUserId: _user?.uid ?? '',
+                      currentViewMonth: _currentViewMonth,
+                      canWrite: _canWrite,
+                      onMonthChanged: (title, date) {
+                        setState(() {
+                          _currentMonthTitle = title;
+                          _currentViewMonth = date;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20), // Space for FAB
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            _buildSpeedDialOption(
-              icon: Icons.add_location,
-              label: 'Add Location',
-              onTap: () {
-                setState(() => _speedDialOpen = false);
-                _openLocationPicker();
-              },
-            ),
-            const SizedBox(height: 12),
           ],
-          // Main FAB
-          FloatingActionButton(
-            heroTag: "speedDial",
-            onPressed: () => setState(() => _speedDialOpen = !_speedDialOpen),
-            child: AnimatedRotation(
-              turns: _speedDialOpen ? 0.125 : 0, // 45 degree rotation
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                _speedDialOpen ? Icons.close : Icons.add,
-                color: Colors.black,
-              ),
-            ),
-          ),
-        ],
+        ),
+        floatingActionButton: HomeSpeedDial(
+          onAddEvent: _openAddEventModal,
+          onAddLocation: _openLocationPicker,
+        ),
       ),
     );
-  }
-
-  Widget _buildSpeedDialOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        FloatingActionButton.small(
-          heroTag: label,
-          onPressed: onTap,
-          child: Icon(icon, color: Colors.black, size: 20),
-        ),
-      ],
-    );
-  }
-}
-
-/// Widget that shows skeleton during loading and waits a minimum delay
-/// before showing empty state to confirm data is truly empty
-class _DelayedEmptyStateWidget extends StatefulWidget {
-  final Stream<List<Group>> stream;
-  final int delayMs;
-  final Widget Function() skeletonBuilder;
-  final Widget Function() emptyBuilder;
-
-  const _DelayedEmptyStateWidget({
-    required this.stream,
-    required this.delayMs,
-    required this.skeletonBuilder,
-    required this.emptyBuilder,
-  });
-
-  @override
-  State<_DelayedEmptyStateWidget> createState() => _DelayedEmptyStateWidgetState();
-}
-
-class _DelayedEmptyStateWidgetState extends State<_DelayedEmptyStateWidget> {
-  bool _minDelayPassed = false;
-  bool _hasData = false;
-  List<Group>? _data;
-  StreamSubscription? _subscription;
-
-  @override
-  void initState() {
-    super.initState();
-    
-    // Start the minimum delay timer
-    Future.delayed(Duration(milliseconds: widget.delayMs), () {
-      if (mounted) {
-        setState(() => _minDelayPassed = true);
-      }
-    });
-
-    // Subscribe to the stream
-    _subscription = widget.stream.listen((data) {
-      if (mounted) {
-        setState(() {
-          _hasData = true;
-          _data = data;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _subscription?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // If we have groups, hide this widget
-    if (_hasData && _data != null && _data!.isNotEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    // If minimum delay hasn't passed, show skeleton (or nothing if we already have data with groups)
-    if (!_minDelayPassed) {
-      return widget.skeletonBuilder();
-    }
-
-    // Delay passed - now show empty state only if confirmed empty
-    if (_hasData && _data != null && _data!.isEmpty) {
-      return widget.emptyBuilder();
-    }
-
-    // Still waiting for data after delay - keep showing skeleton
-    return widget.skeletonBuilder();
   }
 }
