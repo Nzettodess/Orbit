@@ -273,8 +273,8 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     _sessionService = null;
   }
 
-  /// Check if writes are allowed (session is active)
-  bool get _canWrite => !_isSessionTerminated;
+  /// Check if writes are allowed (session is active and online)
+  bool get _canWrite => !_isSessionTerminated && !_isOffline;
 
   /// Show dialog when write is blocked and return false
   bool _checkCanWrite() {
@@ -284,13 +284,39 @@ class _HomeWithLoginState extends State<HomeWithLogin>
         builder: (context) => AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.block, color: Colors.red[700], size: 22),
+              Icon(Icons.block, color: Colors.grey[700], size: 22),
+              const SizedBox(width: 8),
+              const Text('Session Terminated'),
+            ],
+          ),
+          content: const Text(
+            'This session was terminated. You cannot make changes.\n\nClick "Resume" in the banner to start a new session.',
+            style: TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return false;
+    }
+
+    if (_isOffline) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.cloud_off, color: Colors.orange[800], size: 22),
               const SizedBox(width: 8),
               const Text('Read-Only Mode'),
             ],
           ),
           content: const Text(
-            'This session was terminated. You cannot make changes.\n\nClick "Resume" in the banner to start a new session.',
+            'You are currently offline. Changes cannot be saved until you are back online.',
             style: TextStyle(fontSize: 14),
           ),
           actions: [
@@ -1488,6 +1514,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
         body: Stack(
           children: [
             // Persistent offline banner
+            // Persistent offline banner
             if (_isOffline)
               Positioned(
                 top: MediaQuery.of(context).padding.top + kToolbarHeight,
@@ -1509,9 +1536,15 @@ class _HomeWithLoginState extends State<HomeWithLogin>
                       const SizedBox(width: 10),
                       const Expanded(
                         child: Text(
-                          'You are offline. Some features may be unavailable.',
+                          'You are offline. Changes cannot be saved.',
                           style: TextStyle(color: Colors.white, fontSize: 13),
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Simple status label for consistency with "Resume" layout
+                      const Text(
+                        'Read Only',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
                       ),
                     ],
                   ),

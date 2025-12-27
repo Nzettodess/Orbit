@@ -278,12 +278,13 @@ class _NotificationCenterState extends State<NotificationCenter> {
                         ),
                       if (!isNarrow) const SizedBox(width: 8),
                       // Mark All Unread Button (New)
-                      IconButton(
-                        onPressed: _markAllAsUnread,
-                        icon: const Icon(Icons.undo), // Or another suitable icon
-                        tooltip: 'Mark All Unread',
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                      if (widget.canWrite)
+                        IconButton(
+                          onPressed: _markAllAsUnread,
+                          icon: const Icon(Icons.undo), 
+                          tooltip: 'Mark All Unread',
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       // Delete All Button (Trash Sweep)
                       if (widget.canWrite)
                         IconButton(
