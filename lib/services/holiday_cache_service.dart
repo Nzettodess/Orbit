@@ -39,8 +39,29 @@ class HolidayCacheService {
         if (expiresAt != null) {
           final expiryDate = (expiresAt as Timestamp).toDate();
           if (DateTime.now().isBefore(expiryDate)) {
-            // Cache valid - return immediately
-            return _parseHolidays(cache['holidays']);
+            try {
+              final holidays = _parseHolidays(cache['holidays']);
+              
+              // If we have data, it's a valid cache hit
+              if (holidays.isNotEmpty) {
+                return holidays;
+              }
+              
+              // If cache is empty, check if we fetched it recently (within 5 mins)
+              // This forces an update for old empty caches, but prevents infinite loops if the calendar is truly empty
+              final fetchedAt = cache['fetchedAt'];
+              if (fetchedAt != null && fetchedAt is Timestamp) {
+                final fetchTime = fetchedAt.toDate();
+                if (DateTime.now().difference(fetchTime).inMinutes < 5) {
+                  return [];
+                }
+              }
+              
+              print('Cache existed but was empty and stale. Fetching fresh data...');
+            } catch (e) {
+              print('Cache parsing failed (likely format change): $e. Fetching fresh data...');
+              // Fall through to fetch fresh data
+            }
           }
         }
       }

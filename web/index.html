@@ -195,6 +195,28 @@
 </head>
 
 <body>
+  <!-- Firebase App Check Debug Mode (localhost only) -->
+  <!-- Per Firebase docs: https://firebase.google.com/docs/app-check/web/debug-provider -->
+  <script>
+    // Enable App Check debug mode for localhost
+    // This will log a debug token in console that you must register in Firebase Console
+    // Firebase Console > App Check > Apps > Manage debug tokens
+    (function () {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        // Check if we have a registered token in localStorage (for CI-like scenarios)
+        var registeredToken = localStorage.getItem('FIREBASE_APPCHECK_DEBUG_TOKEN');
+        if (registeredToken) {
+          // Use the registered token directly
+          self.FIREBASE_APPCHECK_DEBUG_TOKEN = registeredToken;
+          console.log('[AppCheck] Using registered debug token:', registeredToken.substring(0, 8) + '...');
+        } else {
+          // Enable debug mode - this will log a token to console that you need to register
+          self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+          console.log('[AppCheck] Debug mode enabled. Check console for debug token to register in Firebase Console.');
+        }
+      }
+    })();
+  </script>
   <!-- Skeleton loading screen - shown while fonts load -->
   <div id="loading-skeleton">
     <div class="skeleton-logo"></div>

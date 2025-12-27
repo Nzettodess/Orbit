@@ -28,11 +28,12 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Enable Firebase App Check for API Security with Resilience
+  // Debug mode is enabled via FIREBASE_APPCHECK_DEBUG_TOKEN in index.html (for localhost only)
   try {
     await FirebaseAppCheck.instance.activate(
       webProvider: ReCaptchaV3Provider('6LecyDcsAAAAAH1E16_m85mrrAodiAdM9nWWfGRu'),
     );
-    debugPrint("Firebase App Check initialized successfully");
+    debugPrint("Firebase App Check initialized");
   } catch (e) {
     debugPrint("Warning: Firebase App Check failed to initialize (possibly blocked): $e");
   }

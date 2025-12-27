@@ -445,7 +445,7 @@ class _DetailModalState extends State<DetailModal> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(left: 16, top: 16, bottom: 16, right: 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       height: MediaQuery.of(context).size.height * 0.9,
       child: GestureDetector(
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),

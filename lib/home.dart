@@ -212,7 +212,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.1),
+                color: Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
@@ -318,7 +318,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
+                        color: Colors.orange.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -478,21 +478,37 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   
   void _cancelAllSubscriptions() {
     _groupsSubscription?.cancel();
+    _groupsSubscription = null;
     _locationsSubscription?.cancel();
+    _locationsSubscription = null;
     _placeholderLocationsSubscription?.cancel();
+    _placeholderLocationsSubscription = null;
     _usersSubscription?.cancel();
+    _usersSubscription = null;
     _placeholderMembersSubscription?.cancel();
+    _placeholderMembersSubscription = null;
     _eventsSubscription?.cancel();
+    _eventsSubscription = null;
     _settingsSubscription?.cancel();
+    _settingsSubscription = null;
     _profileSubscription?.cancel();
+    _profileSubscription = null;
   }
   
   void _cancelDataSubscriptions() {
     // Cancel inner data subscriptions (not groups subscription)
     _locationsSubscription?.cancel();
+    _locationsSubscription = null;
     _placeholderLocationsSubscription?.cancel();
+    _placeholderLocationsSubscription = null;
     _usersSubscription?.cancel();
+    _usersSubscription = null;
     _placeholderMembersSubscription?.cancel();
+    _placeholderMembersSubscription = null;
+    _eventsSubscription?.cancel();
+    _eventsSubscription = null;
+    _settingsSubscription?.cancel();
+    _settingsSubscription = null;
   }
 
   void _handleLoginSuccess() async {
@@ -827,15 +843,16 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       });
     }
 
-    // 4. Users
-    _usersSubscription = _firestoreService.getAllUsersStream().listen((allUsers) {
+    // 4. Users - Only fetch users who are in my groups (security rule compliant)
+    final memberIdsList = myGroupMemberIds.toList();
+    _usersSubscription = _firestoreService.getUsersByIdsStream(memberIdsList).listen((allUsers) {
       if (!mounted) return;
       
-      // Filter to only my group members and DEDUPLICATE by userId
+      // Assign each user to their first matching group (for display purposes)
       final userIdToGroupId = <String, String>{}; 
       for (final user in allUsers) {
         final uid = user['uid'] as String? ?? '';
-        if (myGroupMemberIds.contains(uid) && !userIdToGroupId.containsKey(uid)) {
+        if (!userIdToGroupId.containsKey(uid)) {
           final matchingGroups = _myGroups.where((g) => g.members.contains(uid)).toList();
           if (matchingGroups.isNotEmpty) {
             userIdToGroupId[uid] = matchingGroups.first.id;
@@ -871,6 +888,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       final data = snapshot.data();
       if (data == null) return;
       
+      debugPrint('[Home] Settings Update: tileCalendarDisplay=${data['tileCalendarDisplay']}, religiousCalendars=${data['religiousCalendars']}');
       setState(() {
         _religiousCalendars = List<String>.from(data['religiousCalendars'] ?? []);
         _tileCalendarDisplay = data['tileCalendarDisplay'] ?? 'none';
@@ -918,7 +936,10 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
       
       if (foundCountryCode != null) {
         final calendarId = GoogleCalendarService.countryCalendars[foundCountryCode];
+        debugPrint('[Home] Mapping Public Holiday (PH): $defaultLocation -> $foundCountryCode -> $calendarId');
         if (calendarId != null) calendarIds.add(calendarId);
+      } else {
+        debugPrint('[Home] No Public Holiday (PH) mapping found for location: $defaultLocation');
       }
     }
     
@@ -939,9 +960,10 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
   void _fetchHolidays(List<String> calendarIds) async {
     if (_user == null) return;
     
-    // Use holiday cache service for 7-day caching (reduces API calls by ~87%)
     final cacheService = HolidayCacheService(_user!.uid);
+    debugPrint('[Home] Fetching holidays for ${calendarIds.length} calendars: $calendarIds');
     final holidays = await cacheService.getHolidays(calendarIds);
+    debugPrint('[Home] Fetched ${holidays.length} Public Holiday (PH) total for $calendarIds');
     
     if (mounted) {
       setState(() {
@@ -1264,10 +1286,58 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
+    // Show calendar behind login overlay so users can see what the app is about
     if (_user == null) {
+      debugPrint('[Home] Building Login/Preview View');
       return Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset("assets/orbit_logo.svg", height: 40),
+              const SizedBox(width: 8),
+              Text("Orbit", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
         body: Stack(
           children: [
+            // Show the calendar in the background
+            HomeCalendar(
+              currentUserId: '', // Empty for preview mode
+              locations: [],
+              events: [],
+              holidays: [],
+              controller: _calendarController,
+              currentViewMonth: _currentViewMonth,
+              religiousCalendars: [],
+              tileCalendarDisplay: 'none',
+              allUsers: [],
+              placeholderMembers: [],
+              onMonthChanged: (title, viewMonth) {},
+              canWrite: false,
+            ),
+            // Blur filter over the calendar
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.1),
+                ),
+              ),
+            ),
+            // Login overlay on top
             LoginOverlay(onSignedIn: _handleLoginSuccess),
           ],
         ),
@@ -1285,7 +1355,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.7), // Translucent using theme surface
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7), // Translucent using theme surface
             ),
           ),
         ),
@@ -1728,7 +1798,7 @@ class _HomeWithLoginState extends State<HomeWithLogin> with WidgetsBindingObserv
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),

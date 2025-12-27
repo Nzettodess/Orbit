@@ -182,24 +182,27 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isNarrow = screenWidth < 450;
-    final isVeryNarrow = screenWidth < 380;
-    
-    // Use 95% of screen width on mobile, capped at 500 for larger screens
-    final dialogWidth = screenWidth < 550 ? screenWidth * 0.95 : 500.0;
-    
-    // Responsive text styles
-    final sectionTitleStyle = TextStyle(
-      fontSize: isVeryNarrow ? 14 : (isNarrow ? 15 : 16),
-      fontWeight: FontWeight.bold,
-    );
-    final bodyTextStyle = TextStyle(
-      fontSize: isVeryNarrow ? 12 : (isNarrow ? 13 : 14),
-    );
-    final smallTextStyle = TextStyle(
-      fontSize: isVeryNarrow ? 11 : (isNarrow ? 12 : 13),
-    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        final screenHeight = constraints.maxHeight;
+        final isNarrow = screenWidth < 450;
+        final isVeryNarrow = screenWidth < 380;
+        
+        // Use 95% of screen width on mobile, capped at 500 for larger screens
+        final dialogWidth = screenWidth < 550 ? screenWidth * 0.95 : 500.0;
+        
+        // Responsive text styles
+        final sectionTitleStyle = TextStyle(
+          fontSize: isVeryNarrow ? 14 : (isNarrow ? 15 : 16),
+          fontWeight: FontWeight.bold,
+        );
+        final bodyTextStyle = TextStyle(
+          fontSize: isVeryNarrow ? 12 : (isNarrow ? 13 : 14),
+        );
+        final smallTextStyle = TextStyle(
+          fontSize: isVeryNarrow ? 11 : (isNarrow ? 12 : 13),
+        );
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -210,7 +213,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       child: Container(
         width: dialogWidth,
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
+          maxHeight: screenHeight * 0.85,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -605,6 +608,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ],
         ),
       ),
+        );
+      },
     );
   }
 }

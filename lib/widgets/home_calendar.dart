@@ -62,43 +62,41 @@ class _HomeCalendarState extends State<HomeCalendar> {
   void didUpdateWidget(HomeCalendar oldWidget) {
     super.didUpdateWidget(oldWidget);
     
-    // Check if month changed - need full recache
-    final monthChanged = oldWidget.currentViewMonth.month != widget.currentViewMonth.month ||
-        oldWidget.currentViewMonth.year != widget.currentViewMonth.year;
-    
-    if (monthChanged) {
-      _lastCachedMonth = null;
-      _visibleDates = null;
-      _precomputeMonthData(widget.currentViewMonth);
-      return;
+    // Simplified Transparent Caching: Any change to Data or Settings triggers a full refresh
+    bool needsRefresh = false;
+    String reason = '';
+
+    if (oldWidget.currentUserId != widget.currentUserId) {
+      reason = 'userId changed';
+      needsRefresh = true;
+    } else if (oldWidget.tileCalendarDisplay != widget.tileCalendarDisplay) {
+      reason = 'tileCalendarDisplay change: ${oldWidget.tileCalendarDisplay} -> ${widget.tileCalendarDisplay}';
+      needsRefresh = true;
+    } else if (oldWidget.locations != widget.locations) {
+      reason = 'locations updated';
+      needsRefresh = true;
+    } else if (oldWidget.events != widget.events) {
+      reason = 'events updated';
+      needsRefresh = true;
+    } else if (oldWidget.holidays != widget.holidays) {
+      reason = 'Public Holidays (PH) updated';
+      needsRefresh = true;
+    } else if (oldWidget.allUsers != widget.allUsers) {
+      reason = 'user list updated';
+      needsRefresh = true;
+    } else if (oldWidget.placeholderMembers != widget.placeholderMembers) {
+      reason = 'placeholder members updated';
+      needsRefresh = true;
+    } else if (oldWidget.currentViewMonth != widget.currentViewMonth) {
+      reason = 'view month changed';
+      needsRefresh = true;
     }
-    
-    // GRANULAR CACHE UPDATES - only update what changed
-    _visibleDates ??= _getVisibleDatesForMonth(widget.currentViewMonth);
-    
-    // Locations or users changed -> update locations/travelers/birthdays caches only
-    if (oldWidget.locations != widget.locations || 
-        oldWidget.allUsers != widget.allUsers ||
-        oldWidget.placeholderMembers != widget.placeholderMembers) {
-      _updateLocationsCacheOnly();
-    }
-    
-    // Events changed -> update events cache only
-    if (oldWidget.events != widget.events) {
-      _updateEventsCacheOnly();
-    }
-    
-    // Holidays changed -> update holidays cache only
-    if (oldWidget.holidays != widget.holidays) {
-      _updateHolidaysCacheOnly();
-    }
-    
-    // Calendar display setting changed -> update religious dates cache only
-    if (oldWidget.tileCalendarDisplay != widget.tileCalendarDisplay) {
-      _updateReligiousDatesCacheOnly();
+
+    if (needsRefresh) {
+      debugPrint('[HomeCalendar] Refresh triggered by: $reason');
+      forceRefresh();
     }
   }
-
   @override
   void initState() {
     super.initState();
@@ -108,63 +106,28 @@ class _HomeCalendarState extends State<HomeCalendar> {
     });
   }
 
-  /// Force refresh the cache - call this after settings changes
+  /// Force refresh the cache - call this after settings changes or major data refreshes
   void forceRefresh() {
-    _lastCachedMonth = null;
-    _visibleDates = null;
-    _preloadedMonths.clear();  // Clear preload tracking to reload all
-    _cachedLocations.clear();
-    _cachedTravelers.clear();
-    _cachedEvents.clear();
-    _cachedHolidays.clear();
-    _cachedBirthdays.clear();
-    _cachedReligiousDates.clear();
+    if (!mounted) return;
+    setState(() {
+      _lastCachedMonth = null;
+      _visibleDates = null;
+      _preloadedMonths.clear();
+      _cachedLocations.clear();
+      _cachedTravelers.clear();
+      _cachedEvents.clear();
+      _cachedHolidays.clear();
+      _cachedBirthdays.clear();
+      _cachedReligiousDates.clear();
+      
+      // Re-compute basic structure
+      _visibleDates = _getVisibleDatesForMonth(widget.currentViewMonth);
+    });
+    
+    // Kick off precompute for the current view
     _precomputeMonthData(widget.currentViewMonth);
   }
 
-  // === GRANULAR CACHE UPDATE METHODS ===
-  
-  void _updateLocationsCacheOnly() {
-    final dates = _visibleDates ?? _getVisibleDatesForMonth(widget.currentViewMonth);
-    for (final date in dates) {
-      final key = _dateKey(date);
-      _cachedLocations[key] = _computeLocationsForDate(date);
-      _cachedTravelers[key] = _computeTravelersForDate(date);
-      _cachedBirthdays[key] = _computeBirthdaysForDate(date);
-    }
-    if (mounted) setState(() {});
-  }
-  
-  void _updateEventsCacheOnly() {
-    final dates = _visibleDates ?? _getVisibleDatesForMonth(widget.currentViewMonth);
-    for (final date in dates) {
-      final key = _dateKey(date);
-      _cachedEvents[key] = widget.events.where((e) => 
-        e.date.year == date.year && e.date.month == date.month && e.date.day == date.day).toList();
-    }
-    if (mounted) setState(() {});
-  }
-  
-  void _updateHolidaysCacheOnly() {
-    final dates = _visibleDates ?? _getVisibleDatesForMonth(widget.currentViewMonth);
-    for (final date in dates) {
-      final key = _dateKey(date);
-      _cachedHolidays[key] = widget.holidays.where((h) => 
-        h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
-    }
-    if (mounted) setState(() {});
-  }
-  
-  void _updateReligiousDatesCacheOnly() {
-    final dates = _visibleDates ?? _getVisibleDatesForMonth(widget.currentViewMonth);
-    for (final date in dates) {
-      final key = _dateKey(date);
-      _cachedReligiousDates[key] = widget.tileCalendarDisplay == 'none' 
-        ? [] 
-        : ReligiousCalendarHelper.getReligiousDates(date, [widget.tileCalendarDisplay]);
-    }
-    if (mounted) setState(() {});
-  }
 
   /// Pre-compute all data for the visible month (42 dates)
   /// This runs ONCE when month changes, not 42 times per frame
@@ -187,23 +150,36 @@ class _HomeCalendarState extends State<HomeCalendar> {
     for (final date in _visibleDates!) {
       final key = _dateKey(date);
       
-      // Only compute if not already cached
+      // Compute each cache independently to avoid partial cache issues
       if (!_cachedLocations.containsKey(key)) {
         _cachedLocations[key] = _computeLocationsForDate(date);
         _cachedTravelers[key] = _computeTravelersForDate(date);
+        _cachedBirthdays[key] = _computeBirthdaysForDate(date);
+      }
+      if (!_cachedEvents.containsKey(key)) {
         _cachedEvents[key] = widget.events.where((e) => 
           e.date.year == date.year && e.date.month == date.month && e.date.day == date.day).toList();
+      }
+      if (!_cachedHolidays.containsKey(key)) {
         _cachedHolidays[key] = widget.holidays.where((h) => 
           h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
-        _cachedBirthdays[key] = _computeBirthdaysForDate(date);
-        _cachedReligiousDates[key] = widget.tileCalendarDisplay == 'none' 
-          ? [] 
-          : ReligiousCalendarHelper.getReligiousDates(date, [widget.tileCalendarDisplay]);
       }
+      
+      // ALWAYS ensure religious dates are computed for each date using the latest setting
+      // These are cheap to compute and shouldn't be gated by containsKey if settings might have changed
+      final List<String> calendarsToFetch = widget.tileCalendarDisplay == 'none' 
+        ? [] 
+        : [widget.tileCalendarDisplay];
+      _cachedReligiousDates[key] = ReligiousCalendarHelper.getReligiousDates(date, calendarsToFetch);
     }
     
     _preloadedMonths.add(monthKey);
     
+    debugPrint('[HomeCalendar] Precompute done for $monthKey. Cache sizes: '
+      'Holidays: ${_cachedHolidays.length}, '
+      'Religious: ${_cachedReligiousDates.length}, '
+      'Events: ${_cachedEvents.length}');
+
     // PRELOAD ADJACENT MONTHS (async, after current month is displayed)
     // This makes swipe transitions seamless!
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -233,18 +209,26 @@ class _HomeCalendarState extends State<HomeCalendar> {
     final dates = _getVisibleDatesForMonth(month);
     for (final date in dates) {
       final key = _dateKey(date);
+      // Compute each cache independently
       if (!_cachedLocations.containsKey(key)) {
         _cachedLocations[key] = _computeLocationsForDate(date);
         _cachedTravelers[key] = _computeTravelersForDate(date);
+        _cachedBirthdays[key] = _computeBirthdaysForDate(date);
+      }
+      if (!_cachedEvents.containsKey(key)) {
         _cachedEvents[key] = widget.events.where((e) => 
           e.date.year == date.year && e.date.month == date.month && e.date.day == date.day).toList();
+      }
+      if (!_cachedHolidays.containsKey(key)) {
         _cachedHolidays[key] = widget.holidays.where((h) => 
           h.date.year == date.year && h.date.month == date.month && h.date.day == date.day).toList();
-        _cachedBirthdays[key] = _computeBirthdaysForDate(date);
-        _cachedReligiousDates[key] = widget.tileCalendarDisplay == 'none' 
-          ? [] 
-          : ReligiousCalendarHelper.getReligiousDates(date, [widget.tileCalendarDisplay]);
       }
+      
+      // Always re-calculate religious dates for preloaded months too
+      final List<String> calendarsToFetch = widget.tileCalendarDisplay == 'none' 
+        ? [] 
+        : [widget.tileCalendarDisplay];
+      _cachedReligiousDates[key] = ReligiousCalendarHelper.getReligiousDates(date, calendarsToFetch);
     }
     _preloadedMonths.add(monthKey);
   }
@@ -417,29 +401,26 @@ class _HomeCalendarState extends State<HomeCalendar> {
     return birthdays;
   }
 
-  /// Get responsive sizes based on screen width
+  /// Get responsive sizes based on constraints
   /// Mobile (<500): smaller fonts, tighter spacing, hide lunar month
   /// Tablet (500-800): medium sizing
   /// Desktop (>800): original sizing
-  _ResponsiveSizes _getResponsiveSizes(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    
+  _ResponsiveSizes _getResponsiveSizes(double width) {
     if (width < 500) {
       // Mobile - compact sizing, hide lunar month text
-      // iPhone 14 Pro Max is 430px, so use 500px breakpoint
       return _ResponsiveSizes(
         cardMargin: 8.0,
         dayFontSize: 12.0,
         religiousFontSize: 7.0,
         barFontSize: 6.5,
         moreFontSize: 6.0,
-        avatarSize: 15.0,  // Smaller when = 3
+        avatarSize: 15.0,
         avatarSizeMedium: 13.0,
         avatarSizeSmall: 11.0,
         cellPadding: 0.5,
-        maxAvatars: 3,  // Fewer avatars on mobile
-        showLunarMonth: false,  // Hide month like 十月, only show day
-        maxBars: 5,  // Limit to 5 to prevent overflow
+        maxAvatars: 3,
+        showLunarMonth: false,
+        maxBars: 5,
       );
     } else if (width < 800) {
       // Tablet (500-800px) - medium sizing
@@ -454,8 +435,8 @@ class _HomeCalendarState extends State<HomeCalendar> {
         avatarSizeSmall: 12.0,
         cellPadding: 0.75,
         maxAvatars: 6,
-        showLunarMonth: true,  // Show lunar month on tablet
-        maxBars: 2,  // Medium event bars
+        showLunarMonth: true,
+        maxBars: 2,
       );
     } else {
       // Desktop - original sizing
@@ -470,33 +451,34 @@ class _HomeCalendarState extends State<HomeCalendar> {
         avatarSizeSmall: 13.0,
         cellPadding: 1.0,
         maxAvatars: 8,
-        showLunarMonth: true,  // Show lunar month on desktop
-        maxBars: 3,  // More event bars on large screens
+        showLunarMonth: true,
+        maxBars: 3,
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final sizes = _getResponsiveSizes(context);
-    
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: sizes.cardMargin),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      // Use LayoutBuilder ONCE here instead of 42 times inside each cell
-      // This dramatically improves swipe performance
-      child: LayoutBuilder(
-        builder: (context, calendarConstraints) {
-          // Pre-calculate maxBars once based on calendar height
-          // Each cell is roughly calendarHeight / 6 rows
-          final estimatedCellHeight = calendarConstraints.maxHeight / 6;
-          final reservedHeight = sizes.dayFontSize + 8 + sizes.avatarSize + sizes.moreFontSize + 16; // +N more text + padding
-          final availableHeight = estimatedCellHeight - reservedHeight;
-          final barHeight = sizes.barFontSize + 5;
-          final dynamicMaxBars = (availableHeight / barHeight).floor().clamp(1, 5); // Clamp to 5 max
-          
-          return SfCalendar(
+    return LayoutBuilder(
+      builder: (context, calendarConstraints) {
+        final sizes = _getResponsiveSizes(calendarConstraints.maxWidth);
+
+        // Pre-calculate maxBars once based on calendar height
+        // Each cell is roughly calendarHeight / 6 rows
+        final estimatedCellHeight = calendarConstraints.maxHeight / 6;
+        final reservedHeight = sizes.dayFontSize + 8 + sizes.avatarSize + sizes.moreFontSize + 16; // +N more text + padding
+        final availableHeight = estimatedCellHeight - reservedHeight;
+        final barHeight = sizes.barFontSize + 5;
+        final dynamicMaxBars = (availableHeight / barHeight).floor().clamp(1, 5); // Clamp to 5 max
+        
+        return Card(
+          margin: EdgeInsets.symmetric(horizontal: sizes.cardMargin),
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          child: Column(
+            children: [
+              Expanded(
+                child: SfCalendar(
         controller: widget.controller,
         view: CalendarView.month,
         headerHeight: 0,
@@ -523,7 +505,6 @@ class _HomeCalendarState extends State<HomeCalendar> {
           
           // === PERFORMANCE: O(1) cached lookups instead of O(n) computations ===
           final key = _dateKey(date);
-          final dayLocations = _cachedLocations[key] ?? [];  // For detail modal
           final dayTravelers = _cachedTravelers[key] ?? [];  // For avatar display
           final dayHolidays = _cachedHolidays[key] ?? [];
           final dayEvents = _cachedEvents[key] ?? [];
@@ -561,9 +542,9 @@ class _HomeCalendarState extends State<HomeCalendar> {
               duration: const Duration(milliseconds: 1000),
               curve: Curves.easeOut,
               decoration: BoxDecoration(
-                border: Border.all(color: isDarkMode ? Colors.white10 : Colors.grey.withOpacity(0.1)),
+                border: Border.all(color: isDarkMode ? Colors.white10 : Colors.grey.withValues(alpha: 0.1)),
                 color: isToday 
-                  ? Theme.of(context).colorScheme.primary.withOpacity(isDarkMode ? 0.35 : 0.2)
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: isDarkMode ? 0.35 : 0.2)
                   : (isCurrentMonth 
                       ? Theme.of(context).colorScheme.surface 
                       : (isDarkMode ? Colors.grey.shade900 : Colors.grey[50])),
@@ -585,7 +566,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
                             ? Theme.of(context).colorScheme.primary 
                             : (isCurrentMonth 
                                 ? Theme.of(context).colorScheme.onSurface 
-                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.4))
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4))
                         )),
                       if (filteredReligiousDates.isNotEmpty)
                         Expanded(
@@ -594,8 +575,8 @@ class _HomeCalendarState extends State<HomeCalendar> {
                             style: TextStyle(
                               fontSize: sizes.religiousFontSize, 
                               color: isCurrentMonth 
-                                ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
-                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.3), 
+                                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3), 
                               fontWeight: FontWeight.w500
                             ),
                             maxLines: 1,
@@ -612,10 +593,10 @@ class _HomeCalendarState extends State<HomeCalendar> {
                     Color color = Colors.blue;
                     if (item is Holiday) {
                       title = item.localName;
-                      color = Colors.red.withOpacity(0.7);
+                      color = Colors.red.withValues(alpha: 0.7);
                     } else if (item is GroupEvent) {
                       title = item.title;
-                      color = Colors.blue.withOpacity(0.7);
+                      color = Colors.blue.withValues(alpha: 0.7);
                     } else if (item is Birthday) {
                       // Format: "Name - Ageth" for solar, "[农历] Name" for lunar
                       if (item.isLunar) {
@@ -624,12 +605,12 @@ class _HomeCalendarState extends State<HomeCalendar> {
                         final ageSuffix = _getAgeSuffix(item.age);
                         title = "${item.displayName} - ${item.age}$ageSuffix";
                       }
-                      color = Colors.green.withOpacity(0.7);
+                      color = Colors.green.withValues(alpha: 0.7);
                     }
                     
                     // Dim bars for non-current month
                     if (!isCurrentMonth) {
-                      color = color.withOpacity(0.3);
+                      color = color.withValues(alpha: 0.3);
                     }
 
                     return Container(
@@ -803,10 +784,13 @@ class _HomeCalendarState extends State<HomeCalendar> {
             );
           }
         },
-      );  // Close SfCalendar
-    },  // Close LayoutBuilder builder
-      ),  // Close LayoutBuilder
-    );  // Close Card
+      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   String _getAgeSuffix(int age) {

@@ -939,8 +939,58 @@ class FirestoreService {
     // Cache will be updated by the stream listener
   }
 
-  // --- Users and Global Locations ---
+  /// Get users by their IDs (for group members only)
+  /// This replaces the broken getAllUsersStream which violated security rules
+  /// by trying to read ALL users instead of just group members
+  Stream<List<Map<String, dynamic>>> getUsersByIdsStream(List<String> userIds) async* {
+    if (userIds.isEmpty) {
+      yield [];
+      return;
+    }
 
+    final cacheKey = 'users_${userIds.hashCode}';
+    if (_lastUsersCache.containsKey(cacheKey)) {
+      yield _lastUsersCache[cacheKey]!;
+    }
+
+    // Firestore 'whereIn' has a limit of 10 items per query
+    // For larger lists, we need to batch the queries
+    const batchSize = 10;
+    final allUsers = <Map<String, dynamic>>[];
+    
+    for (var i = 0; i < userIds.length; i += batchSize) {
+      final batch = userIds.skip(i).take(batchSize).toList();
+      
+      try {
+        await for (final snapshot in _db
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: batch)
+            .snapshots()) {
+          
+          // Merge batch results into allUsers
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            data['uid'] = doc.id; // Ensure uid is set
+            final existingIndex = allUsers.indexWhere((u) => u['uid'] == doc.id);
+            if (existingIndex >= 0) {
+              allUsers[existingIndex] = data;
+            } else {
+              allUsers.add(data);
+            }
+          }
+          
+          _lastUsersCache[cacheKey] = List.from(allUsers);
+          yield _lastUsersCache[cacheKey]!;
+        }
+      } catch (e) {
+        print('[FirestoreService] Error fetching users batch: $e');
+        // Continue with next batch on error
+      }
+    }
+  }
+
+  /// @deprecated Use getUsersByIdsStream instead - this violates security rules
+  /// Keeping for backward compatibility but will fail with permission denied
   Stream<List<Map<String, dynamic>>> getAllUsersStream() async* {
     const cacheKey = 'global_users';
     if (_lastUsersCache.containsKey(cacheKey)) {
