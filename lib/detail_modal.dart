@@ -152,9 +152,15 @@ class _DetailModalState extends State<DetailModal> {
   }
 
   Future<void> _loadGroupNames() async {
-    // Load group names for all groups in locations
-    final groupIds = widget.locations.map((l) => l.groupId).toSet();
+    // Load group names for all groups in locations and events
+    final groupIds = {
+      ...widget.locations.map((l) => l.groupId),
+      ...widget.events.map((e) => e.groupId),
+    };
+    
     for (final groupId in groupIds) {
+      if (_groupNames.containsKey(groupId)) continue;
+      
       // Handle special "global" groupId
       if (groupId == 'global') {
         setState(() {
@@ -573,7 +579,14 @@ class _DetailModalState extends State<DetailModal> {
                                builder: (context, snapshot) {
                                  if (snapshot.hasData) {
                                     final data = snapshot.data!.data() as Map<String, dynamic>?;
-                                    return Text("Owner: ${data?['displayName'] ?? 'Unknown'}", style: const TextStyle(fontSize: 12, color: Colors.grey));
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text("Group: ${_groupNames[e.groupId] ?? 'Loading...'}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 4),
+                                        Text("Owner: ${data?['displayName'] ?? 'Unknown'}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                      ],
+                                    );
                                  }
                                  return const SizedBox.shrink();
                                },
@@ -600,6 +613,10 @@ class _DetailModalState extends State<DetailModal> {
                  subtitle: Column(
                    crossAxisAlignment: CrossAxisAlignment.start,
                    children: [
+                     // Show Group Name at the top for context
+                     Text("Group: ${_groupNames[e.groupId] ?? 'Loading...'}", 
+                       style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor, fontWeight: FontWeight.bold)),
+                     const SizedBox(height: 2),
                      // Time display - show if event has time
                      if (e.hasTime)
                        Row(
@@ -953,7 +970,7 @@ class _DetailModalState extends State<DetailModal> {
                                                   endDate,
                                                   country,
                                                   state,
-                                                );
+                                                  );
                                               },
                                             ),
                                           ],
@@ -1028,35 +1045,35 @@ class _DetailModalState extends State<DetailModal> {
                                   },
                                   tooltip: isCurrentUser ? 'Delete (Revert to Default)' : 'Delete Member Location',
                                 ),
-                          // Pin button for all users
-                          IconButton(
-                            icon: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: iconSize),
-                            color: isPinned ? Colors.blue : Colors.grey,
-                            padding: EdgeInsets.zero,
-                            constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
-                            splashRadius: iconSize,
-                            onPressed: () => _togglePin(element.userId),
-                          ),
+                              // Pin button for all users
+                              IconButton(
+                                icon: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: iconSize),
+                                color: isPinned ? Colors.blue : Colors.grey,
+                                padding: EdgeInsets.zero,
+                                constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
+                                splashRadius: iconSize,
+                                onPressed: () => _togglePin(element.userId),
+                              ),
 
-                        ],
-                      );
-                  }),
-                  ),  // Close GestureDetector
-                );
-                  },
-                );
-              },
-            );
-          },
-        ),
-              ],
+                            ],
+                          );
+                      }),
+                    ),  // Close GestureDetector
+                  );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
-  ),
-);
+  );
 }
 
 
@@ -1150,9 +1167,9 @@ class _DetailModalState extends State<DetailModal> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildRSVPChip(event, widget.currentUserId, 'No', Colors.red, dialogContext, setDialogState),
-                      _buildRSVPChip(event, widget.currentUserId, 'Maybe', Colors.orange, dialogContext, setDialogState),
-                      _buildRSVPChip(event, widget.currentUserId, 'Yes', Colors.green, dialogContext, setDialogState),
+                      _buildRSVPChip(event, widget.currentUserId, 'No', Colors.red, dialogContext, setDialogState, 'Myself'),
+                      _buildRSVPChip(event, widget.currentUserId, 'Maybe', Colors.orange, dialogContext, setDialogState, 'Myself'),
+                      _buildRSVPChip(event, widget.currentUserId, 'Yes', Colors.green, dialogContext, setDialogState, 'Myself'),
                     ],
                   ),
                   
@@ -1225,7 +1242,7 @@ class _DetailModalState extends State<DetailModal> {
     );
   }
 
-  Widget _buildRSVPChip(GroupEvent event, String userId, String status, Color color, BuildContext dialogContext, StateSetter setDialogState) {
+  Widget _buildRSVPChip(GroupEvent event, String userId, String status, Color color, BuildContext dialogContext, StateSetter setDialogState, String responderName) {
     final currentStatus = event.rsvps[userId];
     final isSelected = currentStatus == status;
     return ChoiceChip(
@@ -1234,7 +1251,7 @@ class _DetailModalState extends State<DetailModal> {
       selectedColor: color.withOpacity(0.3),
       onSelected: (_) {
       if (!_checkCanWrite()) return;
-      _firestoreService.rsvpEvent(event.id, userId, status);
+      _firestoreService.rsvpEvent(event.id, userId, status, responderName: responderName);
         // Update local state so UI reflects change
         setDialogState(() {
           event.rsvps[userId] = status;
@@ -1288,7 +1305,7 @@ class _DetailModalState extends State<DetailModal> {
             ),
             onSelected: (status) {
             if (!_checkCanWrite()) return;
-            _firestoreService.rsvpEvent(event.id, memberId, status);
+            _firestoreService.rsvpEvent(event.id, memberId, status, responderName: name);
               // Update UI
               setDialogState(() {
                 event.rsvps[memberId] = status;

@@ -757,8 +757,8 @@ class FirestoreService {
     }
   }
 
-  Future<void> rsvpEvent(String eventId, String userId, String status) async {
-    _log.debug('User $userId RSVPing to event $eventId with status: $status');
+  Future<void> rsvpEvent(String eventId, String userId, String status, {String? responderName}) async {
+    _log.debug('User $userId RSVPing to event $eventId with status: $status (Name: $responderName)');
     // Update RSVP
     await _db.collection('events').doc(eventId).update({
       'rsvps.$userId': status,
@@ -776,8 +776,16 @@ class FirestoreService {
         return;
       }
       
-      final userDoc = await _db.collection('users').doc(userId).get();
-      final userName = userDoc.data()?['displayName'] ?? userDoc.data()?['email'] ?? 'Someone';
+      String userName = responderName ?? 'Someone';
+      if (responderName == null) {
+        if (userId.startsWith('placeholder_')) {
+          final phDoc = await _db.collection('placeholder_members').doc(userId).get();
+          userName = phDoc.data()?['displayName'] ?? 'A member';
+        } else {
+          final userDoc = await _db.collection('users').doc(userId).get();
+          userName = userDoc.data()?['displayName'] ?? userDoc.data()?['email'] ?? 'Someone';
+        }
+      }
       
       _log.debug('Notifying event creator ${event.creatorId} of RSVP from $userName for event ${event.title}');
       await NotificationService().notifyRSVP(

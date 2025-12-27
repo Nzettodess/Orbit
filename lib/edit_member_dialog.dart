@@ -30,6 +30,7 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
   bool _hasLunarBirthday = false;
   int? _lunarBirthdayMonth;
   int? _lunarBirthdayDay;
+  final TextEditingController _nameController = TextEditingController();
   bool _isLoading = false;
   
   // Per-field privacy settings
@@ -60,6 +61,7 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
         _hasLunarBirthday = data['hasLunarBirthday'] ?? false;
         _lunarBirthdayMonth = data['lunarBirthdayMonth'];
         _lunarBirthdayDay = data['lunarBirthdayDay'];
+        _nameController.text = data['displayName'] ?? '';
         
         // Check per-field privacy settings
         final privacySettings = data['privacySettings'] as Map<String, dynamic>?;
@@ -82,6 +84,7 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
         'hasLunarBirthday': _hasLunarBirthday,
         'lunarBirthdayMonth': _lunarBirthdayMonth,
         'lunarBirthdayDay': _lunarBirthdayDay,
+        if (widget.isPlaceholder) 'displayName': _nameController.text.trim(),
       };
       
       final collection = widget.isPlaceholder ? 'placeholder_members' : 'users';
@@ -219,6 +222,20 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (widget.isPlaceholder) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: TextField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Display Name',
+                            icon: Icon(Icons.person, color: Colors.teal),
+                          ),
+                          textCapitalization: TextCapitalization.words,
+                        ),
+                      ),
+                      const Divider(),
+                    ],
                     // Default Location
                     ListTile(
                       leading: Icon(Icons.location_on, 

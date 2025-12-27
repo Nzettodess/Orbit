@@ -140,35 +140,6 @@ class _AddEventModalState extends State<AddEventModal> {
           timezone: tz,
         );
         await _firestoreService.createEvent(event);
-        
-        // --- Trigger Notification ---
-        try {
-          // Get group details to send notifications
-          final selectedGroup = _userGroups.firstWhere((g) => g.id == _selectedGroupId!);
-          
-          debugPrint('DEBUG: Target Group: ${selectedGroup.name}');
-          debugPrint('DEBUG: Raw Members: ${selectedGroup.members}');
-          
-          debugPrint('DEBUG: Raw Members: ${selectedGroup.members}');
-
-          await NotificationService().notifyEventCreated(
-            memberIds: selectedGroup.members,
-            creatorId: widget.currentUserId,
-            eventId: event.id,
-            eventTitle: event.title,
-            groupId: selectedGroup.id,
-            groupName: selectedGroup.name,
-          );
-          
-          debugPrint('DEBUG: notifyEventCreated completed successfully');
-        } catch (e) {
-          debugPrint('Error sending event notification: $e');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Push Failed: $e'), backgroundColor: Colors.red),
-            );
-          }
-        }
       }
       
       // Small delay to let SnackBar be seen (optional, but helpful for debug)

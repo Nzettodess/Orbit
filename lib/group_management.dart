@@ -40,13 +40,29 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
-              if (controller.text.trim().isEmpty) return;
+              final newName = controller.text.trim();
+              if (newName.isEmpty) {
+                showDialog(
+                  context: context,
+                  builder: (errorContext) => AlertDialog(
+                    title: const Text("Error"),
+                    content: const Text("Group name cannot be empty."),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(errorContext),
+                        child: const Text("OK"),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
               try {
                 // Determine if user is allowed (Double check owner/admin status)
                 // UI already hides the button, but good to be safe.
                 // Firestore rules should also enforce this.
                 await FirebaseFirestore.instance.collection('groups').doc(group.id).update({
-                  'name': controller.text.trim()
+                  'name': newName
                 });
                  if (mounted) {
                   Navigator.pop(context);
@@ -66,9 +82,28 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
   }
 
   void _createGroup() async {
-    if (_groupNameController.text.isEmpty || _user == null) return;
+    final name = _groupNameController.text.trim();
+    if (_user == null) return;
+    
+    if (name.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Error"),
+          content: const Text("Group name cannot be empty."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     try {
-      await _firestoreService.createGroup(_groupNameController.text, _user!.uid);
+      await _firestoreService.createGroup(name, _user!.uid);
       _groupNameController.clear();
       if (mounted) {
         Navigator.pop(context); // Close create dialog
