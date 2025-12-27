@@ -272,6 +272,16 @@ class _NotificationDebugDialogState extends State<NotificationDebugDialog> {
             Icons.family_restroom,
             _testInheritanceFlow,
           ),
+          _buildWorkflowCard(
+            'Birthday Journey',
+            'Triggers manual birthday check for all group members',
+            Icons.cake_outlined,
+            () async {
+              _updateStatus('Starting Manual Birthday Check...');
+              await NotificationService().checkAllBirthdays(widget.currentUserId, force: true);
+              _updateStatus('✅ Birthday Check Complete. Watch for notifications!');
+            },
+          ),
         ],
       ),
     );

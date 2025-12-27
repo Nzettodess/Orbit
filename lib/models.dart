@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lunar/lunar.dart';
 import 'models/placeholder_member.dart';
+export 'models/placeholder_member.dart';
 
 class Group {
   final String id;
