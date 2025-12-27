@@ -32,6 +32,7 @@ import 'services/notification_service.dart';
 import 'widgets/skeleton_loading.dart';
 import 'widgets/delayed_empty_state.dart';
 import 'widgets/home_speed_dial.dart';
+import 'widgets/home_app_bar.dart';
 
 class HomeWithLogin extends StatefulWidget {
   const HomeWithLogin({super.key});
@@ -1591,187 +1592,26 @@ class _HomeWithLoginState extends State<HomeWithLogin>
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
         extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent, // Glassmorphism base
-          elevation: 0,
-          flexibleSpace: ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                color: Theme.of(context).colorScheme.surface.withValues(
-                  alpha: 0.7,
-                ), // Translucent using theme surface
-              ),
-            ),
-          ),
-          title: GestureDetector(
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => const CreditsAndFeedbackDialog(),
-              );
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SvgPicture.asset("assets/orbit_logo.svg", height: 40),
-                const SizedBox(width: 8),
-                Text(
-                  "Orbit",
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.event_note, color: Colors.deepPurple),
-              tooltip: 'Upcoming',
-              onPressed: _openUpcomingSummary,
-            ),
-            IconButton(
-              icon: const Icon(Icons.cake, color: Colors.pink),
-              tooltip: 'Birthday Baby',
-              onPressed: _openBirthdayBabyDialog,
-            ),
-
-            // Notification bell with unread badge
-            StreamBuilder<int>(
-              stream: NotificationService().getUnreadCount(_user!.uid),
-              builder: (context, snapshot) {
-                final unreadCount = snapshot.data ?? 0;
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.notifications,
-                        color: Colors.orange,
-                      ),
-                      tooltip: 'Notifications',
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (dialogContext) => NotificationCenter(
-                            currentUserId: _user!.uid,
-                            canWrite: _canWrite,
-                            onNavigateToDate: (date) {
-                              // Close the notification dialog first (already handled in NotificationCenter)
-                              // Open detail modal for the specified date
-                              final normalizedDate = DateTime(
-                                date.year,
-                                date.month,
-                                date.day,
-                              );
-                              final locations = _getLocationsForDate(
-                                normalizedDate,
-                              );
-                              final events = _getEventsForDate(normalizedDate);
-                              final holidays = _getHolidaysForDate(
-                                normalizedDate,
-                              );
-                              final birthdays = _getBirthdaysForDate(
-                                normalizedDate,
-                              );
-
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(20),
-                                  ),
-                                ),
-                                builder: (sheetContext) => DetailModal(
-                                  date: normalizedDate,
-                                  locations: locations,
-                                  events: events,
-                                  holidays: holidays,
-                                  birthdays: birthdays,
-                                  currentUserId: _user!.uid,
-                                  canWrite: _canWrite,
-                                  allUsers: _allUsers,
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                    if (unreadCount > 0)
-                      Positioned(
-                        right: 4,
-                        top: 4,
-                        child: IgnorePointer(
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 1.5,
-                              ),
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 18,
-                              minHeight: 18,
-                            ),
-                            child: Text(
-                              unreadCount > 9 ? '9+' : unreadCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0, left: 8.0),
-              child: GestureDetector(
-                onTap: () {
-                  if (!_checkCanWrite()) return;
-                  showDialog(
-                    context: context,
-                    builder: (_) => ProfileDialog(user: _user!),
-                  );
-                },
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.grey[200],
-                  child: ClipOval(
-                    child: Image.network(
-                      _photoUrl ??
-                          _user?.photoURL ??
-                          "https://ui-avatars.com/api/?name=${Uri.encodeComponent(_displayName ?? _user?.displayName ?? 'User')}",
-                      width: 36,
-                      height: 36,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Image.network(
-                          "https://ui-avatars.com/api/?name=${Uri.encodeComponent(_displayName ?? _user?.displayName ?? 'User')}",
-                          width: 36,
-                          height: 36,
-                          fit: BoxFit.cover,
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+      appBar: HomeAppBar(
+        user: _user,
+        canWrite: _canWrite,
+        photoUrl: _photoUrl,
+        displayName: _displayName,
+        allUsers: _allUsers,
+        onUpcomingTap: _openUpcomingSummary,
+        onBirthdayTap: _openBirthdayBabyDialog,
+        onProfileTap: () {
+          if (!_checkCanWrite()) return;
+          showDialog(
+            context: context,
+            builder: (_) => ProfileDialog(user: _user!),
+          );
+        },
+        getLocationsForDate: _getLocationsForDate,
+        getEventsForDate: _getEventsForDate,
+        getHolidaysForDate: _getHolidaysForDate,
+        getBirthdaysForDate: _getBirthdaysForDate,
+      ),
         drawer: HomeDrawer(
           user: _user,
           displayName: _displayName,
