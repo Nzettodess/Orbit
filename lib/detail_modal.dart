@@ -13,6 +13,7 @@ import 'widgets/skeleton_loading.dart';
 import 'rsvp_management.dart';
 import 'edit_member_dialog.dart';
 import 'widgets/user_profile_dialog.dart';
+import 'widgets/rich_description_viewer.dart';
 
 class DetailModal extends StatefulWidget {
   final DateTime date;
@@ -568,11 +569,11 @@ class _DetailModalState extends State<DetailModal> {
                                Text("Time: ${DateFormat('HH:mm').format(e.date)}", style: const TextStyle(fontWeight: FontWeight.bold)),
                              const SizedBox(height: 8),
                              if (e.venue != null && e.venue!.isNotEmpty) ...[
-                               Text("Venue: ${e.venue}", style: const TextStyle(fontStyle: FontStyle.italic)),
+                               VenueLinkText(venue: e.venue!, style: const TextStyle(fontStyle: FontStyle.italic)),
                                const SizedBox(height: 8),
                              ],
                              if (e.description.isNotEmpty)
-                               Text(e.description),
+                               RichDescriptionViewer(description: e.description),
                              const SizedBox(height: 16),
                              FutureBuilder<DocumentSnapshot>(
                                future: FirebaseFirestore.instance.collection('users').doc(e.creatorId).get(),
@@ -630,26 +631,15 @@ class _DetailModalState extends State<DetailModal> {
                          ],
                        ),
                      if (e.description.isNotEmpty)
-                       Text(
-                         e.description,
-                         maxLines: 3,
-                         overflow: TextOverflow.ellipsis,
+                       RichDescriptionPreview(
+                         description: e.description,
+                         maxLength: 80,
                          style: TextStyle(fontSize: 13, color: Theme.of(context).hintColor),
                        ),
                      if (e.venue != null && e.venue!.isNotEmpty)
-                       Row(
-                         children: [
-                           Icon(Icons.location_on, size: 14, color: Theme.of(context).hintColor),
-                           const SizedBox(width: 4),
-                           Expanded(
-                             child: Text(
-                               e.venue!,
-                               style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Theme.of(context).hintColor),
-                               maxLines: 1,
-                               overflow: TextOverflow.ellipsis,
-                             ),
-                           ),
-                         ],
+                       VenueLinkText(
+                         venue: e.venue!,
+                         style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Theme.of(context).hintColor),
                        ),
                      FutureBuilder<DocumentSnapshot>(
                        future: FirebaseFirestore.instance.collection('users').doc(e.creatorId).get(),

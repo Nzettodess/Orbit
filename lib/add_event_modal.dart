@@ -5,6 +5,7 @@ import 'models.dart';
 import 'firestore_service.dart';
 import 'widgets/syncfusion_date_picker.dart';
 import 'services/notification_service.dart';
+import 'widgets/rich_description_editor.dart';
 
 class AddEventModal extends StatefulWidget {
   final String currentUserId;
@@ -204,13 +205,14 @@ class _AddEventModalState extends State<AddEventModal> {
                 decoration: const InputDecoration(labelText: "Event Title"),
                 validator: (value) => value!.isEmpty ? "Required" : null,
               ),
-              TextFormField(
+              const SizedBox(height: 8),
+              SimpleMarkdownField(
                 controller: _descController,
-                decoration: const InputDecoration(labelText: "Description"),
-                minLines: 1,
+                hintText: 'Add description (supports **bold**, *italic*, [links](url))',
+                minLines: 2,
                 maxLines: 5,
-                keyboardType: TextInputType.multiline,
               ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _venueController,
                 decoration: const InputDecoration(

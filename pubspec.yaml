@@ -59,6 +59,9 @@ dependencies:
   url_launcher: ^6.3.2
   font_awesome_flutter: ^10.12.0
   web: ^1.1.0
+  flutter_linkify: ^6.0.0
+  flutter_markdown: ^0.7.4+3
+  flutter_quill: ^11.5.0
 
 
 

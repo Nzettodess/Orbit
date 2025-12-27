@@ -5,6 +5,7 @@ import 'models.dart';
 import 'models/upcoming_item.dart';
 import 'models/placeholder_member.dart';
 import 'add_event_modal.dart';
+import 'widgets/rich_description_viewer.dart';
 
 /// Dialog showing upcoming events, location changes, and birthdays
 /// grouped by date. Only dates with items are displayed.
@@ -591,17 +592,9 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
               
               // Venue
               if (event.venue != null && event.venue!.isNotEmpty) ...[
-                Row(
-                  children: [
-                    Icon(Icons.location_on, size: 16, color: Colors.grey.shade600),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        event.venue!,
-                        style: TextStyle(color: Colors.grey.shade700),
-                      ),
-                    ),
-                  ],
+                VenueLinkText(
+                  venue: event.venue!,
+                  style: TextStyle(color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -623,9 +616,9 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 8),
-                Text(
-                  event.description,
-                  style: const TextStyle(fontSize: 14),
+                RichDescriptionViewer(
+                  description: event.description,
+                  selectable: true,
                 ),
               ],
             ],
