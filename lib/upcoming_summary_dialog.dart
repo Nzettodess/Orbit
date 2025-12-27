@@ -6,6 +6,7 @@ import 'models/upcoming_item.dart';
 import 'models/placeholder_member.dart';
 import 'add_event_modal.dart';
 import 'widgets/rich_description_viewer.dart';
+import 'widgets/event_detail_dialog.dart';
 
 /// Dialog showing upcoming events, location changes, and birthdays
 /// grouped by date. Only dates with items are displayed.
@@ -538,99 +539,26 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
 
   /// Show event detail dialog with edit button
   void _showEventDetail(GroupEvent event) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                event.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue),
-              tooltip: 'Edit Event',
-              onPressed: () {
-                if (!_checkCanWrite()) return;
-                Navigator.pop(context); // Close event detail
-                Navigator.pop(this.context); // Close upcoming summary
-                // Show edit modal
-                showModalBottomSheet(
-                  context: this.context,
-                  isScrollControlled: true,
-                  builder: (context) => AddEventModal(
-                    currentUserId: widget.currentUserId,
-                    initialDate: event.date,
-                    eventToEdit: event,
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Date and time
-              Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('MMM d, yyyy').format(event.date) +
-                        (event.hasTime ? ' at ${DateFormat('HH:mm').format(event.date)}' : ''),
-                    style: TextStyle(color: Colors.grey.shade700),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              
-              // Venue
-              if (event.venue != null && event.venue!.isNotEmpty) ...[
-                VenueLinkText(
-                  venue: event.venue!,
-                  style: TextStyle(color: Colors.grey.shade700),
-                ),
-                const SizedBox(height: 8),
-              ],
-              
-              // Group
-              Row(
-                children: [
-                  Icon(Icons.group, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.groupNames[event.groupId] ?? 'Group',
-                    style: TextStyle(color: Colors.grey.shade700),
-                  ),
-                ],
-              ),
-              
-              // Description
-              if (event.description.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-                RichDescriptionViewer(
-                  description: event.description,
-                  selectable: true,
-                ),
-              ],
-            ],
+    showEventDetailDialog(
+      context,
+      event,
+      groupName: widget.groupNames[event.groupId],
+      showDate: true,
+      onEdit: () {
+        if (!_checkCanWrite()) return;
+        Navigator.pop(context); // Close event detail
+        Navigator.pop(this.context); // Close upcoming summary
+        // Show edit modal
+        showModalBottomSheet(
+          context: this.context,
+          isScrollControlled: true,
+          builder: (context) => AddEventModal(
+            currentUserId: widget.currentUserId,
+            initialDate: event.date,
+            eventToEdit: event,
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

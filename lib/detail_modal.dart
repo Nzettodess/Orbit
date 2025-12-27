@@ -14,6 +14,7 @@ import 'rsvp_management.dart';
 import 'edit_member_dialog.dart';
 import 'widgets/user_profile_dialog.dart';
 import 'widgets/rich_description_viewer.dart';
+import 'widgets/event_detail_dialog.dart';
 
 class DetailModal extends StatefulWidget {
   final DateTime date;
@@ -556,53 +557,11 @@ class _DetailModalState extends State<DetailModal> {
                  contentPadding: const EdgeInsets.only(left: 16.0, right: 2.0),
                  visualDensity: VisualDensity.compact,
                  onTap: () {
-                   showDialog(
-                     context: context,
-                     builder: (context) => AlertDialog(
-                       title: Text(e.title),
-                       content: SingleChildScrollView(
-                         child: Column(
-                           crossAxisAlignment: CrossAxisAlignment.start,
-                           mainAxisSize: MainAxisSize.min,
-                           children: [
-                             if (e.hasTime)
-                               Text("Time: ${DateFormat('HH:mm').format(e.date)}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                             const SizedBox(height: 8),
-                             if (e.venue != null && e.venue!.isNotEmpty) ...[
-                               VenueLinkText(venue: e.venue!, style: const TextStyle(fontStyle: FontStyle.italic)),
-                               const SizedBox(height: 8),
-                             ],
-                             if (e.description.isNotEmpty)
-                               RichDescriptionViewer(description: e.description),
-                             const SizedBox(height: 16),
-                             FutureBuilder<DocumentSnapshot>(
-                               future: FirebaseFirestore.instance.collection('users').doc(e.creatorId).get(),
-                               builder: (context, snapshot) {
-                                 if (snapshot.hasData) {
-                                    final data = snapshot.data!.data() as Map<String, dynamic>?;
-                                    return Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text("Group: ${_groupNames[e.groupId] ?? 'Loading...'}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 4),
-                                        Text("Owner: ${data?['displayName'] ?? 'Unknown'}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                      ],
-                                    );
-                                 }
-                                 return const SizedBox.shrink();
-                               },
-                             ),
-                           ],
-                         ),
-                       ),
-                       actions: [
-                         TextButton(
-                           onPressed: () => Navigator.pop(context),
-                           child: const Text('Close'),
-                         ),
-                       ],
-                     ),
-                   );
+                   showEventDetailDialog(
+                      context, 
+                      e, 
+                      groupName: _groupNames[e.groupId],
+                    );
                  },
                  leading: const Icon(Icons.event, color: Colors.blue),
                  title: Text(
