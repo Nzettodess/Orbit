@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -289,6 +291,15 @@ class _HomeWithLoginState extends State<HomeWithLogin>
       if (groupId != null && groupId.isNotEmpty) {
         debugPrint('[Home] Join link detected: Join Group $groupId');
         _pendingJoinGroupId = groupId;
+
+        // Clean up the URL: remove 'join' parameter without reloading
+        try {
+          final newPath = uri.path;
+          js.context['history'].callMethod('replaceState', [null, '', newPath]);
+          debugPrint('[Home] URL cleaned up: Removed join parameter');
+        } catch (e) {
+          debugPrint('[Home] Failed to cleanup URL: $e');
+        }
       }
     }
   }
