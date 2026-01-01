@@ -1,3 +1,4 @@
+import 'dart:js' as js;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -163,6 +164,12 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
         content: TextField(
           controller: _groupNameController,
           decoration: const InputDecoration(labelText: "Group Name"),
+          enableInteractiveSelection: true,
+          contextMenuBuilder: (context, editableTextState) {
+            return AdaptiveTextSelectionToolbar.editableText(
+              editableTextState: editableTextState,
+            );
+          },
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
@@ -184,6 +191,13 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
             TextField(
               controller: _joinCodeController,
               decoration: const InputDecoration(labelText: "Group ID"),
+              autofocus: true,
+              enableInteractiveSelection: true,
+              contextMenuBuilder: (context, editableTextState) {
+                return AdaptiveTextSelectionToolbar.editableText(
+                  editableTextState: editableTextState,
+                );
+              },
             ),
             const SizedBox(height: 8),
             Text(
@@ -315,19 +329,25 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
         vertical: 24,
       ),
       child: Container(
-        padding: EdgeInsets.all(isNarrow ? 8 : 20),
+        padding: EdgeInsets.zero, // Remove global padding
         width: dialogWidth,
         height: 500,
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text("Groups", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-              ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Groups", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                ],
+              ),
             ),
-            const Divider(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Divider(),
+            ),
             Expanded(
               child: StreamBuilder<List<Group>>(
                 stream: _firestoreService.getUserGroups(_user!.uid),
@@ -348,6 +368,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
 
                   final groups = snapshot.data!;
                   return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 0), 
                     itemCount: groups.length,
                     itemBuilder: (context, index) {
                       final group = groups[index];
@@ -368,7 +389,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                                       tooltip: 'Rename Group',
                                       onPressed: () => _renameGroup(group),
                                       padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                                     ),
                                 ],
                               ),
@@ -386,7 +407,39 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                               },
                               tooltip: 'Copy Group ID',
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.share, size: 20, color: Colors.blue),
+                              onPressed: () {
+                                String baseUrl = 'https://orbit-wheat-sigma.vercel.app/'; // Fallback
+                                try {
+                                  final origin = js.context['location']['origin'];
+                                  if (origin != null) baseUrl = origin;
+                                } catch (e) {
+                                  debugPrint('Error getting origin: $e');
+                                }
+
+                                final joinLink = 'Click this link to join our group on Orbit: $baseUrl/?join=${group.id}';
+                                Clipboard.setData(ClipboardData(text: joinLink));
+
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text("Link Copied!"),
+                                    content: const Text("Join link has been copied to your clipboard.\n\nSend it to your friends to invite them to this group!"),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text("OK"),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              tooltip: 'Copy Join Link',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                             ),
                           ],
                         ),
@@ -404,7 +457,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                                 return Stack(
                                   children: [
                                     IconButton(
-                                      icon: const Icon(Icons.person_outline, color: Colors.blue, size: 22),
+                                      icon: const Icon(Icons.person_outline, color: Colors.blue, size: 26),
                                       onPressed: () {
                                         showDialog(
                                           context: context,
@@ -417,7 +470,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                                       tooltip: 'Placeholder Members',
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                      constraints: const BoxConstraints(minWidth: 36, minHeight: 34),
                                     ),
                                     // Show badge if admin/owner and there are pending inheritance requests
                                     if (isAdminOrOwner && inheritPendingCount > 0)
@@ -460,7 +513,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                                 return Stack(
                                   children: [
                                     IconButton(
-                                      icon: const Icon(Icons.group, color: Colors.green, size: 22),
+                                      icon: const Icon(Icons.group, color: Colors.green, size: 24),
                                       onPressed: () {
                                         showDialog(
                                           context: context,
@@ -506,7 +559,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                               },
                             ),
                             IconButton(
-                              icon: const Icon(Icons.exit_to_app, color: Colors.red, size: 22),
+                              icon: const Icon(Icons.exit_to_app, color: Colors.red, size: 24),
                               onPressed: () => _leaveGroup(group),
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
@@ -626,50 +679,58 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
             ),
 
             
-            const SizedBox(height: 16),
-            // Responsive buttons - stack vertically on very narrow screens
-            if (isVeryNarrow)
-              Column(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _showJoinDialog,
-                      icon: const Icon(Icons.group_add, size: 18),
-                      label: const Text("Join Group"),
+                  const SizedBox(height: 16),
+                  // Responsive buttons - stack vertically on very narrow screens
+                  if (isVeryNarrow)
+                    Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _showJoinDialog,
+                            icon: const Icon(Icons.group_add, size: 18),
+                            label: const Text("Join Group"),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _showCreateDialog,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text("Create Group"),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _showJoinDialog,
+                            icon: Icon(Icons.group_add, size: isNarrow ? 16 : 20),
+                            label: Text("Join", style: TextStyle(fontSize: isNarrow ? 12 : 14)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _showCreateDialog,
+                            icon: Icon(Icons.add, size: isNarrow ? 16 : 20),
+                            label: Text("Create", style: TextStyle(fontSize: isNarrow ? 12 : 14)),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _showCreateDialog,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text("Create Group"),
-                    ),
-                  ),
-                ],
-              )
-            else
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _showJoinDialog,
-                      icon: Icon(Icons.group_add, size: isNarrow ? 16 : 20),
-                      label: Text("Join", style: TextStyle(fontSize: isNarrow ? 12 : 14)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _showCreateDialog,
-                      icon: Icon(Icons.add, size: isNarrow ? 16 : 20),
-                      label: Text("Create", style: TextStyle(fontSize: isNarrow ? 12 : 14)),
-                    ),
-                  ),
                 ],
               ),
+            ),
 
           ],
         ),

@@ -1,5 +1,8 @@
 import 'dart:ui';
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js' as js;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -46,6 +49,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   User? _user = FirebaseAuth.instance.currentUser;
   String? _photoUrl;
   String? _displayName;
+  String? _pendingJoinGroupId; // For deep link invitations
   double _previousKeyboardHeight = 0;
   final FirestoreService _firestoreService = FirestoreService();
   final GoogleCalendarService _googleCalendarService = GoogleCalendarService();
@@ -98,6 +102,9 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     ConnectivityService().init();
     _setupConnectivityListener();
 
+    // Check for join link invitation (join=[groupId])
+    _checkJoinLink();
+
     // Listen to auth state changes (login/logout)
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (mounted) {
@@ -117,6 +124,8 @@ class _HomeWithLoginState extends State<HomeWithLogin>
         NotificationService().initialize(user.uid);
         // Check for birthday notifications (day-of and monthly summary)
         _checkBirthdayNotifications(user.uid);
+        // Process any pending join request from deep link
+        _processPendingJoin(user.uid);
       } else {
         // User logged out - clear data and cancel subscriptions
         _endSessionTracking();
@@ -271,6 +280,90 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   void _endSessionTracking() {
     _sessionService?.endSession();
     _sessionService = null;
+  }
+
+  void _checkJoinLink() {
+    if (!kIsWeb) return;
+
+    final uri = Uri.base;
+    if (uri.queryParameters.containsKey('join')) {
+      final groupId = uri.queryParameters['join'];
+      if (groupId != null && groupId.isNotEmpty) {
+        debugPrint('[Home] Join link detected: Join Group $groupId');
+        _pendingJoinGroupId = groupId;
+
+        // Clean up the URL: remove 'join' parameter without reloading
+        try {
+          final newPath = uri.path;
+          js.context['history'].callMethod('replaceState', [null, '', newPath]);
+          debugPrint('[Home] URL cleaned up: Removed join parameter');
+        } catch (e) {
+          debugPrint('[Home] Failed to cleanup URL: $e');
+        }
+      }
+    }
+  }
+
+  Future<void> _processPendingJoin(String userId) async {
+    if (_pendingJoinGroupId == null) return;
+
+    final groupId = _pendingJoinGroupId!;
+    _pendingJoinGroupId = null; // Clear so we don't process twice
+
+    debugPrint('[Home] Auto-processing join request from join link: $groupId');
+
+    try {
+      // 1. Check if already a member
+      final userGroups = await _firestoreService.getUserGroups(userId).first;
+      if (userGroups.any((g) => g.id == groupId)) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text("Already a Member"),
+              content: const Text("You are already a member of this group!"),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK")),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      // 2. Send join request
+      await _firestoreService.requestToJoinGroup(groupId, userId);
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Join Link Detected"),
+            content: const Text("A join request has been automatically sent to the group admin for approval."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Got it!"),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[Home] Join link processing failed: $e');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Join Link Failed"),
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK")),
+            ],
+          ),
+        );
+      }
+    }
   }
 
   /// Check if writes are allowed (session is active and online)
@@ -1458,7 +1551,13 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     }
 
     return GestureDetector(
-      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      onTap: () {
+        // Only unfocus if we're not tapping on an existing focus (prevents toolbar flickering)
+        final currentFocus = FocusScope.of(context);
+        if (!currentFocus.hasPrimaryFocus && currentFocus.focusedChild != null) {
+          FocusManager.instance.primaryFocus?.unfocus();
+        }
+      },
       child: Scaffold(
         extendBodyBehindAppBar: true,
       appBar: HomeAppBar(
