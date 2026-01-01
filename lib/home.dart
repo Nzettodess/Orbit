@@ -1540,7 +1540,13 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     }
 
     return GestureDetector(
-      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      onTap: () {
+        // Only unfocus if we're not tapping on an existing focus (prevents toolbar flickering)
+        final currentFocus = FocusScope.of(context);
+        if (!currentFocus.hasPrimaryFocus && currentFocus.focusedChild != null) {
+          FocusManager.instance.primaryFocus?.unfocus();
+        }
+      },
       child: Scaffold(
         extendBodyBehindAppBar: true,
       appBar: HomeAppBar(

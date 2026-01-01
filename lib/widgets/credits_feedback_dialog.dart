@@ -195,6 +195,11 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                 const Text('Nzettodess', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               ],
             ),
+            const SizedBox(height: 4),
+            Text(
+              'v1.0.1',
+              style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor.withOpacity(0.8)),
+            ),
             const SizedBox(height: 12),
             
             // Connect - SVG icons with LIGHT backgrounds

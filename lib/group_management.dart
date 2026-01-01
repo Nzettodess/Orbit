@@ -164,6 +164,12 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
         content: TextField(
           controller: _groupNameController,
           decoration: const InputDecoration(labelText: "Group Name"),
+          enableInteractiveSelection: true,
+          contextMenuBuilder: (context, editableTextState) {
+            return AdaptiveTextSelectionToolbar.editableText(
+              editableTextState: editableTextState,
+            );
+          },
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
@@ -185,6 +191,13 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
             TextField(
               controller: _joinCodeController,
               decoration: const InputDecoration(labelText: "Group ID"),
+              autofocus: true,
+              enableInteractiveSelection: true,
+              contextMenuBuilder: (context, editableTextState) {
+                return AdaptiveTextSelectionToolbar.editableText(
+                  editableTextState: editableTextState,
+                );
+              },
             ),
             const SizedBox(height: 8),
             Text(
