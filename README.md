@@ -24,8 +24,9 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 - **🎂 Birthday Reliability**: Implemented lifecycle-aware, group-wide birthday checks to ensure notifications never miss a beat.
 - **🔗 Join Link invitations**: Users can now join groups via shareable, PWA-aware links with automatic login, join request handling, and **smart URL cleanup** to prevent refresh loops.
 - **📤 Enhanced Sharing**: Mobile users enjoy **native share sheets** for instant app sharing, while desktop users get a reliable clipboard fallback.
+- **📋 Device Info**: Added "Copy Info" button in Feedback dialog to instantly grab App Version, User Agent, Timezone, and PWA status for easier debugging.
+- **🎨 UI Modernization**: Refined spaces, icons, and **Dismissible Dialogs** (click outside to close) for a smoother experience.
 - **📱 Mobile Paste Fix**: Empowered mobile users with native long-press context menus for seamless ID pasting.
-- **🎨 UI Modernization**: Refined "Groups" spacing, updated management icons, added app version display (v1.0.1), and **optimized profile actions** for narrower screens.
 - **🛡️ Admin Hierarchy**: Refined permissions to allow Admins to edit details while protecting Owners and other Admins from removal.
 - **🛠️ Stability & Dedup**: Improved notification deduplication, external ID sync, and fixed join link compilation issues.
 

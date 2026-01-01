@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -46,6 +47,66 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
 
   void _openEmail() {
     js.context.callMethod('open', ['mailto:$_emailAddress', '_self']);
+  }
+
+  Future<void> _copyDeviceInfo() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final sb = StringBuffer();
+
+    sb.writeln('--- Orbit Device Info ---');
+    sb.writeln('App Version: v1.0.1');
+    sb.writeln('Timestamp: ${DateTime.now()}');
+    sb.writeln('User ID: ${user?.uid ?? "Not Logged In"}');
+    sb.writeln('Email: ${user?.email ?? "N/A"}');
+    
+    // Platform Check
+    try {
+      sb.writeln('Platform: ${Theme.of(context).platform}');
+    } catch (_) {
+      sb.writeln('Platform: Unknown');
+    }
+
+    // Web-specific Info via dart:js
+    try {
+      final nav = js.context['navigator'];
+      final win = js.context;
+      
+      sb.writeln('User Agent: ${nav['userAgent']}');
+      sb.writeln('Language: ${nav['language']}');
+      sb.writeln('Touch Points: ${nav['maxTouchPoints']}');
+      
+      // Screen/Window
+      sb.writeln('Window Size: ${win['innerWidth']} x ${win['innerHeight']}');
+      sb.writeln('Pixel Ratio: ${win['devicePixelRatio']}');
+      
+      // Timezone
+      final tz = js.context['Intl']
+          .callMethod('DateTimeFormat')
+          .callMethod('resolvedOptions')['timeZone'];
+      sb.writeln('Timezone: $tz');
+
+      // PWA Check
+      final isPwa = win.callMethod('matchMedia', ['(display-mode: standalone)'])['matches'];
+      sb.writeln('PWA Mode: $isPwa');
+      
+    } catch (e) {
+      sb.writeln('Web Info Error: $e');
+    }
+    
+    sb.writeln('Flutter Screen Size: ${MediaQuery.of(context).size}');
+    sb.writeln('-------------------------');
+
+    await Clipboard.setData(ClipboardData(text: sb.toString()));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('📋 Device info copied to clipboard!'),
+          backgroundColor: Colors.blueAccent,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _sendFeedback() async {
@@ -269,12 +330,13 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
+                  child: OutlinedButton.icon(
+                    onPressed: _copyDeviceInfo,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                     ),
-                    child: const Text('Close'),
+                    icon: const Icon(Icons.copy, size: 16),
+                    label: const Text('Copy Info', style: TextStyle(fontSize: 12)),
                   ),
                 ),
                 const SizedBox(width: 12),

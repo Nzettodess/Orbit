@@ -221,7 +221,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   void _showSessionTerminatedDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
