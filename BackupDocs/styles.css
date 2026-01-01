@@ -178,7 +178,8 @@ li {
   /* Prevent overflow for long links */
 }
 
-ul {
+ul,
+ol {
   padding-left: 20px;
 }
 
@@ -242,6 +243,11 @@ code {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   /* Add subtle shadow to screenshot */
   border-radius: 4px;
+}
+
+.placeholder-img .img-md {
+  width: 100%;
+  max-width: 300px;
 }
 
 /* Mobile Toggle */
