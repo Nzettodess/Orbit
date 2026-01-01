@@ -437,7 +437,7 @@ class _GroupManagementDialogState extends State<GroupManagementDialog> {
                                     js.context['navigator'].callMethod('share', [
                                       js.JsObject.jsify({
                                         'title': 'Join my Orbit Group',
-                                        'text': joinLink,
+                                        'text': 'Come join my group on Orbit!', // Removed manual link concatenation
                                         'url': '$baseUrl/?join=${group.id}',
                                       })
                                     ]);
