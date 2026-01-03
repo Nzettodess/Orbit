@@ -7,6 +7,19 @@ class PWAService {
   factory PWAService() => _instance;
   PWAService._internal();
 
+  /// Check if running on iOS
+  bool _isIOS() {
+    if (!kIsWeb) return false;
+    try {
+      final userAgent = js.context['navigator']['userAgent'] as String? ?? '';
+      return userAgent.contains('iPhone') || 
+             userAgent.contains('iPad') || 
+             userAgent.contains('iPod');
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Check if the PWA install prompt is available (Android/Chrome) or if it's iOS
   bool isInstallPromptAvailable() {
     if (!kIsWeb) return false;
@@ -16,6 +29,18 @@ class PWAService {
       debugPrint('Error checking PWA install availability: $e');
       return false;
     }
+  }
+
+  /// Determine whether to show the Install App button in the drawer.
+  /// Always shows on iOS because Safari can't reliably detect if PWA is installed.
+  bool shouldShowInstallButton() {
+    if (!kIsWeb) return false;
+    
+    // Always show on iOS - Safari can't reliably detect installation status
+    if (_isIOS()) return true;
+    
+    // For other platforms, use the standard check
+    return isInstallPromptAvailable();
   }
 
   /// Trigger the manually exposed PWA install prompt

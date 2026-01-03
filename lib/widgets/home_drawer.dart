@@ -133,7 +133,7 @@ class HomeDrawer extends StatelessWidget {
               );
             },
           ),
-          if (PWAService().isInstallPromptAvailable())
+          if (PWAService().shouldShowInstallButton())
             ListTile(
               leading: const Icon(Icons.install_mobile, color: Colors.green),
               title: const Text("Install App"),
