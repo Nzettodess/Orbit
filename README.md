@@ -20,16 +20,10 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 
 ### [1.0.1] - 2026-01-03
 
-- **📐 Responsive App Bar**: Logo and title now adapt to narrow screens (<400px hides title spacing, <375px hides "Orbit" text, <320px hides logo) to prevent overflow.
-- **🎨 Solid Button Colors**: "Join Group" (green), "Create Group" (purple), and "More" buttons now have solid, vibrant backgrounds for better visibility.
-- **📅 Responsive Date Picker**: Date picker dialog now adapts to very narrow screens with reduced padding, smaller fonts, and shorter helper text.
-- **📝 Text Size Settings**: Added adjustable font size (80%-150%) in Settings for elderly users and accessibility.
-- **🔄 Manual Refresh**: Added a refresh button in the navigation bar for quick page reloads, especially useful for PWA users.
-- **📱 iOS PWA Install**: The "Install App" button now always shows on iOS since Safari cannot reliably detect installation status.
-- **🔒 Enhanced Security**: Tightened Firestore rules to ensure User Profiles and Group Lists are private and accessible only to relevant members.
-- **🛡️ Secure Join Flow**: Improved "Join Group" process to securely handle user identity without exposing public profile data.
-- **🚫 Owner Protection**: Enforced strict rules preventing Group Owners from leaving without first transferring ownership, ensuring groups never become orphaned.
-- **🐛 Access Fixes**: Resolved issues where valid group members could not see their own groups due to permission configurations.
+- **🎨 UI & Accessibility**: Standardized 90% mobile dialogs with pixel-perfect icon alignment, added variable text scaling (80-150%), and refined Settings labels with vibrant, high-contrast button colors.
+- **� Responsive Polish**: Optimized App Bar, Date Picker, and "Load more" button layouts to prevent overflows on narrow screens (320px-450px) while maintaining legibility.
+- **⚡ UX & PWA**: Restored original AlertDialog feedback for copy actions, added a manual refresh button, and optimized installation logic for iOS PWA users.
+- **� Security & Integrity**: Hardened Firestore rules for user privacy, secured the group join flow, and enforced strict ownership transfer policies to prevent orphaned groups.
 
 ### [1.0.0] - 2026-01-01
 
