@@ -421,8 +421,13 @@
         console.log('[PWA] beforeinstallprompt captured');
       });
 
-      // Expose trigger function for Flutter
+      // Expose trigger function for Flutter - returns status for UI feedback
       window.triggerPWAInstall = function () {
+        // Check if already installed (standalone mode)
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+          console.log('[PWA] App is already installed');
+          return 'installed';
+        }
         if (window.deferredPrompt) {
           console.log('[PWA] Triggering native install prompt');
           window.deferredPrompt.prompt();
@@ -432,17 +437,25 @@
             }
             window.deferredPrompt = null;
           });
+          return 'triggered';
         } else if (isIOS) {
           console.log('[PWA] Triggering iOS install modal');
           iosModal.style.display = 'flex';
+          return 'ios';
         } else {
           console.warn('[PWA] No install prompt available');
+          return 'unavailable';
         }
       };
 
       // Expose check function for Flutter
       window.isPWAInstallAvailable = function () {
         return !!window.deferredPrompt || isIOS;
+      };
+
+      // Expose function to check if app is already installed
+      window.isAppInstalled = function () {
+        return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
       };
 
       // Show banner for iOS after short delay

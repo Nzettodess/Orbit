@@ -20,8 +20,11 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 
 ### [1.0.1] - 2026-01-03
 
-- **� Text Size Settings**: Added adjustable font size (80%-150%) in Settings for elderly users and accessibility.
-- **�🔄 Manual Refresh**: Added a refresh button in the navigation bar for quick page reloads, especially useful for PWA users.
+- **📐 Responsive App Bar**: Logo and title now adapt to narrow screens (<400px hides title spacing, <375px hides "Orbit" text, <320px hides logo) to prevent overflow.
+- **🎨 Solid Button Colors**: "Join Group" (green), "Create Group" (purple), and "More" buttons now have solid, vibrant backgrounds for better visibility.
+- **📅 Responsive Date Picker**: Date picker dialog now adapts to very narrow screens with reduced padding, smaller fonts, and shorter helper text.
+- **📝 Text Size Settings**: Added adjustable font size (80%-150%) in Settings for elderly users and accessibility.
+- **🔄 Manual Refresh**: Added a refresh button in the navigation bar for quick page reloads, especially useful for PWA users.
 - **📱 iOS PWA Install**: The "Install App" button now always shows on iOS since Safari cannot reliably detect installation status.
 - **🔒 Enhanced Security**: Tightened Firestore rules to ensure User Profiles and Group Lists are private and accessible only to relevant members.
 - **🛡️ Secure Join Flow**: Improved "Join Group" process to securely handle user identity without exposing public profile data.

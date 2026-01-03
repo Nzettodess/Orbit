@@ -139,7 +139,31 @@ class HomeDrawer extends StatelessWidget {
               title: const Text("Install App"),
               onTap: () {
                 Navigator.pop(context);
-                PWAService().triggerInstall();
+                final result = PWAService().triggerInstall();
+                if (result == 'installed') {
+                  // Show dialog informing user app is already installed
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green),
+                          SizedBox(width: 8),
+                          Text("Already Installed"),
+                        ],
+                      ),
+                      content: const Text(
+                        "Orbit is already installed on your device! You're using it right now.",
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("OK"),
+                        ),
+                      ],
+                    ),
+                  );
+                }
               },
             ),
           const SizedBox(height: 8),

@@ -43,13 +43,26 @@ class PWAService {
     return isInstallPromptAvailable();
   }
 
-  /// Trigger the manually exposed PWA install prompt
-  void triggerInstall() {
-    if (!kIsWeb) return;
+  /// Check if the app is already installed (running in standalone mode)
+  bool isAppInstalled() {
+    if (!kIsWeb) return false;
     try {
-      js.context.callMethod('triggerPWAInstall');
+      return js.context.callMethod('isAppInstalled') ?? false;
+    } catch (e) {
+      debugPrint('Error checking if app is installed: $e');
+      return false;
+    }
+  }
+
+  /// Trigger the manually exposed PWA install prompt
+  /// Returns: 'installed', 'triggered', 'ios', 'unavailable', or null on error
+  String? triggerInstall() {
+    if (!kIsWeb) return null;
+    try {
+      return js.context.callMethod('triggerPWAInstall') as String?;
     } catch (e) {
       debugPrint('Error triggering PWA install: $e');
+      return null;
     }
   }
 
