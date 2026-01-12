@@ -335,11 +335,16 @@ class FirestoreService {
 
   // Set Location - now updates for all groups user is in
   Future<void> setLocation(String userId, String groupId, DateTime date, String nation, String? state) async {
-    // Get all groups the user is in
-    final groups = await getUserGroupsSnapshot(userId);
-    
     // Identify the requester
     final currentUid = _auth.currentUser?.uid;
+    if (currentUid == null) {
+      _log.warning('No authenticated user');
+      return;
+    }
+    
+    // IMPORTANT: Query REQUESTER's groups (which they have access to),
+    // not the TARGET's groups (which may include groups requester can't see).
+    final requesterGroups = await getUserGroupsSnapshot(currentUid);
     
     // Create location entry for each group where requester has permission
     final batch = _db.batch();
@@ -347,9 +352,12 @@ class FirestoreService {
     // Use ISO string for date to avoid timezone issues
     final isoDate = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
-    final groupsToUpdate = groups.where((g) {
+    // Filter groups where requester is admin AND target is member
+    final groupsToUpdate = requesterGroups.where((g) {
       if (userId == currentUid) return true; // User can always update own docs
-      return g.ownerId == currentUid || g.admins.contains(currentUid); // Admin can update group docs
+      final isAdmin = g.ownerId == currentUid || g.admins.contains(currentUid);
+      final targetIsMember = g.members.contains(userId);
+      return isAdmin && targetIsMember;
     }).toList();
 
     if (groupsToUpdate.isEmpty && userId != currentUid) {
@@ -379,8 +387,14 @@ class FirestoreService {
 
   /// Delete Location for a specific date across all user's shared groups
   Future<void> deleteLocation(String userId, DateTime date) async {
-    final groups = await getUserGroupsSnapshot(userId);
     final currentUid = _auth.currentUser?.uid;
+    if (currentUid == null) {
+      _log.warning('No authenticated user');
+      return;
+    }
+    
+    // IMPORTANT: Query REQUESTER's groups (which they have access to)
+    final requesterGroups = await getUserGroupsSnapshot(currentUid);
     
     // ISO date for lookup
     final isoDate = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
@@ -389,9 +403,11 @@ class FirestoreService {
     final batch = _db.batch();
     int ops = 0;
 
-    for (final group in groups) {
-      // Permission check: self or admin of this specific group
-      final hasPermission = (userId == currentUid) || (group.ownerId == currentUid || group.admins.contains(currentUid));
+    for (final group in requesterGroups) {
+      // Permission check: self or admin AND target is member
+      final isAdmin = group.ownerId == currentUid || group.admins.contains(currentUid);
+      final targetIsMember = group.members.contains(userId);
+      final hasPermission = (userId == currentUid) || (isAdmin && targetIsMember);
       
       if (hasPermission) {
         final docId = "${userId}_${group.id}_$dateStr";
@@ -448,8 +464,24 @@ class FirestoreService {
     String nation,
     String? state,
   ) async {
-    // Get all groups the user is in
-    final groups = await getUserGroupsSnapshot(userId);
+    // Identify the requester
+    final currentUid = _auth.currentUser?.uid;
+    if (currentUid == null) {
+      _log.warning('No authenticated user');
+      return;
+    }
+    
+    // IMPORTANT: Query REQUESTER's groups (which they have access to),
+    // not the TARGET's groups (which may include groups requester can't see).
+    // This avoids Firestore permission denied on list queries.
+    final List<Group> requesterGroups;
+    if (userId == currentUid) {
+      // Self update - get own groups
+      requesterGroups = await getUserGroupsSnapshot(currentUid);
+    } else {
+      // Updating another user - get requester's groups and filter to shared groups
+      requesterGroups = await getUserGroupsSnapshot(currentUid);
+    }
     
     // Calculate all dates in range
     final dates = <DateTime>[];
@@ -460,14 +492,16 @@ class FirestoreService {
       dates.add(currentDate);
       currentDate = currentDate.add(const Duration(days: 1));
     }
-    
-    // Identify the requester
-    final currentUid = _auth.currentUser?.uid;
 
-    // Filter groups where requester has permission
-    final groupsToUpdate = groups.where((g) {
-      if (userId == currentUid) return true; // Self
-      return g.ownerId == currentUid || g.admins.contains(currentUid); // Admin
+    // Filter groups where:
+    // 1. Requester has permission (is owner or admin)
+    // 2. Target user is also a member of the group
+    final groupsToUpdate = requesterGroups.where((g) {
+      if (userId == currentUid) return true; // Self - all own groups
+      // For other users: must be admin AND target must be member
+      final isAdmin = g.ownerId == currentUid || g.admins.contains(currentUid);
+      final targetIsMember = g.members.contains(userId);
+      return isAdmin && targetIsMember;
     }).toList();
 
     if (groupsToUpdate.isEmpty && userId != currentUid) {

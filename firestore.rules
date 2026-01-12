@@ -33,17 +33,25 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/groups/$(groupId)).data;
     }
     
+    // Check if a group document exists
+    function groupExists(groupId) {
+      return exists(/databases/$(database)/documents/groups/$(groupId));
+    }
+    
     // Check if user is a member of a group
     function isGroupMember(groupId) {
       return isAuthenticated() && 
+             groupExists(groupId) &&
              userId() in getGroup(groupId).members;
     }
     
     // Check if user is an admin of a group (includes owner)
+    // Returns false if group doesn't exist or admins is null
     function isGroupAdmin(groupId) {
-      let group = getGroup(groupId);
       return isAuthenticated() && 
-             (userId() == group.ownerId || userId() in group.admins);
+             groupExists(groupId) &&
+             (userId() == getGroup(groupId).ownerId || 
+              (getGroup(groupId).admins != null && userId() in getGroup(groupId).admins));
     }
     
     // Check if user is the owner of a group
