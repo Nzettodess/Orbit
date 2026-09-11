@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     }
 
     const apiKey = process.env.ONESIGNAL_API_KEY;
-    const appId = process.env.ONESIGNAL_APP_ID;
+    const appId = process.env.ONESIGNAL_APP_ID || '74c32f25-a8d0-4d63-889b-9edf49ba8784';
 
     if (!apiKey || !appId) {
         console.error('SERVER ERROR: Missing ONESIGNAL_API_KEY or ONESIGNAL_APP_ID in environment variables');
@@ -34,6 +34,7 @@ export default async function handler(req, res) {
     try {
         const payload = {
             app_id: appId,
+            target_channel: 'push',
             // Target by External ID (Firebase UID)
             include_aliases: {
                 external_id: playerIds
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
             headings: { en: title || 'Orbit' },
             contents: { en: message },
             data: data || {},
-            external_id: external_id,
+            ...(external_id ? { external_id: String(external_id) } : {}),
         };
 
         console.log('OneSignal Payload:', JSON.stringify(payload, null, 2));
