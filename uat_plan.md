@@ -71,3 +71,11 @@ This document serves as the master checklist to ensure that refactoring and modu
 - [ ] **7.2 "Check Status" Manual Refresh:** Tap "Check Status" button on "No Groups Yet" card.
   - *Expected:* Displays spinner ("Checking…") with 8-second safety timeout; updates group list immediately and shows feedback snackbar.
 
+## 8. Development & Build Verification
+
+- [ ] **8.1 Local Pre-deploy Verification (`check.bat`):** Run `check.bat` in the repository root.
+  - *Expected:* Analyzer passes with zero critical errors, and all 17 unit/widget tests pass.
+- [ ] **8.2 Web Chrome Launch:** Run `flutter run -d chrome`.
+  - *Expected:* Launches without IndexedDB transaction locks or `Future not completed` timeout.
+
+

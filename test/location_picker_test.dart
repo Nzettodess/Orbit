@@ -17,16 +17,13 @@ Widget createTestableWidget(Widget child) {
 void main() {
   group('SearchableLocationInput Widget Tests', () {
     testWidgets('renders input fields with initial values', (WidgetTester tester) async {
-      String selectedCountry = '';
-      String? selectedState;
-
       await tester.pumpWidget(
         createTestableWidget(
           SearchableLocationInput(
             initialCountry: 'Malaysia',
             initialState: 'Penang',
-            onCountryChanged: (c) => selectedCountry = c,
-            onStateChanged: (s) => selectedState = s,
+            onCountryChanged: (_) {},
+            onStateChanged: (_) {},
           ),
         ),
       );

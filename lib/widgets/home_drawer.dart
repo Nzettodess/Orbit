@@ -178,8 +178,6 @@ class HomeDrawer extends StatelessWidget {
 
   /// Profile header with avatar and name
   Widget _buildProfileHeader(BuildContext context, bool isDark, Color surfaceColor) {
-    final headerBgColor = isDark ? AppColors.iosPurple.withOpacity(0.3) : AppColors.iosPurple;
-    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),

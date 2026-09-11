@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_performance/firebase_performance.dart';
@@ -52,11 +53,13 @@ void main() async {
     debugPrint("Warning: Firebase Analytics failed to initialize: $e");
   }
 
-  // Enable offline persistence with 15MB cache for PWA support
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-    cacheSizeBytes: 15 * 1024 * 1024, // 15MB
-  );
+  // Enable offline persistence on native platforms (disabled on web to prevent IndexedDB hang/locking)
+  if (!kIsWeb) {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: 15 * 1024 * 1024, // 15MB
+    );
+  }
 
   runApp(const MyApp());
 }

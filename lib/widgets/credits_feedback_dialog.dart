@@ -3,9 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/notification_service.dart';
-import '../models.dart';
 import 'notification_debug_dialog.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:js' as js;

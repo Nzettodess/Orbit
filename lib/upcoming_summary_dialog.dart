@@ -3,9 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'models.dart';
 import 'models/upcoming_item.dart';
-import 'models/placeholder_member.dart';
 import 'add_event_modal.dart';
-import 'widgets/rich_description_viewer.dart';
 import 'widgets/event_detail_dialog.dart';
 
 /// Dialog showing upcoming events, location changes, and birthdays

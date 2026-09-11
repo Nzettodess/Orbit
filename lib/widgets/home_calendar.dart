@@ -3,7 +3,6 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models.dart';
-import '../models/placeholder_member.dart';
 import '../religious_calendar_helper.dart';
 import '../detail_modal.dart';
 
@@ -67,37 +66,16 @@ class _HomeCalendarState extends State<HomeCalendar> {
     super.didUpdateWidget(oldWidget);
     
     // Simplified Transparent Caching: Any change to Data or Settings triggers a full refresh
-    bool needsRefresh = false;
-    String reason = '';
-
-    if (oldWidget.currentUserId != widget.currentUserId) {
-      reason = 'userId changed';
-      needsRefresh = true;
-    } else if (oldWidget.tileCalendarDisplay != widget.tileCalendarDisplay) {
-      reason = 'tileCalendarDisplay change: ${oldWidget.tileCalendarDisplay} -> ${widget.tileCalendarDisplay}';
-      needsRefresh = true;
-    } else if (oldWidget.locations != widget.locations) {
-      reason = 'locations updated';
-      needsRefresh = true;
-    } else if (oldWidget.events != widget.events) {
-      reason = 'events updated';
-      needsRefresh = true;
-    } else if (oldWidget.holidays != widget.holidays) {
-      reason = 'Public Holidays (PH) updated';
-      needsRefresh = true;
-    } else if (oldWidget.allUsers != widget.allUsers) {
-      reason = 'user list updated';
-      needsRefresh = true;
-    } else if (oldWidget.placeholderMembers != widget.placeholderMembers) {
-      reason = 'placeholder members updated';
-      needsRefresh = true;
-    } else if (oldWidget.currentViewMonth != widget.currentViewMonth) {
-      reason = 'view month changed';
-      needsRefresh = true;
-    }
+    final needsRefresh = oldWidget.currentUserId != widget.currentUserId ||
+        oldWidget.tileCalendarDisplay != widget.tileCalendarDisplay ||
+        oldWidget.locations != widget.locations ||
+        oldWidget.events != widget.events ||
+        oldWidget.holidays != widget.holidays ||
+        oldWidget.allUsers != widget.allUsers ||
+        oldWidget.placeholderMembers != widget.placeholderMembers ||
+        oldWidget.currentViewMonth != widget.currentViewMonth;
 
     if (needsRefresh) {
-      // debugPrint('[HomeCalendar] Refresh triggered by: $reason');
       forceRefresh();
     }
   }
