@@ -1,23 +1,45 @@
 import admin from 'firebase-admin';
 import { Solar } from 'lunar-javascript';
 
-// 1. Initialize Firebase Admin
+console.log('--- Checking Environment Secrets ---');
+const hasWhereaboutsSa = !!process.env.FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB;
+const hasDefaultSa = !!process.env.FIREBASE_SERVICE_ACCOUNT;
+console.log('- FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB present:', hasWhereaboutsSa);
+console.log('- FIREBASE_SERVICE_ACCOUNT present:', hasDefaultSa);
+console.log('- ONESIGNAL_API_KEY present:', !!process.env.ONESIGNAL_API_KEY);
+
 const saEnv = process.env.FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB || process.env.FIREBASE_SERVICE_ACCOUNT;
 if (!saEnv) {
-  console.error('ERROR: Missing FIREBASE_SERVICE_ACCOUNT or FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB secret/environment variable.');
+  console.error('ERROR: Missing Firebase service account secret. Neither FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB nor FIREBASE_SERVICE_ACCOUNT was found.');
   process.exit(1);
 }
 
 let serviceAccount;
 try {
   serviceAccount = JSON.parse(saEnv);
-} catch (e) {
-  console.error('ERROR: Failed to parse Firebase service account JSON:', e.message);
-  process.exit(1);
+  console.log('Successfully parsed Firebase service account as raw JSON.');
+} catch (e1) {
+  try {
+    const decoded = Buffer.from(saEnv, 'base64').toString('utf8');
+    serviceAccount = JSON.parse(decoded);
+    console.log('Successfully decoded and parsed Firebase service account from base64.');
+  } catch (e2) {
+    console.error('ERROR: Failed to parse Firebase service account JSON (tried raw JSON and base64).');
+    console.error('Raw JSON error:', e1.message);
+    console.error('Base64 decode error:', e2.message);
+    process.exit(1);
+  }
 }
 
+if (serviceAccount.private_key) {
+  serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+}
+
+console.log(`Connecting to Firebase project: ${serviceAccount.project_id || 'whereabouts-510db'} (Client Email: ${serviceAccount.client_email})...`);
+
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
+  projectId: serviceAccount.project_id || 'whereabouts-510db'
 });
 
 const db = admin.firestore();
