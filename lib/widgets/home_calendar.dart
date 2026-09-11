@@ -847,6 +847,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
                 placeholderMembers: widget.placeholderMembers,
                 groupNames: widget.groupNames,
                 groups: widget.groups,
+                religiousCalendars: widget.religiousCalendars,
               ),
             );
           }

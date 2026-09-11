@@ -3,13 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:intl/intl.dart';
 import '../services/notification_service.dart';
 import '../services/pwa_service.dart';
 import '../models.dart';
 import '../notification_center.dart';
 import 'credits_feedback_dialog.dart';
-import '../profile.dart';
 import '../detail_modal.dart';
 
 class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -18,6 +16,9 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String? photoUrl;
   final String? displayName;
   final List<Map<String, dynamic>> allUsers;
+  final List<PlaceholderMember> placeholderMembers;
+  final List<Group> groups;
+  final List<String> religiousCalendars;
   
   final VoidCallback onUpcomingTap;
   final VoidCallback onBirthdayTap;
@@ -36,6 +37,9 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.photoUrl,
     this.displayName,
     required this.allUsers,
+    this.placeholderMembers = const [],
+    this.groups = const [],
+    this.religiousCalendars = const [],
     required this.onUpcomingTap,
     required this.onBirthdayTap,
     required this.onProfileTap,
@@ -176,6 +180,10 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                               currentUserId: user!.uid,
                               canWrite: canWrite,
                               allUsers: allUsers,
+                              placeholderMembers: placeholderMembers,
+                              groups: groups,
+                              groupNames: {for (final g in groups) g.id: g.name},
+                              religiousCalendars: religiousCalendars,
                             ),
                           );
                         },

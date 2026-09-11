@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'package:intl/intl.dart';
 import 'models.dart';
-import 'models/placeholder_member.dart';
 import 'firestore_service.dart';
 import 'religious_calendar_helper.dart';
 import 'location_picker.dart';
@@ -28,6 +27,7 @@ class DetailModal extends StatefulWidget {
   final List<PlaceholderMember> placeholderMembers; // Pre-loaded placeholders from home
   final Map<String, String> groupNames; // Pre-loaded group names from parent for 0ms instant display
   final List<Group> groups; // Pre-loaded groups from parent for 0ms instant permission resolution
+  final List<String> religiousCalendars; // Pre-loaded religious calendar keys for 0ms synchronous calculation
 
   const DetailModal({
     super.key,
@@ -42,6 +42,7 @@ class DetailModal extends StatefulWidget {
     this.placeholderMembers = const [],
     this.groupNames = const {},
     this.groups = const [],
+    this.religiousCalendars = const [],
   });
 
   @override
@@ -61,6 +62,7 @@ class _DetailModalState extends State<DetailModal> {
   List<String> _pinnedMembers = [];
   Set<String> _manageableMembers = {}; // Members the current user can edit (as admin/owner)
   Set<String> _adminGroups = {}; // Groups where current user is owner or admin
+  List<String> _religiousDates = []; // Pre-calculated religious dates for instant display
 
   // Session-based expansion state memory PER DATE (static to persist across modal reopens)
   // Key: "yyyy-MM-dd", Value: expansion state (default true if not set)
@@ -99,6 +101,12 @@ class _DetailModalState extends State<DetailModal> {
     // Pre-populate cache from allUsers and placeholderMembers
     _populateCacheFromAllUsers();
     _populateCacheFromPlaceholderMembers();
+
+    // Pre-calculate religious dates synchronously for 0ms instant display with zero layout shift
+    _religiousDates = ReligiousCalendarHelper.getReligiousDates(widget.date, widget.religiousCalendars);
+    if (widget.religiousCalendars.isEmpty) {
+      _loadReligiousDates();
+    }
     
     _loadUserDetails(); // Load any missing users (e.g., placeholders not in parent list)
     _loadPinnedMembers();
@@ -274,18 +282,35 @@ class _DetailModalState extends State<DetailModal> {
     }
   }
 
-  Future<List<String>> _getReligiousDates() async {
-    // Get user's enabled religious calendars from Firestore
-    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.currentUserId).get();
-    if (doc.exists) {
-      final data = doc.data();
-      final religious = data?['religiousCalendars'];
-      if (religious != null && religious is List) {
-        final enabledCalendars = List<String>.from(religious);
-        return ReligiousCalendarHelper.getReligiousDates(widget.date, enabledCalendars);
+  Future<void> _loadReligiousDates() async {
+    if (widget.religiousCalendars.isNotEmpty) {
+      final dates = ReligiousCalendarHelper.getReligiousDates(widget.date, widget.religiousCalendars);
+      if (mounted && dates.isNotEmpty) {
+        setState(() {
+          _religiousDates = dates;
+        });
       }
+      return;
     }
-    return [];
+    // Fallback: load enabled calendars from Firestore if not passed in
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(widget.currentUserId).get();
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        final religious = data?['religiousCalendars'];
+        if (religious != null && religious is List) {
+          final enabledCalendars = List<String>.from(religious);
+          final dates = ReligiousCalendarHelper.getReligiousDates(widget.date, enabledCalendars);
+          if (mounted) {
+            setState(() {
+              _religiousDates = dates;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading religious calendars: $e');
+    }
   }
 
   Future<void> _loadPinnedMembers() async {
@@ -503,29 +528,25 @@ class _DetailModalState extends State<DetailModal> {
           children: [
           // Sticky Header Section
           Text(
-            "Details for ${widget.date.toLocal().toString().split(' ')[0]}",
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            DateFormat('EEEE, MMM d, yyyy').format(widget.date),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ) ??
+                const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           
-          // Religious Calendar Dates
-          FutureBuilder<List<String>>(
-            future: _getReligiousDates(),
-            builder: (context, snapshot) {
-              if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 5),
-                    ...snapshot.data!.map((date) => Text(
-                      date,
-                      style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
-                    )),
-                  ],
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
+          // Religious Calendar Dates (0ms instant display, zero layout shift)
+          if (_religiousDates.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            ..._religiousDates.map((date) => Text(
+              date,
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: Theme.of(context).hintColor,
+              ),
+            )),
+          ],
           const SizedBox(height: 10),
           
           // Scrollable Content
@@ -579,7 +600,7 @@ class _DetailModalState extends State<DetailModal> {
           // Events
           if (widget.events.isNotEmpty)
              ExpansionTile(
-               title: const Text("Events", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+               title: Text("Events", style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                initiallyExpanded: _eventsExpanded,
                onExpansionChanged: (expanded) => _eventsExpanded = expanded,
                shape: const Border(),
@@ -597,7 +618,7 @@ class _DetailModalState extends State<DetailModal> {
                       groupName: _groupNames[e.groupId],
                     );
                  },
-                 leading: const Icon(Icons.event, color: Colors.blue),
+                 leading: Icon(Icons.event, color: Theme.of(context).colorScheme.primary),
                  title: Text(
                    e.title,
                    maxLines: 1,
@@ -608,7 +629,7 @@ class _DetailModalState extends State<DetailModal> {
                    crossAxisAlignment: CrossAxisAlignment.start,
                    children: [
                      // Show Group Name at the top for context
-                     Text("Group: ${_groupNames[e.groupId] ?? 'Loading...'}", 
+                     Text("Group: ${_groupNames[e.groupId] ?? 'Loading…'}", 
                        style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor, fontWeight: FontWeight.bold)),
                      const SizedBox(height: 2),
                      // Time display - show if event has time
@@ -634,16 +655,25 @@ class _DetailModalState extends State<DetailModal> {
                          venue: e.venue!,
                          style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Theme.of(context).hintColor),
                        ),
-                     FutureBuilder<DocumentSnapshot>(
-                       future: FirebaseFirestore.instance.collection('users').doc(e.creatorId).get(),
-                       builder: (context, snapshot) {
-                         if (snapshot.hasData) {
-                           final data = snapshot.data!.data() as Map<String, dynamic>?;
-                           return Text("Owner: ${data?['displayName'] ?? 'Unknown'}", style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Theme.of(context).hintColor));
+                     Builder(
+                       builder: (context) {
+                         final cachedUser = _userDetailsCache[e.creatorId];
+                         final cachedName = cachedUser?['displayName'] ?? cachedUser?['email'];
+                         if (cachedName != null && (cachedName as String).isNotEmpty) {
+                           return Text("Owner: $cachedName", style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Theme.of(context).hintColor));
                          }
-                         return const SizedBox.shrink();
-                     },
-                   ),
+                         return FutureBuilder<DocumentSnapshot>(
+                           future: FirebaseFirestore.instance.collection('users').doc(e.creatorId).get(),
+                           builder: (context, snapshot) {
+                             if (snapshot.hasData) {
+                               final data = snapshot.data!.data() as Map<String, dynamic>?;
+                               return Text("Owner: ${data?['displayName'] ?? 'Unknown'}", style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Theme.of(context).hintColor));
+                             }
+                             return const SizedBox.shrink();
+                           },
+                         );
+                       },
+                     ),
                  ],  // Close Column children
                ),  // Close Column (subtitle)
 
@@ -661,7 +691,7 @@ class _DetailModalState extends State<DetailModal> {
                           width: btnSize,
                           height: btnSize,
                           child: IconButton(
-                            icon: Icon(Icons.edit, color: Colors.blue, size: iconSize),
+                            icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: iconSize),
                             tooltip: 'Edit',
                             padding: EdgeInsets.zero,
                             onPressed: () {
@@ -900,7 +930,7 @@ class _DetailModalState extends State<DetailModal> {
                               // Edit for own location OR manageable members (always available)
                               if (isCurrentUser || _manageableMembers.contains(element.userId))
                                 IconButton(
-                                  icon: Icon(Icons.edit, size: iconSize),
+                                  icon: Icon(Icons.edit, size: iconSize, color: Theme.of(context).colorScheme.primary),
                                   padding: EdgeInsets.all(iconPadding),
                                   constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
                                   tooltip: isCurrentUser ? 'Edit your location' : 'Edit location for $name',
@@ -953,7 +983,7 @@ class _DetailModalState extends State<DetailModal> {
                                               padding: const EdgeInsets.fromLTRB(20, 16, 8, 0),
                                               child: Row(
                                                 children: [
-                                                  const Icon(Icons.person, color: Colors.blue),
+                                                  Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
                                                   const SizedBox(width: 8),
                                                   Expanded(
                                                     child: Text(
@@ -1011,9 +1041,9 @@ class _DetailModalState extends State<DetailModal> {
                               if ((isCurrentUser || _manageableMembers.contains(element.userId)) && 
                                   element.nation != "No location selected")
                                 IconButton(
-                                  icon: Icon(Icons.delete, size: iconSize, color: Colors.red),
+                                  icon: Icon(Icons.delete_outline, size: iconSize, color: Colors.red),
                                   padding: EdgeInsets.all(iconPadding),
-                                  constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
+                                  constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
                                   onPressed: () async {
                                     if (!_checkCanWrite()) return;
                                     final targetUserId = element.userId;
@@ -1063,15 +1093,15 @@ class _DetailModalState extends State<DetailModal> {
                                       }
                                     }
                                   },
-                                  tooltip: isCurrentUser ? 'Delete (Revert to Default)' : 'Delete Member Location',
+                                  tooltip: isCurrentUser ? 'Clear your location' : 'Delete location for $name',
                                 ),
                               // Pin button for all users
                               IconButton(
                                 icon: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: iconSize),
-                                color: isPinned ? Colors.blue : Colors.grey,
-                                padding: EdgeInsets.zero,
-                                constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
-                                splashRadius: iconSize,
+                                color: isPinned ? Theme.of(context).colorScheme.primary : Colors.grey,
+                                padding: EdgeInsets.all(iconPadding),
+                                constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
+                                tooltip: isPinned ? 'Unpin member' : 'Pin member to top',
                                 onPressed: () => _togglePin(element.userId),
                               ),
 

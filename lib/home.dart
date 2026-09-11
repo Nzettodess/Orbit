@@ -1201,8 +1201,10 @@ class _HomeWithLoginState extends State<HomeWithLogin>
               currentUserId: _user!.uid,
               canWrite: _canWrite,
               allUsers: _allUsers,
+              placeholderMembers: _placeholderMembers,
               groupNames: {for (final g in _myGroups) g.id: g.name},
               groups: _myGroups,
+              religiousCalendars: _religiousCalendars,
             ),
           );
         },
@@ -1568,6 +1570,9 @@ class _HomeWithLoginState extends State<HomeWithLogin>
         photoUrl: _photoUrl,
         displayName: _displayName,
         allUsers: _allUsers,
+        placeholderMembers: _placeholderMembers,
+        groups: _myGroups,
+        religiousCalendars: _religiousCalendars,
         onUpcomingTap: _openUpcomingSummary,
         onBirthdayTap: _openBirthdayBabyDialog,
         onProfileTap: () {
