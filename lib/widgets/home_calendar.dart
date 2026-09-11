@@ -21,6 +21,7 @@ class HomeCalendar extends StatefulWidget {
   final DateTime currentViewMonth;
   final bool canWrite; // Whether write operations are allowed (false if session terminated)
   final Map<String, String> groupNames; // Pre-loaded map of groupId -> groupName
+  final List<Group> groups; // Pre-loaded groups from parent
 
   const HomeCalendar({
     super.key,
@@ -37,6 +38,7 @@ class HomeCalendar extends StatefulWidget {
     required this.currentViewMonth,
     this.canWrite = true, // Default to true for backwards compatibility
     this.groupNames = const {},
+    this.groups = const [],
   });
 
   @override
@@ -844,6 +846,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
                 allUsers: widget.allUsers,
                 placeholderMembers: widget.placeholderMembers,
                 groupNames: widget.groupNames,
+                groups: widget.groups,
               ),
             );
           }

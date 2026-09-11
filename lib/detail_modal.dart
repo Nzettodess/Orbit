@@ -27,6 +27,7 @@ class DetailModal extends StatefulWidget {
   final List<Map<String, dynamic>> allUsers; // Pre-loaded users from home to avoid re-fetching
   final List<PlaceholderMember> placeholderMembers; // Pre-loaded placeholders from home
   final Map<String, String> groupNames; // Pre-loaded group names from parent for 0ms instant display
+  final List<Group> groups; // Pre-loaded groups from parent for 0ms instant permission resolution
 
   const DetailModal({
     super.key,
@@ -40,6 +41,7 @@ class DetailModal extends StatefulWidget {
     this.allUsers = const [], // Default empty for backwards compatibility
     this.placeholderMembers = const [],
     this.groupNames = const {},
+    this.groups = const [],
   });
 
   @override
@@ -79,16 +81,19 @@ class _DetailModalState extends State<DetailModal> {
   void initState() {
     super.initState();
     
-    // Pre-populate group names from widget and global cache for instant 0ms rendering
+    // Pre-populate group names, admin groups, and manageable members synchronously for 0ms instant display
     _globalGroupNamesCache.addAll(widget.groupNames);
-    if (widget.currentUserId.isNotEmpty) {
-      final cachedGroups = _firestoreService.getLastSeenGroups(widget.currentUserId);
-      if (cachedGroups != null) {
-        for (final g in cachedGroups) {
-          _globalGroupNamesCache[g.id] = g.name;
-        }
+    final groupsSource = widget.groups.isNotEmpty
+        ? widget.groups
+        : (widget.currentUserId.isNotEmpty ? (_firestoreService.getLastSeenGroups(widget.currentUserId) ?? []) : <Group>[]);
+    for (final g in groupsSource) {
+      _globalGroupNamesCache[g.id] = g.name;
+      if (g.ownerId == widget.currentUserId || g.admins.contains(widget.currentUserId)) {
+        _adminGroups.add(g.id);
+        _manageableMembers.addAll(g.members);
       }
     }
+    _manageableMembers.remove(widget.currentUserId);
     _groupNames = Map<String, String>.from(_globalGroupNamesCache);
 
     // Pre-populate cache from allUsers and placeholderMembers
@@ -349,17 +354,6 @@ class _DetailModalState extends State<DetailModal> {
     setState(() {
       _pinnedMembers = newPinned;
     });
-  }
-
-  // Check if current user is owner or admin of the group
-  Future<bool> _isOwnerOrAdminOfGroup(String groupId) async {
-    if (groupId == 'global') return false;
-    final doc = await FirebaseFirestore.instance.collection('groups').doc(groupId).get();
-    if (!doc.exists) return false;
-    final data = doc.data()!;
-    final ownerId = data['ownerId'] as String?;
-    final admins = List<String>.from(data['admins'] ?? []);
-    return ownerId == widget.currentUserId || admins.contains(widget.currentUserId);
   }
 
 
@@ -838,14 +832,11 @@ class _DetailModalState extends State<DetailModal> {
                     final isCurrentUser = element.userId == widget.currentUserId;
                     final isPlaceholder = element.userId.startsWith('placeholder_');
 
-                    return FutureBuilder<bool>(
-                      future: isPlaceholder ? _isOwnerOrAdminOfGroup(element.groupId) : Future.value(false),
-                      builder: (context, canEditSnapshot) {
-                        final canEditPlaceholder = canEditSnapshot.data ?? false;
+                    final canEditPlaceholder = isPlaceholder && _adminGroups.contains(element.groupId);
 
-                        return GestureDetector(
-                          onTap: () => _showUserProfileDialog(element, user),
-                          child: ListTile(
+                    return GestureDetector(
+                      onTap: () => _showUserProfileDialog(element, user),
+                      child: ListTile(
                             contentPadding: const EdgeInsets.only(left: 16.0, right: 2.0),
                             visualDensity: VisualDensity.compact,
                             leading: isPlaceholder
@@ -1086,12 +1077,10 @@ class _DetailModalState extends State<DetailModal> {
 
                             ],
                           );
-                      }),
-                    ),  // Close GestureDetector
-                  );
-                    },
-                  );
-                },
+                        }),
+                      ),  // Close GestureDetector
+                    );
+                  },
               );
             },
           ),
