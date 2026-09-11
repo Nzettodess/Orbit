@@ -80,6 +80,11 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   StreamSubscription? _settingsSubscription;
   StreamSubscription? _profileSubscription;
   StreamSubscription<bool>? _connectivitySubscription;
+  StreamSubscription? _pendingJoinRequestsSubscription;
+  Timer? _emptyGroupPollTimer;
+  List<String> _lastKnownJoinedGroupIds = [];
+  bool _isCheckingGroups = false;
+  int _lastPendingCount = 0;
 
   // Session service for multi-device detection
   SessionService? _sessionService;
@@ -126,6 +131,8 @@ class _HomeWithLoginState extends State<HomeWithLogin>
         _checkBirthdayNotifications(user.uid);
         // Process any pending join request from deep link
         _processPendingJoin(user.uid);
+        // Watch pending join requests to auto-refresh when approved
+        _setupPendingJoinRequestListener(user.uid);
       } else {
         // User logged out - clear data and cancel subscriptions
         _endSessionTracking();
@@ -685,6 +692,10 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   }
 
   void _cancelAllSubscriptions() {
+    _emptyGroupPollTimer?.cancel();
+    _emptyGroupPollTimer = null;
+    _pendingJoinRequestsSubscription?.cancel();
+    _pendingJoinRequestsSubscription = null;
     _groupsSubscription?.cancel();
     _groupsSubscription = null;
     _locationsSubscription?.cancel();
@@ -734,6 +745,10 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     if (cached != null) {
       _photoUrl = cached['photoURL'];
       _displayName = cached['displayName'];
+      if (cached['joinedGroupIds'] != null) {
+        _lastKnownJoinedGroupIds =
+            (cached['joinedGroupIds'] as List).map((e) => e.toString()).toList();
+      }
     }
 
     _profileSubscription?.cancel();
@@ -741,11 +756,119 @@ class _HomeWithLoginState extends State<HomeWithLogin>
         .getUserProfileStream(_user!.uid)
         .listen((data) {
           if (!mounted) return;
+
+          final joined =
+              (data['joinedGroupIds'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+          final hadNoGroups = _lastKnownJoinedGroupIds.isEmpty;
+          final nowHasGroups = joined.isNotEmpty;
+          final groupCountChanged =
+              joined.length != _lastKnownJoinedGroupIds.length;
+          _lastKnownJoinedGroupIds = joined;
+
           setState(() {
             _photoUrl = data['photoURL'];
             _displayName = data['displayName'];
           });
+
+          // If user was accepted into a group while having no groups, reload immediately!
+          if ((hadNoGroups && nowHasGroups) ||
+              (_myGroups.isEmpty && nowHasGroups) ||
+              groupCountChanged) {
+            debugPrint(
+              '[Home] User group membership changed via profile update. Reloading data...',
+            );
+            _loadData();
+          }
         });
+  }
+
+  void _setupPendingJoinRequestListener(String userId) {
+    _pendingJoinRequestsSubscription?.cancel();
+    _pendingJoinRequestsSubscription = _firestoreService
+        .getMyPendingJoinRequests(userId)
+        .listen((requests) {
+          if (!mounted) return;
+          if (_lastPendingCount > 0 && requests.length < _lastPendingCount) {
+            debugPrint(
+              '[Home] Pending join request resolved! Checking for groups...',
+            );
+            _manualRefreshGroups(silent: true);
+          }
+          _lastPendingCount = requests.length;
+        });
+  }
+
+  void _startEmptyGroupPolling(String userId) {
+    _emptyGroupPollTimer?.cancel();
+    _emptyGroupPollTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (timer) async {
+        if (!mounted || _user == null || _myGroups.isNotEmpty) {
+          timer.cancel();
+          return;
+        }
+        try {
+          final groups = await _firestoreService.getUserGroupsSnapshot(userId);
+          if (groups.isNotEmpty && mounted) {
+            debugPrint(
+              '[Home] Background poll found ${groups.length} group(s)! Loading...',
+            );
+            timer.cancel();
+            _loadData();
+          }
+        } catch (e) {
+          debugPrint('[Home] Background group poll error: $e');
+        }
+      },
+    );
+  }
+
+  Future<void> _manualRefreshGroups({bool silent = false}) async {
+    if (_user == null || _isCheckingGroups) return;
+    setState(() => _isCheckingGroups = true);
+
+    try {
+      _firestoreService.clearGroupCache(_user!.uid);
+      final groups = await _firestoreService.getUserGroupsSnapshot(_user!.uid);
+
+      if (!mounted) return;
+      if (groups.isNotEmpty) {
+        setState(() {
+          _myGroups = groups;
+        });
+        _loadData();
+        if (!silent) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Joined ${groups.length} group${groups.length > 1 ? 's' : ''}! 🎉',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (!silent) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No approved groups found yet. Waiting for admin approval.',
+              ),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[Home] Manual refresh error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingGroups = false);
+      }
+    }
   }
 
   /// Check and send birthday notifications (day-of and monthly summary)
@@ -811,6 +934,12 @@ class _HomeWithLoginState extends State<HomeWithLogin>
       setState(() {
         _myGroups = userGroups;
       });
+
+      if (userGroups.isNotEmpty) {
+        _emptyGroupPollTimer?.cancel();
+      } else {
+        _startEmptyGroupPolling(userId);
+      }
 
       // Restart listeners if group list OR member composition changed
       if (oldSignature != newSignature || _eventsSubscription == null) {
@@ -1731,6 +1860,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
                 children: [
                   DelayedEmptyStateWidget(
                     stream: _firestoreService.getUserGroups(_user!.uid),
+                    groups: _myGroups,
                     delayMs: 800, // Wait 800ms before showing empty state
                     skeletonBuilder: () => Card(
                       child: Padding(
@@ -1770,28 +1900,57 @@ class _HomeWithLoginState extends State<HomeWithLogin>
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
-                            const SizedBox(height: 10),
-                            ElevatedButton(
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) =>
-                                      const GroupManagementDialog(),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.deepPurple,
-                                foregroundColor: Colors.white,
-                                elevation: 2,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
+                            const SizedBox(height: 14),
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 10,
+                              runSpacing: 8,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) =>
+                                          const GroupManagementDialog(),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.deepPurple,
+                                    foregroundColor: Colors.white,
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                  child: const Text("Get Started"),
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12,
+                                OutlinedButton.icon(
+                                  onPressed: _isCheckingGroups
+                                      ? null
+                                      : () => _manualRefreshGroups(),
+                                  icon: _isCheckingGroups
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.refresh, size: 16),
+                                  label: Text(_isCheckingGroups ? "Checking..." : "Check Status"),
+                                  style: OutlinedButton.styleFrom(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              child: const Text("Get Started"),
+                              ],
                             ),
                           ],
                         ),

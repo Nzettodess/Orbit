@@ -6,6 +6,7 @@ import '../models.dart';
 /// before showing empty state to confirm data is truly empty
 class DelayedEmptyStateWidget extends StatefulWidget {
   final Stream<List<Group>> stream;
+  final List<Group>? groups;
   final int delayMs;
   final Widget Function() skeletonBuilder;
   final Widget Function() emptyBuilder;
@@ -13,6 +14,7 @@ class DelayedEmptyStateWidget extends StatefulWidget {
   const DelayedEmptyStateWidget({
     super.key,
     required this.stream,
+    this.groups,
     required this.delayMs,
     required this.skeletonBuilder,
     required this.emptyBuilder,
@@ -39,7 +41,11 @@ class _DelayedEmptyStateWidgetState extends State<DelayedEmptyStateWidget> {
       }
     });
 
-    // Subscribe to the stream
+    _subscribeToStream();
+  }
+
+  void _subscribeToStream() {
+    _subscription?.cancel();
     _subscription = widget.stream.listen(
       (data) {
         if (mounted) {
@@ -62,6 +68,14 @@ class _DelayedEmptyStateWidgetState extends State<DelayedEmptyStateWidget> {
   }
 
   @override
+  void didUpdateWidget(DelayedEmptyStateWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.stream != widget.stream) {
+      _subscribeToStream();
+    }
+  }
+
+  @override
   void dispose() {
     _subscription?.cancel();
     super.dispose();
@@ -69,7 +83,12 @@ class _DelayedEmptyStateWidgetState extends State<DelayedEmptyStateWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // If we have groups, hide this widget
+    // If parent already has non-empty groups, hide immediately!
+    if (widget.groups != null && widget.groups!.isNotEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // If we have groups from stream, hide this widget
     if (_hasData && _data != null && _data!.isNotEmpty) {
       return const SizedBox.shrink();
     }
@@ -80,7 +99,9 @@ class _DelayedEmptyStateWidgetState extends State<DelayedEmptyStateWidget> {
     }
 
     // Delay passed - now show empty state only if confirmed empty
-    if (_hasData && _data != null && _data!.isEmpty) {
+    final isConfirmedEmpty = (widget.groups != null && widget.groups!.isEmpty) ||
+        (_hasData && _data != null && _data!.isEmpty);
+    if (isConfirmedEmpty) {
       return widget.emptyBuilder();
     }
 

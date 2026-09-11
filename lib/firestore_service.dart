@@ -290,6 +290,12 @@ class FirestoreService {
     return _lastGroupsCache[userId];
   }
 
+  /// Invalidate group cache to force a fresh fetch
+  void clearGroupCache(String userId) {
+    _lastGroupsCache.remove(userId);
+    _groupsStreamCache.remove(userId);
+  }
+
   Stream<List<Group>> _getUserGroupsInternal(String userId) async* {
     if (_lastGroupsCache.containsKey(userId)) {
       yield _lastGroupsCache[userId]!;
