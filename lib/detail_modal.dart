@@ -975,7 +975,6 @@ class _DetailModalState extends State<DetailModal> {
                                     }
 
                                   },
-                                  tooltip: isCurrentUser ? 'Edit Location' : 'Edit Member Location',
                                 ),
                               // Delete only shows when there's an actual location (not "No location selected")
                               if ((isCurrentUser || _manageableMembers.contains(element.userId)) && 
