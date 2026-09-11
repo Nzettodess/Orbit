@@ -50,3 +50,4 @@ app.*.map.json
 
 # CodeGraph
 .codegraph/
+.env*.local
