@@ -26,6 +26,7 @@ class DetailModal extends StatefulWidget {
   final bool canWrite; // Whether write operations are allowed (false if session terminated)
   final List<Map<String, dynamic>> allUsers; // Pre-loaded users from home to avoid re-fetching
   final List<PlaceholderMember> placeholderMembers; // Pre-loaded placeholders from home
+  final Map<String, String> groupNames; // Pre-loaded group names from parent for 0ms instant display
 
   const DetailModal({
     super.key,
@@ -38,6 +39,7 @@ class DetailModal extends StatefulWidget {
     this.canWrite = true, // Default to true for backwards compatibility
     this.allUsers = const [], // Default empty for backwards compatibility
     this.placeholderMembers = const [],
+    this.groupNames = const {},
   });
 
   @override
@@ -47,6 +49,9 @@ class DetailModal extends StatefulWidget {
 class _DetailModalState extends State<DetailModal> {
   final FirestoreService _firestoreService = FirestoreService();
   
+  // Static global cache of groupId -> groupName to ensure 0ms instant header rendering across all dates
+  static final Map<String, String> _globalGroupNamesCache = {'global': 'All Members'};
+
   // Instance cache for member names in this modal session (fresh on modal open)
   final Map<String, Map<String, dynamic>> _userDetailsCache = {};
   
@@ -74,6 +79,18 @@ class _DetailModalState extends State<DetailModal> {
   void initState() {
     super.initState();
     
+    // Pre-populate group names from widget and global cache for instant 0ms rendering
+    _globalGroupNamesCache.addAll(widget.groupNames);
+    if (widget.currentUserId.isNotEmpty) {
+      final cachedGroups = _firestoreService.getLastSeenGroups(widget.currentUserId);
+      if (cachedGroups != null) {
+        for (final g in cachedGroups) {
+          _globalGroupNamesCache[g.id] = g.name;
+        }
+      }
+    }
+    _groupNames = Map<String, String>.from(_globalGroupNamesCache);
+
     // Pre-populate cache from allUsers and placeholderMembers
     _populateCacheFromAllUsers();
     _populateCacheFromPlaceholderMembers();
@@ -175,28 +192,33 @@ class _DetailModalState extends State<DetailModal> {
       ...widget.events.map((e) => e.groupId),
     };
     
+    bool needsUpdate = false;
     for (final groupId in groupIds) {
-      if (_groupNames.containsKey(groupId)) continue;
+      if (_groupNames.containsKey(groupId) && _groupNames[groupId] != 'Group') continue;
       
       // Handle special "global" groupId
       if (groupId == 'global') {
-        setState(() {
-          _groupNames['global'] = 'All Members';
-        });
+        _groupNames['global'] = 'All Members';
+        _globalGroupNamesCache['global'] = 'All Members';
+        needsUpdate = true;
         continue;
       }
       
       final doc = await FirebaseFirestore.instance.collection('groups').doc(groupId).get();
       if (doc.exists) {
-        setState(() {
-          _groupNames[groupId] = doc.data()?['name'] ?? 'Unknown Group';
-        });
+        final name = doc.data()?['name'] ?? 'Group';
+        _groupNames[groupId] = name;
+        _globalGroupNamesCache[groupId] = name;
+        needsUpdate = true;
       } else {
         // Group doesn't exist, use a readable fallback
-        setState(() {
-          _groupNames[groupId] = 'Group';
-        });
+        _groupNames[groupId] = 'Group';
+        _globalGroupNamesCache[groupId] = 'Group';
       }
+    }
+
+    if (needsUpdate && mounted) {
+      setState(() {});
     }
   }
 
@@ -790,21 +812,24 @@ class _DetailModalState extends State<DetailModal> {
                     if (value2 == "___FAVORITES") return 1;
                     return value1.compareTo(value2);
                   },
-                  groupSeparatorBuilder: (String value) => Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      value == "___CURRENT_USER" 
-                        ? "You" 
-                        : value == "___FAVORITES" 
-                          ? "Favorites" 
-                          : (_groupNames[value] ?? value),
-                      style: TextStyle(
-                        fontSize: 16, 
-                        fontWeight: FontWeight.bold, 
-                        color: Theme.of(context).colorScheme.primary,
+                  groupSeparatorBuilder: (String value) {
+                    final title = value == "___CURRENT_USER"
+                        ? "You"
+                        : value == "___FAVORITES"
+                            ? "Favorites"
+                            : (_groupNames[value] ?? _globalGroupNamesCache[value] ?? (value == "global" ? "All Members" : "Group"));
+                    return Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold, 
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                   itemBuilder: (context, element) {
                     final user = _userDetailsCache[element.userId];
                     final name = user?['displayName'] ?? user?['email'] ?? "Unknown User";

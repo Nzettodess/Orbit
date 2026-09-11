@@ -1201,6 +1201,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
               currentUserId: _user!.uid,
               canWrite: _canWrite,
               allUsers: _allUsers,
+              groupNames: {for (final g in _myGroups) g.id: g.name},
             ),
           );
         },
@@ -1893,6 +1894,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
                       currentUserId: _user?.uid ?? '',
                       currentViewMonth: _currentViewMonth,
                       canWrite: _canWrite,
+                      groupNames: {for (final g in _myGroups) g.id: g.name},
                       onMonthChanged: (title, date) {
                         setState(() {
                           _currentMonthTitle = title;
