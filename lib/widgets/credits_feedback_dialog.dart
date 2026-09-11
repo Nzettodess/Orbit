@@ -51,7 +51,7 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
     final sb = StringBuffer();
 
     sb.writeln('--- Orbit Device Info ---');
-    sb.writeln('App Version: v1.0.1');
+    sb.writeln('App Version: v1.0.2');
     sb.writeln('Timestamp: ${DateTime.now()}');
     sb.writeln('User ID: ${user?.uid ?? "Not Logged In"}');
     sb.writeln('Email: ${user?.email ?? "N/A"}');
@@ -255,7 +255,7 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
             ),
             const SizedBox(height: 4),
             Text(
-              'v1.0.1',
+              'v1.0.2',
               style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor.withOpacity(0.8)),
             ),
             const SizedBox(height: 12),

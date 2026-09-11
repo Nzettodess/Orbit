@@ -77,5 +77,8 @@ This document serves as the master checklist to ensure that refactoring and modu
   - *Expected:* Analyzer passes with zero critical errors, and all 27 unit/widget tests pass (including models, helpers, and role hierarchy).
 - [ ] **8.2 Web Chrome Launch:** Run `flutter run -d chrome`.
   - *Expected:* Launches without IndexedDB transaction locks or `Future not completed` timeout.
+- [ ] **8.3 Automated Deploy Guard (`deploy.bat`):** Run `deploy.bat`.
+  - *Expected:* Automatically runs test suite first; halts deployment if any test fails; seamlessly proceeds to `flutter build web --release` and Vercel deployment upon success.
+
 
 
