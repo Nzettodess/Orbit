@@ -50,3 +50,24 @@ This document serves as the master checklist to ensure that refactoring and modu
   - *Expected:* No memory leaks or multiple active listeners in debug console.
 - [ ] **5.2 Large Member List:** View group with > 10 members.
   - *Expected:* All members load; no "Internal Assertion" errors in console.
+- [ ] **5.3 Stream Stability & Target State Underflow:** Rapidly rebuild home screen or switch tabs.
+  - *Expected:* Zero `INTERNAL ASSERTION FAILED: Unexpected state (ID: ca9) CONTEXT: {"ve":-1}` errors.
+
+## 6. Automated Birthday Notifications & GitHub Actions Cron
+
+- [ ] **6.1 Midnight Scheduled Cron (00:00 MYT):** Workflow triggers automatically at `16:00 UTC`.
+  - *Expected:* Matches solar and lunar birthdays for both real members and placeholders; creates in-app notifications and sends OneSignal push.
+- [ ] **6.2 Manual Force Check:** Trigger workflow manually from GitHub Actions tab with `force: true`.
+  - *Expected:* Bypasses `lastBirthdayCheck` daily lock; outputs detailed diagnostics for every group and member.
+- [ ] **6.3 Anti-Duplication on Subsequent Login:** Member logs in to app after GitHub Actions has completed at 00:00.
+  - *Expected:* `checkAllBirthdays` detects `group.lastBirthdayCheck == todayStr` and skips group; zero duplicate push notifications sent.
+- [ ] **6.4 Solo Member Testing:** Group containing only 1 member has birthday today.
+  - *Expected:* Fallback triggers notification directly to that member for verification instead of dropping.
+
+## 7. Group Join Experience & Empty State
+
+- [ ] **7.1 Live Join Detection:** User with 0 groups is approved into a group by an admin.
+  - *Expected:* "No Groups Yet" card automatically disappears and transitions to group view without requiring manual browser reload.
+- [ ] **7.2 "Check Status" Manual Refresh:** Tap "Check Status" button on "No Groups Yet" card.
+  - *Expected:* Displays spinner ("Checking…") with 8-second safety timeout; updates group list immediately and shows feedback snackbar.
+

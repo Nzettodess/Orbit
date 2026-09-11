@@ -18,6 +18,14 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 
 ## 📝 Update Log
 
+### [1.0.2] - 2026-09-12
+
+- **🎂 Automated Birthday Push Cron (GitHub Actions)**: Automated daily serverless birthday check running at 00:00 (Midnight) Malaysia Time (`16:00 UTC`). Evaluates Solar and Lunar birthdays across all group members and placeholders, delivering both in-app notifications and Web Push via OneSignal. Features multi-layer deduplication (`lastBirthdayCheck`, deterministic doc IDs, device throttlers) to prevent re-triggering when users log in.
+- **⚡ Real-time Group Join & Status Check**: Added real-time group detection upon admin approval. The "No Groups Yet" card now includes an interactive **"Check Status"** button with loading indicator and immediate feedback snackbars, along with background polling every 15s.
+- **🛡️ Firestore Web Stability & Stream Protection**: Resolved a critical target state underflow crash (`ca9: {"ve":-1}`) in Firestore Web SDK by decoupling streams from rebuild cycles in `DelayedEmptyStateWidget`. Preserved profile, polling, and pending request streams with safe `onError` handling and 8s query timeouts.
+- **🌍 Free-Text Location Autocomplete**: Completely upgraded location picker from restrictive dropdowns to 100% free-text search with instant autocomplete spanning ~240 countries/territories with flag emojis and state presets.
+- **✨ Web Design Guidelines Refinement**: Converted detail modal dates to human-friendly title-cased formats (`Tuesday, Sep 15, 2026`), upgraded headers and accents to dynamic theme tokens, eliminated CLS layout shifts on religious dates, and accelerated group header and edit pencil rendering to frame 0 (0ms).
+
 ### [1.0.1] - 2026-01-03
 
 - **🎨 UI & Accessibility**: Standardized 90% mobile dialogs with pixel-perfect icon alignment, added variable text scaling (80-150%), and refined Settings labels with vibrant, high-contrast button colors.
