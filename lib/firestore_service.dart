@@ -1865,7 +1865,11 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => JoinRequest.fromFirestore(doc))
-            .toList());
+            .toList())
+        .handleError((error) {
+          _log.warning('Error fetching pending join requests: $error');
+          return <JoinRequest>[];
+        });
   }
 
   /// Process a join request (approve or reject)

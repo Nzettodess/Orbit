@@ -757,53 +757,64 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     _profileSubscription?.cancel();
     _profileSubscription = _firestoreService
         .getUserProfileStream(_user!.uid)
-        .listen((data) {
-          if (!mounted) return;
+        .listen(
+          (data) {
+            if (!mounted) return;
 
-          final joined =
-              (data['joinedGroupIds'] as List?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              [];
-          final hadNoGroups = _lastKnownJoinedGroupIds.isEmpty;
-          final nowHasGroups = joined.isNotEmpty;
-          final groupCountChanged =
-              joined.length != _lastKnownJoinedGroupIds.length;
-          _lastKnownJoinedGroupIds = joined;
+            final joined =
+                (data['joinedGroupIds'] as List?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                [];
+            final hadNoGroups = _lastKnownJoinedGroupIds.isEmpty;
+            final nowHasGroups = joined.isNotEmpty;
+            final groupCountChanged =
+                joined.length != _lastKnownJoinedGroupIds.length;
+            _lastKnownJoinedGroupIds = joined;
 
-          setState(() {
-            _photoUrl = data['photoURL'];
-            _displayName = data['displayName'];
-          });
+            setState(() {
+              _photoUrl = data['photoURL'];
+              _displayName = data['displayName'];
+            });
 
-          // Only reload data on profile stream updates if initial load is done AND groups actually changed
-          if (_isProfileInitialLoadDone &&
-              ((hadNoGroups && nowHasGroups) ||
-                  (_myGroups.isEmpty && nowHasGroups) ||
-                  groupCountChanged)) {
-            debugPrint(
-              '[Home] User group membership changed via profile update. Reloading data...',
-            );
-            _loadData();
-          }
-          _isProfileInitialLoadDone = true;
-        });
+            // Only reload data on profile stream updates if initial load is done AND groups actually changed
+            if (_isProfileInitialLoadDone &&
+                ((hadNoGroups && nowHasGroups) ||
+                    (_myGroups.isEmpty && nowHasGroups) ||
+                    groupCountChanged)) {
+              debugPrint(
+                '[Home] User group membership changed via profile update. Reloading data...',
+              );
+              _loadData();
+            }
+            _isProfileInitialLoadDone = true;
+          },
+          onError: (e) {
+            debugPrint('[Home] Error listening to user profile: $e');
+            _isProfileInitialLoadDone = true;
+          },
+        );
   }
 
   void _setupPendingJoinRequestListener(String userId) {
     _pendingJoinRequestsSubscription?.cancel();
     _pendingJoinRequestsSubscription = _firestoreService
         .getMyPendingJoinRequests(userId)
-        .listen((requests) {
-          if (!mounted) return;
-          if (_lastPendingCount > 0 && requests.length < _lastPendingCount) {
-            debugPrint(
-              '[Home] Pending join request resolved! Checking for groups...',
-            );
-            _manualRefreshGroups(silent: true);
-          }
-          _lastPendingCount = requests.length;
-        });
+        .listen(
+          (requests) {
+            if (!mounted) return;
+            if (_lastPendingCount > 0 && requests.length < _lastPendingCount) {
+              debugPrint(
+                '[Home] Pending join request resolved! Checking for groups...',
+              );
+              _manualRefreshGroups(silent: true);
+            }
+            _lastPendingCount = requests.length;
+          },
+          onError: (e) {
+            debugPrint('[Home] Error listening to pending join requests: $e');
+          },
+        );
   }
 
   void _startEmptyGroupPolling(String userId) {
@@ -816,7 +827,9 @@ class _HomeWithLoginState extends State<HomeWithLogin>
           return;
         }
         try {
-          final groups = await _firestoreService.getUserGroupsSnapshot(userId);
+          final groups = await _firestoreService
+              .getUserGroupsSnapshot(userId)
+              .timeout(const Duration(seconds: 8));
           if (groups.isNotEmpty && mounted) {
             debugPrint(
               '[Home] Background poll found ${groups.length} group(s)! Loading...',
@@ -837,7 +850,9 @@ class _HomeWithLoginState extends State<HomeWithLogin>
 
     try {
       _firestoreService.clearGroupCache(_user!.uid);
-      final groups = await _firestoreService.getUserGroupsSnapshot(_user!.uid);
+      final groups = await _firestoreService
+          .getUserGroupsSnapshot(_user!.uid)
+          .timeout(const Duration(seconds: 8));
 
       if (!mounted) return;
       if (groups.isNotEmpty) {
@@ -869,6 +884,14 @@ class _HomeWithLoginState extends State<HomeWithLogin>
       }
     } catch (e) {
       debugPrint('[Home] Manual refresh error: $e');
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not check groups: $e'),
+            backgroundColor: Colors.red[700],
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isCheckingGroups = false);
@@ -907,8 +930,9 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   void _loadData() {
     if (_user == null) return;
 
-    // Cancel existing subscriptions
-    _cancelAllSubscriptions();
+    // Cancel existing data subscriptions and group subscription
+    _groupsSubscription?.cancel();
+    _cancelDataSubscriptions();
 
     final userId = _user!.uid;
 
@@ -951,6 +975,8 @@ class _HomeWithLoginState extends State<HomeWithLogin>
         print('[Home] Groups or members changed, resetting data listeners');
         _setupDataListeners(userId, userGroups.map((g) => g.id).toList());
       }
+    }, onError: (e) {
+      debugPrint('[Home] Error listening to user groups: $e');
     });
   }
 
