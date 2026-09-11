@@ -175,7 +175,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                     widthFactor: 1.0,
                     heightFactor: 1.0,
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 14, right: 10, top: 3.0),
+                      padding: const EdgeInsets.only(left: 14, right: 10, top: 1.0),
                       child: Text(
                         currentFlag,
                         style: const TextStyle(fontSize: 19, height: 1.0),
