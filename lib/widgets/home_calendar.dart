@@ -840,6 +840,7 @@ class _HomeCalendarState extends State<HomeCalendar> {
                 currentUserId: widget.currentUserId,
                 canWrite: widget.canWrite,
                 allUsers: widget.allUsers,
+                placeholderMembers: widget.placeholderMembers,
               ),
             );
           }

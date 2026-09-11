@@ -25,6 +25,7 @@ class DetailModal extends StatefulWidget {
   final String currentUserId;
   final bool canWrite; // Whether write operations are allowed (false if session terminated)
   final List<Map<String, dynamic>> allUsers; // Pre-loaded users from home to avoid re-fetching
+  final List<PlaceholderMember> placeholderMembers; // Pre-loaded placeholders from home
 
   const DetailModal({
     super.key,
@@ -36,6 +37,7 @@ class DetailModal extends StatefulWidget {
     required this.currentUserId,
     this.canWrite = true, // Default to true for backwards compatibility
     this.allUsers = const [], // Default empty for backwards compatibility
+    this.placeholderMembers = const [],
   });
 
   @override
@@ -45,18 +47,13 @@ class DetailModal extends StatefulWidget {
 class _DetailModalState extends State<DetailModal> {
   final FirestoreService _firestoreService = FirestoreService();
   
-  // Static cache for member names (persists across modal openings until app reload)
-  static Map<String, Map<String, dynamic>> _userDetailsCache = {};
+  // Instance cache for member names in this modal session (fresh on modal open)
+  final Map<String, Map<String, dynamic>> _userDetailsCache = {};
   
   Map<String, String> _groupNames = {}; // Map groupId -> groupName
   List<String> _pinnedMembers = [];
   Set<String> _manageableMembers = {}; // Members the current user can edit (as admin/owner)
   Set<String> _adminGroups = {}; // Groups where current user is owner or admin
-  
-  // Static method to clear cache (call on logout or explicit refresh)
-  static void clearUserCache() {
-    _userDetailsCache.clear();
-  }
 
   // Session-based expansion state memory PER DATE (static to persist across modal reopens)
   // Key: "yyyy-MM-dd", Value: expansion state (default true if not set)
@@ -77,10 +74,11 @@ class _DetailModalState extends State<DetailModal> {
   void initState() {
     super.initState();
     
-    // Pre-populate cache from allUsers (already loaded in home page)
+    // Pre-populate cache from allUsers and placeholderMembers
     _populateCacheFromAllUsers();
+    _populateCacheFromPlaceholderMembers();
     
-    _loadUserDetails(); // Load any missing users (e.g., placeholders)
+    _loadUserDetails(); // Load any missing users (e.g., placeholders not in parent list)
     _loadPinnedMembers();
 
     _loadGroupNames();
@@ -91,9 +89,26 @@ class _DetailModalState extends State<DetailModal> {
   void _populateCacheFromAllUsers() {
     for (final user in widget.allUsers) {
       final uid = user['uid'] as String?;
-      if (uid != null && !_userDetailsCache.containsKey(uid)) {
+      if (uid != null) {
         _userDetailsCache[uid] = user;
       }
+    }
+  }
+
+  /// Pre-populate cache from widget.placeholderMembers for instant, real-time name reflection
+  void _populateCacheFromPlaceholderMembers() {
+    for (final ph in widget.placeholderMembers) {
+      _userDetailsCache[ph.id] = {
+        'displayName': ph.displayName,
+        'photoURL': null,
+        'isPlaceholder': true,
+        'groupId': ph.groupId,
+        'defaultLocation': ph.defaultLocation,
+        'birthday': ph.birthday,
+        'hasLunarBirthday': ph.hasLunarBirthday,
+        'lunarBirthdayMonth': ph.lunarBirthdayMonth,
+        'lunarBirthdayDay': ph.lunarBirthdayDay,
+      };
     }
   }
   
@@ -255,12 +270,12 @@ class _DetailModalState extends State<DetailModal> {
     }
   }
 
-  Future<void> _loadUserDetails() async {
+  Future<void> _loadUserDetails({bool force = false}) async {
     final userIds = widget.locations.map((l) => l.userId).toSet();
     bool needsUpdate = false;
     
     for (final uid in userIds) {
-      if (!_userDetailsCache.containsKey(uid)) {
+      if (force || !_userDetailsCache.containsKey(uid)) {
         // Check if this is a placeholder member
         if (uid.startsWith('placeholder_')) {
           final doc = await FirebaseFirestore.instance.collection('placeholder_members').doc(uid).get();
@@ -1119,7 +1134,7 @@ class _DetailModalState extends State<DetailModal> {
               groupId: location.groupId,
               isPlaceholder: isPlaceholder, // Pass isPlaceholder flag
               onSaved: () {
-                _loadUserDetails(); // Refresh data
+                _loadUserDetails(force: true); // Force refresh data so updated name displays immediately
               },
             ),
           );
