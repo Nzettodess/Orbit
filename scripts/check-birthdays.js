@@ -2,16 +2,17 @@ import admin from 'firebase-admin';
 import { Solar } from 'lunar-javascript';
 
 // 1. Initialize Firebase Admin
-if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-  console.error('ERROR: Missing FIREBASE_SERVICE_ACCOUNT secret/environment variable.');
+const saEnv = process.env.FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB || process.env.FIREBASE_SERVICE_ACCOUNT;
+if (!saEnv) {
+  console.error('ERROR: Missing FIREBASE_SERVICE_ACCOUNT or FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB secret/environment variable.');
   process.exit(1);
 }
 
 let serviceAccount;
 try {
-  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  serviceAccount = JSON.parse(saEnv);
 } catch (e) {
-  console.error('ERROR: Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:', e.message);
+  console.error('ERROR: Failed to parse Firebase service account JSON:', e.message);
   process.exit(1);
 }
 

@@ -31,6 +31,7 @@ jobs:
       - name: Run Birthday Check & Push
         working-directory: ./scripts
         env:
+          FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           ONESIGNAL_API_KEY: ${{ secrets.ONESIGNAL_API_KEY }}
           ONESIGNAL_APP_ID: "74c32f25-a8d0-4d63-889b-9edf49ba8784"
