@@ -74,7 +74,7 @@ This document serves as the master checklist to ensure that refactoring and modu
 ## 8. Development & Build Verification
 
 - [ ] **8.1 Local Pre-deploy Verification (`check.bat`):** Run `check.bat` in the repository root.
-  - *Expected:* Analyzer passes with zero critical errors, and all 17 unit/widget tests pass.
+  - *Expected:* Analyzer passes with zero critical errors, and all 27 unit/widget tests pass (including models, helpers, and role hierarchy).
 - [ ] **8.2 Web Chrome Launch:** Run `flutter run -d chrome`.
   - *Expected:* Launches without IndexedDB transaction locks or `Future not completed` timeout.
 

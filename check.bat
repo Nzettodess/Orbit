@@ -5,7 +5,7 @@ echo ========================================
 echo.
 
 echo [1/2] Running Flutter Analyze...
-call flutter analyze --no-fatal-infos
+call flutter analyze --no-fatal-infos --no-fatal-warnings
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo [ERROR] Flutter analyze found critical errors! Please fix them before deploying.

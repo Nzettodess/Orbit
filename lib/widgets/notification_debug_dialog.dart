@@ -521,15 +521,21 @@ class _NotificationDebugDialogState extends State<NotificationDebugDialog> {
        }
        
        _updateStatus('✅ Success! Backfilled $updatedUsers security tags across $totalGroups groups.');
-       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-         content: Text('Success! Backfilled $updatedUsers security tags.'),
-         backgroundColor: Colors.green,
-       ));
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+           content: Text('Success! Backfilled $updatedUsers security tags.'),
+           backgroundColor: Colors.green,
+         ));
+       }
     } catch (e) {
        _updateStatus('❌ Backfill Error: $e');
-       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+       }
     } finally {
-       setState(() => _isLoading = false);
+       if (mounted) {
+         setState(() => _isLoading = false);
+       }
     }
   }
 
