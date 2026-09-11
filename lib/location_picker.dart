@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:csc_picker_plus/csc_picker_plus.dart';
 import 'package:intl/intl.dart';
 import 'widgets/syncfusion_date_picker.dart';
+import 'widgets/searchable_location_input.dart';
+import 'widgets/location_data.dart';
 import 'models/placeholder_member.dart';
 import 'theme.dart';
 
@@ -38,7 +39,6 @@ class LocationPicker extends StatefulWidget {
 class _LocationPickerState extends State<LocationPicker> {
   String? countryValue;
   String? stateValue;
-  String? cityValue;
   late DateTime startDate;
   late DateTime endDate;
   
@@ -49,9 +49,9 @@ class _LocationPickerState extends State<LocationPicker> {
   @override
   void initState() {
     super.initState();
-    // Initialize with default values
-    countryValue = widget.defaultCountry;
-    stateValue = widget.defaultState;
+    // Initialize with default values (cleaned of flag emojis)
+    countryValue = widget.defaultCountry != null ? LocationData.cleanText(widget.defaultCountry!) : null;
+    stateValue = widget.defaultState != null ? LocationData.cleanText(widget.defaultState!) : null;
     
     // Initialize date range
     startDate = widget.initialStartDate ?? DateTime.now();
@@ -59,6 +59,31 @@ class _LocationPickerState extends State<LocationPicker> {
     
     // Current user selected by default
     selectedMemberIds = {widget.currentUserId};
+  }
+
+  @override
+  void didUpdateWidget(covariant LocationPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.defaultCountry != oldWidget.defaultCountry) {
+      setState(() {
+        countryValue = widget.defaultCountry != null ? LocationData.cleanText(widget.defaultCountry!) : null;
+      });
+    }
+    if (widget.defaultState != oldWidget.defaultState) {
+      setState(() {
+        stateValue = widget.defaultState != null ? LocationData.cleanText(widget.defaultState!) : null;
+      });
+    }
+    if (widget.initialStartDate != oldWidget.initialStartDate && widget.initialStartDate != null) {
+      setState(() {
+        startDate = widget.initialStartDate!;
+      });
+    }
+    if (widget.initialEndDate != oldWidget.initialEndDate && widget.initialEndDate != null) {
+      setState(() {
+        endDate = widget.initialEndDate!;
+      });
+    }
   }
 
   Future<void> _selectStartDate() async {
@@ -108,65 +133,6 @@ class _LocationPickerState extends State<LocationPicker> {
       }
     }
     return names.join(", ");
-  }
-
-  // Map country names to CscCountry enum values
-  CscCountry? _getCountryEnum(String? countryName) {
-    if (countryName == null) {
-      return null;
-    }
-    
-    // Map of country names to enum values
-    final countryMap = {
-      'United States': CscCountry.United_States,
-      'United Kingdom': CscCountry.United_Kingdom,
-      'Canada': CscCountry.Canada,
-      'Australia': CscCountry.Australia,
-      'New Zealand': CscCountry.New_Zealand,
-      'Singapore': CscCountry.Singapore,
-      'Malaysia': CscCountry.Malaysia,
-      'Indonesia': CscCountry.Indonesia,
-      'Thailand': CscCountry.Thailand,
-      'Philippines': CscCountry.Philippines,
-      'Vietnam': CscCountry.Vietnam,
-      'Japan': CscCountry.Japan,
-      // Note: South Korea not available in CscCountry enum
-      'China': CscCountry.China,
-      'Hong Kong': CscCountry.China,  // Hong Kong falls under China in this package
-      'Taiwan': CscCountry.Taiwan,
-      'India': CscCountry.India,
-      'Germany': CscCountry.Germany,
-      'France': CscCountry.France,
-      'Italy': CscCountry.Italy,
-      'Spain': CscCountry.Spain,
-      'Netherlands': CscCountry.Belgium,  // Use Belgium as fallback for Netherlands
-      'Belgium': CscCountry.Belgium,
-      'Switzerland': CscCountry.Switzerland,
-      'Austria': CscCountry.Austria,
-      'Sweden': CscCountry.Sweden,
-      'Norway': CscCountry.Norway,
-      'Denmark': CscCountry.Denmark,
-      'Finland': CscCountry.Finland,
-      'Poland': CscCountry.Poland,
-      'Ireland': CscCountry.Ireland,
-      'Portugal': CscCountry.Portugal,
-      'Greece': CscCountry.Greece,
-      'Brazil': CscCountry.Brazil,
-      'Mexico': CscCountry.Mexico,
-      'Argentina': CscCountry.Argentina,
-      'Chile': CscCountry.Chile,
-      'Colombia': CscCountry.Colombia,
-      'South Africa': CscCountry.South_Africa,
-      'Egypt': CscCountry.Egypt,
-      'Nigeria': CscCountry.Nigeria,
-      'Russia': CscCountry.Russia,
-      'Turkey': CscCountry.Turkey,
-      'Saudi Arabia': CscCountry.Saudi_Arabia,
-      'United Arab Emirates': CscCountry.United_Arab_Emirates,
-      'Israel': CscCountry.Israel,
-    };
-    
-    return countryMap[countryName];
   }
 
   @override
@@ -243,21 +209,27 @@ class _LocationPickerState extends State<LocationPicker> {
                     // Group members (who allow location editing)
                     if (widget.isOwnerOrAdmin && widget.groupMembers.isNotEmpty) ...[
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         child: Text("Group Members", style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor, fontWeight: FontWeight.bold)),
                       ),
                       ...widget.groupMembers.map((member) {
                         final memberId = member['uid'] as String;
-                        final displayName = member['displayName'] ?? member['email'] ?? 'Unknown';
+                        final memberName = member['displayName'] ?? member['email'] ?? 'Unknown Member';
+                        final photoUrl = member['photoURL'] as String?;
+                        
                         return CheckboxListTile(
                           dense: true,
                           title: Row(
                             children: [
-                              const Icon(Icons.person, size: 20, color: Colors.green),
+                              CircleAvatar(
+                                radius: 12,
+                                backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                                child: photoUrl == null ? const Icon(Icons.person, size: 14) : null,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  displayName,
+                                  memberName,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -417,7 +389,7 @@ class _LocationPickerState extends State<LocationPicker> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2),
+                color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -433,58 +405,18 @@ class _LocationPickerState extends State<LocationPicker> {
             ),
             const SizedBox(height: 20),
             
-            // Location Selection
-            Text(
-              "Location",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Theme.of(context).hintColor),
-            ),
-            const SizedBox(height: 10),
-            CSCPickerPlus(
-              showCities: false,
-              defaultCountry: _getCountryEnum(countryValue) ?? CscCountry.United_States,
-              dropdownDecoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Theme.of(context).dividerColor),
-              ),
-              disabledDropdownDecoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Theme.of(context).dividerColor),
-              ),
-              selectedItemStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 14,
-              ),
-              dropdownHeadingStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-              dropdownItemStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 14,
-              ),
-              dropdownDialogRadius: 12,
-              searchBarRadius: 12,
+            // Searchable & Free-Text Location Input
+            SearchableLocationInput(
+              initialCountry: countryValue,
+              initialState: stateValue,
               onCountryChanged: (value) {
-                // CSCPickerPlus returns values with emojis like "🇲🇾    Malaysia"
-                // We need to strip them to match our mapping
-                final cleaned = value?.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F', unicode: true), '').trim();
                 setState(() {
-                  countryValue = cleaned;
+                  countryValue = value.trim().isNotEmpty ? value.trim() : null;
                 });
               },
               onStateChanged: (value) {
-                // Also clean state values
-                final cleaned = value?.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F', unicode: true), '').trim();
                 setState(() {
-                  stateValue = cleaned;
-                });
-              },
-              onCityChanged: (value) {
-                setState(() {
-                  cityValue = value;
+                  stateValue = (value != null && value.trim().isNotEmpty) ? value.trim() : null;
                 });
               },
             ),
@@ -501,7 +433,7 @@ class _LocationPickerState extends State<LocationPicker> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _isSaving ? null : () async {
-                if (countryValue != null && selectedMemberIds.isNotEmpty) {
+                if (countryValue != null && countryValue!.isNotEmpty && selectedMemberIds.isNotEmpty) {
                   setState(() => _isSaving = true);
                   try {
                     await widget.onLocationSelected(
@@ -525,9 +457,9 @@ class _LocationPickerState extends State<LocationPicker> {
                       setState(() => _isSaving = false);
                     }
                   }
-                } else if (countryValue == null) {
+                } else if (countryValue == null || countryValue!.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please select a country")),
+                    const SnackBar(content: Text("Please enter or select a country/location")),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -539,6 +471,9 @@ class _LocationPickerState extends State<LocationPicker> {
                 backgroundColor: AppColors.getButtonBackground(context),
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               child: _isSaving 
                 ? const SizedBox(
@@ -557,4 +492,3 @@ class _LocationPickerState extends State<LocationPicker> {
     );
   }
 }
-

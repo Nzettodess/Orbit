@@ -910,8 +910,12 @@ class _DetailModalState extends State<DetailModal> {
                                             // Standard LocationPicker UI
                                             LocationPicker(
                                               currentUserId: widget.currentUserId,
-                                              defaultCountry: defaultCountry ?? (element.nation != "No location selected" ? element.nation : null),
-                                              defaultState: defaultState ?? element.state,
+                                              defaultCountry: (element.nation.isNotEmpty && element.nation != "No location selected")
+                                                  ? element.nation 
+                                                  : defaultCountry,
+                                              defaultState: (element.nation.isNotEmpty && element.nation != "No location selected")
+                                                  ? element.state 
+                                                  : defaultState,
                                               initialStartDate: widget.date,
                                               initialEndDate: widget.date,
                                               onLocationSelected: (country, state, startDate, endDate, selectedMemberIds) async {

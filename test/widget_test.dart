@@ -1,30 +1,45 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:whereabouts/main.dart';
+import 'package:whereabouts/core/utils/date_utils.dart';
+import 'package:whereabouts/models.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('Core Utilities & Models Tests', () {
+    test('formatDateKey formats YYYY-MM-DD correctly', () {
+      final date = DateTime(2026, 9, 15);
+      expect(formatDateKey(date), '2026-09-15');
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('getDaySuffix returns correct suffix', () {
+      expect(getDaySuffix(1), '1st');
+      expect(getDaySuffix(2), '2nd');
+      expect(getDaySuffix(3), '3rd');
+      expect(getDaySuffix(4), '4th');
+      expect(getDaySuffix(11), '11th');
+      expect(getDaySuffix(21), '21st');
+      expect(getDaySuffix(22), '22nd');
+      expect(getDaySuffix(23), '23rd');
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('UserLocation serialization works with custom location', () {
+      final loc = UserLocation(
+        userId: 'user_123',
+        groupId: 'group_456',
+        date: DateTime(2026, 9, 15),
+        nation: 'South Korea',
+        state: 'Seoul',
+      );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      final map = loc.toMap();
+      expect(map['userId'], 'user_123');
+      expect(map['groupId'], 'group_456');
+      expect(map['nation'], 'South Korea');
+      expect(map['state'], 'Seoul');
+      expect(map['date'], '2026-09-15');
+
+      final deserialized = UserLocation.fromFirestore(map);
+      expect(deserialized.userId, 'user_123');
+      expect(deserialized.nation, 'South Korea');
+      expect(deserialized.state, 'Seoul');
+    });
   });
 }
