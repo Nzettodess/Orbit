@@ -8,6 +8,9 @@ console.log('- FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB present:', hasWhereabo
 console.log('- FIREBASE_SERVICE_ACCOUNT present:', hasDefaultSa);
 console.log('- ONESIGNAL_API_KEY present:', !!process.env.ONESIGNAL_API_KEY);
 
+const isForce = process.env.FORCE_CHECK === 'true' || process.argv.includes('--force');
+console.log('- FORCE_CHECK enabled:', isForce);
+
 const saEnv = process.env.FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB || process.env.FIREBASE_SERVICE_ACCOUNT;
 if (!saEnv) {
   console.error('ERROR: Missing Firebase service account secret. Neither FIREBASE_SERVICE_ACCOUNT_WHEREABOUTS_510DB nor FIREBASE_SERVICE_ACCOUNT was found.');
@@ -68,8 +71,11 @@ const currentLunarDay = lunar.getDay();
 console.log(`=== DAILY BIRTHDAY CHECK (MYT ${todayStr} 00:00) ===`);
 console.log(`Solar: ${todayYear}-${todayMonth}-${todayDay} | Lunar: Month ${currentLunarMonth}, Day ${currentLunarDay}`);
 
-async function sendOneSignalPush(recipientUids, title, message, dedupeKey) {
-  if (!recipientUids || recipientUids.length === 0) return;
+async function sendOneSignalPush(recipientUids, title, message) {
+  if (!recipientUids || recipientUids.length === 0) {
+    console.log('Push notification skipped: No recipient UIDs.');
+    return;
+  }
   if (!oneSignalApiKey) {
     console.warn('ONESIGNAL_API_KEY not configured, skipping push notification.');
     return;
@@ -83,8 +89,7 @@ async function sendOneSignalPush(recipientUids, title, message, dedupeKey) {
     },
     headings: { en: title || 'Orbit' },
     contents: { en: message },
-    data: { type: 'birthdayToday' },
-    ...(dedupeKey ? { external_id: String(dedupeKey) } : {})
+    data: { type: 'birthdayToday' }
   };
 
   try {
@@ -97,14 +102,17 @@ async function sendOneSignalPush(recipientUids, title, message, dedupeKey) {
       body: JSON.stringify(payload)
     });
     const result = await res.json();
-    console.log(`OneSignal Push Sent to ${recipientUids.length} users:`, JSON.stringify(result));
+    console.log(`OneSignal Push Sent to ${recipientUids.length} users (${res.status}):`, JSON.stringify(result));
   } catch (err) {
     console.error('Failed to send OneSignal push:', err);
   }
 }
 
 async function recordInAppNotifications(recipientUids, message, groupId, birthdayPersonId, dedupePrefix) {
-  if (!recipientUids || recipientUids.length === 0) return;
+  if (!recipientUids || recipientUids.length === 0) {
+    console.log('In-app notification skipped: No recipient UIDs.');
+    return;
+  }
   const batch = db.batch();
   const nowTs = admin.firestore.FieldValue.serverTimestamp();
 
@@ -121,14 +129,39 @@ async function recordInAppNotifications(recipientUids, message, groupId, birthda
       groupId,
       relatedId: birthdayPersonId
     }, { merge: true });
+    console.log(`  -> Staging in-app notification doc: ${docRef.path}`);
   }
 
   await batch.commit();
+  console.log(`  -> Successfully saved ${recipientUids.length} in-app notification(s) to Firestore.`);
+}
+
+function parseDate(rawDate) {
+  if (!rawDate) return null;
+  if (typeof rawDate.toDate === 'function') {
+    return rawDate.toDate();
+  }
+  if (rawDate instanceof Date) {
+    return rawDate;
+  }
+  const parsed = new Date(rawDate);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function matchesTodaySolar(dateObj) {
+  if (!dateObj) return false;
+  const bdateStr = mytFormatter.format(dateObj);
+  const [, bMonth, bDay] = bdateStr.split('-').map(Number);
+  const utcMonth = dateObj.getUTCMonth() + 1;
+  const utcDay = dateObj.getUTCDate();
+
+  // Match either MYT formatted date or raw UTC day/month to handle any timezone offset
+  return (bMonth === todayMonth && bDay === todayDay) || (utcMonth === todayMonth && utcDay === todayDay);
 }
 
 async function run() {
   const groupsSnap = await db.collection('groups').get();
-  console.log(`Found ${groupsSnap.docs.length} total groups.`);
+  console.log(`Found ${groupsSnap.docs.length} total group(s) in Firestore.`);
 
   let totalBirthdaysFound = 0;
 
@@ -137,95 +170,113 @@ async function run() {
     const groupId = groupDoc.id;
     const memberIds = group.members || [];
 
-    if (memberIds.length === 0) continue;
+    console.log(`\n--- Inspecting Group: "${group.name || groupId}" (${groupId}) ---`);
+    console.log(`  Members (${memberIds.length}): ${JSON.stringify(memberIds)}`);
+    console.log(`  lastBirthdayCheck in Firestore: "${group.lastBirthdayCheck || 'never'}"`);
 
-    // Check if daily check was already completed today
-    if (group.lastBirthdayCheck === todayStr) {
-      console.log(`Group "${group.name || groupId}": Already checked for ${todayStr}. Skipping.`);
+    if (memberIds.length === 0) {
+      console.log('  Group has 0 members. Skipping.');
       continue;
     }
 
-    console.log(`Checking group: "${group.name || groupId}" (${memberIds.length} members)...`);
+    // Check if daily check was already completed today
+    if (!isForce && group.lastBirthdayCheck === todayStr) {
+      console.log(`  Already checked for today (${todayStr}). Skipping. (Run with FORCE_CHECK=true or trigger with force input to re-run)`);
+      continue;
+    }
+
+    console.log(`  Running birthday checks for group "${group.name || groupId}"...`);
 
     // A. Check regular users
     for (const memberId of memberIds) {
       const userDoc = await db.collection('users').doc(memberId).get();
-      if (!userDoc.exists) continue;
+      if (!userDoc.exists) {
+        console.log(`  [User ${memberId}] Document does not exist in 'users' collection.`);
+        continue;
+      }
       const u = userDoc.data();
-      const displayName = u.displayName || u.email || 'Group Member';
+      const displayName = u.displayName || u.email || memberId;
+      const bdate = parseDate(u.birthday);
+      const bdateStr = bdate ? mytFormatter.format(bdate) : 'none';
+
+      console.log(`  [User: "${displayName}"] birthday: ${bdateStr}, lunar: ${u.hasLunarBirthday ? `M${u.lunarBirthdayMonth}/D${u.lunarBirthdayDay}` : 'false'}`);
 
       // 1. Solar Birthday
-      if (u.birthday) {
-        const bdate = u.birthday.toDate ? u.birthday.toDate() : new Date(u.birthday);
-        const bdateStr = mytFormatter.format(bdate);
-        const [, bMonth, bDay] = bdateStr.split('-').map(Number);
-        if (bMonth === todayMonth && bDay === todayDay) {
-          totalBirthdaysFound++;
-          console.log(`🎂 Solar Birthday today: ${displayName} in group "${group.name}"`);
-          const recipients = memberIds.filter(id => id !== memberId);
-          const message = `🎂 ${displayName}'s birthday is today!`;
-          const dedupeKey = `birthday_${groupId}_${memberId}_${todayStr}_solar`;
-
-          await recordInAppNotifications(recipients, message, groupId, memberId, dedupeKey);
-          await sendOneSignalPush(recipients, `${displayName}'s Birthday!`, message, dedupeKey);
+      if (bdate && matchesTodaySolar(bdate)) {
+        totalBirthdaysFound++;
+        console.log(`  🎉 MATCH! Solar Birthday today for "${displayName}"!`);
+        let recipients = memberIds.filter(id => id !== memberId);
+        if (recipients.length === 0) {
+          console.log(`  (Note: Group only has 1 member, sending notification to "${displayName}" for testing)`);
+          recipients = [memberId];
         }
+        const message = `🎂 ${displayName}'s birthday is today!`;
+        const dedupeKey = `birthday_${groupId}_${memberId}_${todayStr}_solar`;
+
+        await recordInAppNotifications(recipients, message, groupId, memberId, dedupeKey);
+        await sendOneSignalPush(recipients, `${displayName}'s Birthday!`, message);
       }
 
       // 2. Lunar Birthday
       if (u.hasLunarBirthday && (u.lunarBirthdayMonth === currentLunarMonth || u.lunarBirthdayMonth === Math.abs(lunar.getMonth())) && u.lunarBirthdayDay === currentLunarDay) {
         totalBirthdaysFound++;
-        console.log(`🏮 Lunar Birthday today: ${displayName} in group "${group.name}"`);
-        const recipients = memberIds.filter(id => id !== memberId);
+        console.log(`  🏮 MATCH! Lunar Birthday today for "${displayName}"!`);
+        let recipients = memberIds.filter(id => id !== memberId);
+        if (recipients.length === 0) {
+          recipients = [memberId];
+        }
         const message = `🏮 ${displayName}'s lunar birthday is today!`;
         const dedupeKey = `birthday_${groupId}_${memberId}_${todayStr}_lunar`;
 
         await recordInAppNotifications(recipients, message, groupId, memberId, dedupeKey);
-        await sendOneSignalPush(recipients, `${displayName}'s Lunar Birthday!`, message, dedupeKey);
+        await sendOneSignalPush(recipients, `${displayName}'s Lunar Birthday!`, message);
       }
     }
 
     // B. Check placeholder members
     const phSnap = await db.collection('placeholder_members').where('groupId', '==', groupId).get();
+    console.log(`  Placeholder members found: ${phSnap.docs.length}`);
+
     for (const phDoc of phSnap.docs) {
       const ph = phDoc.data();
       const phId = phDoc.id;
       const displayName = ph.displayName || 'Placeholder';
+      const bdate = parseDate(ph.birthday);
+      const bdateStr = bdate ? mytFormatter.format(bdate) : 'none';
+
+      console.log(`  [Placeholder: "${displayName}"] birthday: ${bdateStr}, lunar: ${ph.hasLunarBirthday ? `M${ph.lunarBirthdayMonth}/D${ph.lunarBirthdayDay}` : 'false'}`);
 
       // 1. Solar Birthday
-      if (ph.birthday) {
-        const bdate = ph.birthday.toDate ? ph.birthday.toDate() : new Date(ph.birthday);
-        const bdateStr = mytFormatter.format(bdate);
-        const [, bMonth, bDay] = bdateStr.split('-').map(Number);
-        if (bMonth === todayMonth && bDay === todayDay) {
-          totalBirthdaysFound++;
-          console.log(`🎂 Placeholder Solar Birthday today: ${displayName} in group "${group.name}"`);
-          const message = `🎂 ${displayName}'s birthday is today!`;
-          const dedupeKey = `birthday_${groupId}_${phId}_${todayStr}_solar`;
+      if (bdate && matchesTodaySolar(bdate)) {
+        totalBirthdaysFound++;
+        console.log(`  🎉 MATCH! Placeholder Solar Birthday today for "${displayName}"!`);
+        const message = `🎂 ${displayName}'s birthday is today!`;
+        const dedupeKey = `birthday_${groupId}_${phId}_${todayStr}_solar`;
 
-          await recordInAppNotifications(memberIds, message, groupId, phId, dedupeKey);
-          await sendOneSignalPush(memberIds, `${displayName}'s Birthday!`, message, dedupeKey);
-        }
+        await recordInAppNotifications(memberIds, message, groupId, phId, dedupeKey);
+        await sendOneSignalPush(memberIds, `${displayName}'s Birthday!`, message);
       }
 
       // 2. Lunar Birthday
       if (ph.hasLunarBirthday && (ph.lunarBirthdayMonth === currentLunarMonth || ph.lunarBirthdayMonth === Math.abs(lunar.getMonth())) && ph.lunarBirthdayDay === currentLunarDay) {
         totalBirthdaysFound++;
-        console.log(`🏮 Placeholder Lunar Birthday today: ${displayName} in group "${group.name}"`);
+        console.log(`  🏮 MATCH! Placeholder Lunar Birthday today for "${displayName}"!`);
         const message = `🏮 ${displayName}'s lunar birthday is today!`;
         const dedupeKey = `birthday_${groupId}_${phId}_${todayStr}_lunar`;
 
         await recordInAppNotifications(memberIds, message, groupId, phId, dedupeKey);
-        await sendOneSignalPush(memberIds, `${displayName}'s Lunar Birthday!`, message, dedupeKey);
+        await sendOneSignalPush(memberIds, `${displayName}'s Lunar Birthday!`, message);
       }
     }
 
-    // Mark group daily check done to prevent duplicate alerts
+    // Mark group daily check done
     await db.collection('groups').doc(groupId).update({
       lastBirthdayCheck: todayStr
     });
+    console.log(`  Updated group.lastBirthdayCheck to ${todayStr}`);
   }
 
-  console.log(`=== CHECK COMPLETE: ${totalBirthdaysFound} birthdays processed. ===`);
+  console.log(`\n=== CHECK COMPLETE: ${totalBirthdaysFound} birthday(s) processed. ===`);
 }
 
 run().catch(err => {

@@ -6,6 +6,12 @@ on:
     - cron: '0 16 * * *'
   # Allows manual 1-click trigger from GitHub Actions tab for instant testing
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force check (ignore lastBirthdayCheck)'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   check-birthdays:
@@ -35,4 +41,5 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           ONESIGNAL_API_KEY: ${{ secrets.ONESIGNAL_API_KEY }}
           ONESIGNAL_APP_ID: "74c32f25-a8d0-4d63-889b-9edf49ba8784"
+          FORCE_CHECK: ${{ github.event_name == 'workflow_dispatch' && (inputs.force != false) }}
         run: node check-birthdays.js
