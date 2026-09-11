@@ -51,3 +51,6 @@ app.*.map.json
 # CodeGraph
 .codegraph/
 .env*.local
+
+# Node modules
+node_modules/

@@ -1,0 +1,37 @@
+name: Daily Birthday Check & Notification
+
+on:
+  schedule:
+    # 16:00 UTC is exactly 00:00 (Midnight) Malaysia Time (MYT, UTC+8)
+    - cron: '0 16 * * *'
+  # Allows manual 1-click trigger from GitHub Actions tab for instant testing
+  workflow_dispatch:
+
+jobs:
+  check-birthdays:
+    name: Check Birthdays (MYT 00:00)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: scripts/package.json
+
+      - name: Install script dependencies
+        working-directory: ./scripts
+        run: npm install
+
+      - name: Run Birthday Check & Push
+        working-directory: ./scripts
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          ONESIGNAL_API_KEY: ${{ secrets.ONESIGNAL_API_KEY }}
+          ONESIGNAL_APP_ID: "74c32f25-a8d0-4d63-889b-9edf49ba8784"
+        run: node check-birthdays.js
