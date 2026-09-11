@@ -171,19 +171,18 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                 onChanged: _onCountryTextChanged,
                 decoration: InputDecoration(
                   hintText: "Search country or type custom location...",
-                  prefixIcon: Container(
-                    width: 44,
-                    height: 44,
-                    alignment: Alignment.center,
+                  prefixIcon: Center(
+                    widthFactor: 1.0,
+                    heightFactor: 1.0,
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 2.5),
+                      padding: const EdgeInsets.only(left: 14, right: 10, top: 3.0),
                       child: Text(
                         currentFlag,
-                        style: const TextStyle(fontSize: 18, height: 1.0),
+                        style: const TextStyle(fontSize: 19, height: 1.0),
                       ),
                     ),
                   ),
-                  prefixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 0),
                   suffixIcon: _countryController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 18),
