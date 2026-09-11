@@ -85,6 +85,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   List<String> _lastKnownJoinedGroupIds = [];
   bool _isCheckingGroups = false;
   int _lastPendingCount = 0;
+  bool _isProfileInitialLoadDone = false;
 
   // Session service for multi-device detection
   SessionService? _sessionService;
@@ -121,6 +122,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
       if (user != null) {
         // User logged in - end any previous session first (for account switching)
         _endSessionTracking();
+        _isProfileInitialLoadDone = false;
 
         _loadUserProfile(); // Sets up real-time sync
         _loadData();
@@ -136,6 +138,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
       } else {
         // User logged out - clear data and cancel subscriptions
         _endSessionTracking();
+        _isProfileInitialLoadDone = false;
         _cancelAllSubscriptions();
         _firestoreService.clearAllCaches();
         if (mounted) {
@@ -773,15 +776,17 @@ class _HomeWithLoginState extends State<HomeWithLogin>
             _displayName = data['displayName'];
           });
 
-          // If user was accepted into a group while having no groups, reload immediately!
-          if ((hadNoGroups && nowHasGroups) ||
-              (_myGroups.isEmpty && nowHasGroups) ||
-              groupCountChanged) {
+          // Only reload data on profile stream updates if initial load is done AND groups actually changed
+          if (_isProfileInitialLoadDone &&
+              ((hadNoGroups && nowHasGroups) ||
+                  (_myGroups.isEmpty && nowHasGroups) ||
+                  groupCountChanged)) {
             debugPrint(
               '[Home] User group membership changed via profile update. Reloading data...',
             );
             _loadData();
           }
+          _isProfileInitialLoadDone = true;
         });
   }
 
@@ -1859,7 +1864,6 @@ class _HomeWithLoginState extends State<HomeWithLogin>
               child: Column(
                 children: [
                   DelayedEmptyStateWidget(
-                    stream: _firestoreService.getUserGroups(_user!.uid),
                     groups: _myGroups,
                     delayMs: 800, // Wait 800ms before showing empty state
                     skeletonBuilder: () => Card(
