@@ -170,7 +170,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                 },
                 onChanged: _onCountryTextChanged,
                 decoration: InputDecoration(
-                  hintText: "Search country or type custom location...",
+                  hintText: "Search country or type custom location…",
                   prefixIcon: Center(
                     widthFactor: 1.0,
                     heightFactor: 1.0,
@@ -190,7 +190,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                             _countryController.clear();
                             _onCountryTextChanged('');
                           },
-                          tooltip: 'Clear',
+                          tooltip: 'Clear input',
                         )
                       : const Icon(Icons.search, size: 20),
                   filled: true,
@@ -262,6 +262,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                         ..._countryMatches.take(20).map((country) => Material(
                               color: Colors.transparent,
                               child: InkWell(
+                                mouseCursor: SystemMouseCursors.click,
                                 onTap: () => _selectCountry(country),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -272,6 +273,8 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                                       Expanded(
                                         child: Text(
                                           country.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                                         ),
                                       ),
@@ -360,7 +363,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                 },
                 onChanged: _onStateTextChanged,
                 decoration: InputDecoration(
-                  hintText: "Select or type state, province, or city...",
+                  hintText: "Select or type state, province, or city…",
                   prefixIcon: const Icon(Icons.location_city, size: 20),
                   suffixIcon: _stateController.text.isNotEmpty
                       ? IconButton(
@@ -369,7 +372,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                             _stateController.clear();
                             _onStateTextChanged('');
                           },
-                          tooltip: 'Clear',
+                          tooltip: 'Clear input',
                         )
                       : null,
                   filled: true,
@@ -442,6 +445,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                         ..._stateMatches.take(15).map((stateName) => Material(
                               color: Colors.transparent,
                               child: InkWell(
+                                mouseCursor: SystemMouseCursors.click,
                                 onTap: () => _selectState(stateName),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -452,6 +456,8 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                                       Expanded(
                                         child: Text(
                                           stateName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(fontSize: 14),
                                         ),
                                       ),

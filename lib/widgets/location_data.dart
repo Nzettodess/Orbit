@@ -1,5 +1,6 @@
 /// Comprehensive location dataset and helper utilities for Orbit
 /// Supports standard world countries, major states/provinces, and custom free-text locations.
+library;
 
 class CountryInfo {
   final String name;

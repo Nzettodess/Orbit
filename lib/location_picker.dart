@@ -479,7 +479,7 @@ class _LocationPickerState extends State<LocationPicker> {
                 ? const SizedBox(
                     height: 20,
                     width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white, semanticsLabel: "Saving location…"),
                   )
                 : Text(
                     "Save Location for ${selectedMemberIds.length} member${selectedMemberIds.length > 1 ? 's' : ''} " 

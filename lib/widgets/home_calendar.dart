@@ -745,10 +745,6 @@ class _HomeCalendarState extends State<HomeCalendar> {
                             ? photoUrl 
                             : "https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&size=${(avatarSize * 3).toInt()}";
                           
-                          // Debug logging for avatar loading
-                          print('[Avatar] Loading for user: $name (${l.userId})');
-                          print('[Avatar] URL: $imageUrl');
-                          
                           return Padding(
                             padding: const EdgeInsets.only(right: 2),
                             child: Opacity(
@@ -764,7 +760,6 @@ class _HomeCalendarState extends State<HomeCalendar> {
                                     'Referer': 'https://google.com',
                                   },
                                   placeholder: (context, url) {
-                                    print('[Avatar] Loading placeholder for: $name');
                                     return Container(
                                       width: avatarSize,
                                       height: avatarSize,
@@ -772,8 +767,6 @@ class _HomeCalendarState extends State<HomeCalendar> {
                                     );
                                   },
                                   errorWidget: (context, url, error) {
-                                    print('[Avatar] Error loading for $name: $error');
-                                    print('[Avatar] Failed URL: $url');
                                     // Tier 2: If primary image fails, try ui-avatars
                                     return Image.network(
                                       "https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&size=${(avatarSize * 3).toInt()}",

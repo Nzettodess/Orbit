@@ -730,7 +730,26 @@ class _DetailModalState extends State<DetailModal> {
               final deduplicatedLocations = _getDeduplicatedLocations();
               
               if (deduplicatedLocations.isEmpty) {
-                return const Center(child: Text("No member locations set."));
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.location_off_outlined, 
+                          size: 36, 
+                          color: Theme.of(context).hintColor.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "No member locations set for this date",
+                          style: TextStyle(color: Theme.of(context).hintColor, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
               }
               
               return GroupedListView<UserLocation, String>(
@@ -764,7 +783,11 @@ class _DetailModalState extends State<DetailModal> {
                         : value == "___FAVORITES" 
                           ? "Favorites" 
                           : (_groupNames[value] ?? value),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                      style: TextStyle(
+                        fontSize: 16, 
+                        fontWeight: FontWeight.bold, 
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                   ),
                   itemBuilder: (context, element) {
@@ -795,18 +818,28 @@ class _DetailModalState extends State<DetailModal> {
                                 name: name,
                                 radius: 20,
                               ),
-                          title: Text(name),
+                          title: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           subtitle: element.nation == "No location selected"
                             ? Text(
                                 "No location selected",
-                                style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: Theme.of(context).hintColor, fontStyle: FontStyle.italic),
                               )
-                            : Text("${element.nation}${element.state != null && element.state!.isNotEmpty ? ', ${element.state}' : ''}"),
+                            : Text(
+                                "${element.nation}${element.state != null && element.state!.isNotEmpty ? ', ${element.state}' : ''}",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                           trailing: Builder(builder: (context) {
                             final isNarrow = MediaQuery.of(context).size.width < 450;
-                            final iconSize = isNarrow ? 22.0 : 26.0;
-                            final btnSize = isNarrow ? 34.0 : 38.0;
-                            final iconPadding = isNarrow ? 1.0 : 2.0;
+                            final iconSize = isNarrow ? 22.0 : 24.0;
+                            final btnSize = isNarrow ? 40.0 : 44.0;
+                            final iconPadding = isNarrow ? 2.0 : 4.0;
                             return Row(
                               mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment: MainAxisAlignment.end,
@@ -817,20 +850,20 @@ class _DetailModalState extends State<DetailModal> {
                                   width: btnSize,
                                   height: btnSize,
                                   child: IconButton(
-                                    icon: Icon(Icons.edit, size: iconSize, color: Colors.blue),
+                                    icon: Icon(Icons.edit, size: iconSize, color: Theme.of(context).colorScheme.primary),
                                     padding: EdgeInsets.zero,
                                     onPressed: () => _editPlaceholderLocation(element),
-                                    tooltip: 'Edit',
+                                    tooltip: 'Edit location for $name',
                                   ),
                                 ),
                                 // Delete for placeholder members (only when location is set)
                                 if (element.nation != "No location selected")
                                   IconButton(
-                                    icon: Icon(Icons.delete, size: iconSize, color: Colors.red),
+                                    icon: Icon(Icons.delete_outline, size: iconSize, color: Colors.red),
                                     padding: EdgeInsets.all(iconPadding),
-                                    constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
+                                    constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
                                     onPressed: () => _deletePlaceholderLocation(element),
-                                    tooltip: 'Delete Placeholder Location',
+                                    tooltip: 'Delete location for $name',
                                   ),
                               ],
                               // Edit for own location OR manageable members (always available)
@@ -838,7 +871,8 @@ class _DetailModalState extends State<DetailModal> {
                                 IconButton(
                                   icon: Icon(Icons.edit, size: iconSize),
                                   padding: EdgeInsets.all(iconPadding),
-                                  constraints: BoxConstraints(minWidth: iconSize + 8, minHeight: iconSize + 8),
+                                  constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
+                                  tooltip: isCurrentUser ? 'Edit your location' : 'Edit location for $name',
                                   onPressed: () async {
                                     if (!_checkCanWrite()) return;
                                     // Target user for editing

@@ -311,17 +311,40 @@ class _ProfileDialogState extends State<ProfileDialog> {
                         IconButton(
                           icon: const Icon(Icons.clear, color: Colors.red),
                           iconSize: 24,
+                          tooltip: 'Clear Default Location',
                           onPressed: () async {
-                            await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
-                              'defaultLocation': FieldValue.delete(),
-                            });
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Default location cleared"))
-                              );
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Clear Default Location?'),
+                                content: const Text(
+                                  'This will remove your default home location. You can set a new default location at any time.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text('Clear Location'),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (confirm == true) {
+                              await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+                                'defaultLocation': FieldValue.delete(),
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Default location cleared")),
+                                );
+                              }
                             }
                           },
-                          tooltip: 'Clear Default Location',
                         ),
                     ],
                   ),
