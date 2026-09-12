@@ -30,7 +30,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   String? _errorMessage;
   final Map<String, FlightSearchResponse> _currencyCache = {};
   final GlobalKey _cheapestCardKey = GlobalKey();
-  String? _expandedFlightKeyId;
+  int? _expandedFlightIndex;
 
   @override
   void initState() {
@@ -53,17 +53,22 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   }
 
   void _exploreLowestFare(FlightInfo? cheapest) {
-    if (cheapest == null) return;
-    final keyId = '${cheapest.airline}-${cheapest.departure.time}-${cheapest.priceNumeric}';
+    if (cheapest == null || _response == null) return;
+    int index = _response!.flights.indexOf(cheapest);
+    if (index == -1) {
+      index = _response!.flights.indexWhere((f) => f.priceNumeric == cheapest.priceNumeric);
+    }
+    if (index == -1) return;
+
     setState(() {
-      if (_expandedFlightKeyId == keyId) {
-        _expandedFlightKeyId = null;
+      if (_expandedFlightIndex == index) {
+        _expandedFlightIndex = null;
       } else {
-        _expandedFlightKeyId = keyId;
+        _expandedFlightIndex = index;
       }
     });
 
-    if (_expandedFlightKeyId != null) {
+    if (_expandedFlightIndex != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_cheapestCardKey.currentContext != null) {
           Scrollable.ensureVisible(
@@ -81,7 +86,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     if (newCurrency == _currentParams.currency) return;
     final updated = _currentParams.copyWith(currency: newCurrency);
     _currentParams = updated;
-    _expandedFlightKeyId = null;
+    _expandedFlightIndex = null;
 
     // Instant 0ms repaint if this currency was already retrieved
     if (_currencyCache.containsKey(newCurrency)) {
@@ -101,7 +106,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       _currentParams = params;
       _isLoading = true;
       _errorMessage = null;
-      _expandedFlightKeyId = null;
+      _expandedFlightIndex = null;
     });
 
     final res = await FlightService.searchFlights(params);
@@ -247,6 +252,15 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       _response!.flights,
       _currentParams.currency,
     );
+    final cheapestFlight = priceRange?.cheapestFlight;
+    int cheapestIndex = -1;
+    if (cheapestFlight != null) {
+      cheapestIndex = _response!.flights.indexOf(cheapestFlight);
+      if (cheapestIndex == -1 && priceRange != null) {
+        cheapestIndex = _response!.flights.indexWhere((f) => f.priceNumeric == priceRange.min);
+      }
+    }
+    final isCheapestExpanded = cheapestIndex != -1 && _expandedFlightIndex == cheapestIndex;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,8 +331,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                           ),
                           const SizedBox(width: 4),
                           Icon(
-                            _expandedFlightKeyId ==
-                                    '${priceRange.cheapestFlight?.airline}-${priceRange.cheapestFlight?.departure.time}-${priceRange.cheapestFlight?.priceNumeric}'
+                            isCheapestExpanded
                                 ? Icons.keyboard_arrow_up_rounded
                                 : Icons.keyboard_arrow_down_rounded,
                             size: 14,
@@ -353,15 +366,17 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           ],
         ),
         const SizedBox(height: 8),
-        ..._response!.flights.map((flight) {
-          final isCheapest = priceRange != null && flight.priceNumeric == priceRange.min;
-          final keyId = '${flight.airline}-${flight.departure.time}-${flight.priceNumeric}';
-          final isExpanded = _expandedFlightKeyId == keyId;
+        ..._response!.flights.asMap().entries.map((entry) {
+          final index = entry.key;
+          final flight = entry.value;
+          final isCheapestPrice = priceRange != null && flight.priceNumeric == priceRange.min;
+          final isFirstCheapest = index == cheapestIndex;
+          final isExpanded = _expandedFlightIndex == index;
 
           return FlightCard(
-            key: isCheapest ? _cheapestCardKey : null,
+            key: isFirstCheapest ? _cheapestCardKey : ValueKey('flight_card_$index'),
             flight: flight,
-            isLowestFare: isCheapest,
+            isLowestFare: isCheapestPrice,
             initiallyExpanded: isExpanded,
           );
         }),
