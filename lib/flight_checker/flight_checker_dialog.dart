@@ -3,7 +3,10 @@ import '../../core/theme/app_colors.dart';
 import 'models/flight_info.dart';
 import 'services/flight_service.dart';
 import 'utils/currency_helper.dart';
+import 'utils/flight_filter_helper.dart';
 import 'widgets/flight_card.dart';
+import 'widgets/flight_checker_status_views.dart';
+import 'widgets/flight_filter_bar.dart';
 import 'widgets/flight_search_form.dart';
 
 /// Modal dialog for querying flight prices with Google Flights fallback
@@ -29,14 +32,15 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   FlightSearchResponse? _response;
   String? _errorMessage;
   final Map<String, FlightSearchResponse> _currencyCache = {};
-  final GlobalKey _cheapestCardKey = GlobalKey();
-  int? _expandedFlightIndex;
+  FlightFilterCriteria _filterCriteria = const FlightFilterCriteria();
 
   @override
   void initState() {
     super.initState();
-    final depDate = widget.initialDate ?? DateTime.now().add(const Duration(days: 14));
-    final depStr = '${depDate.year}-${depDate.month.toString().padLeft(2, '0')}-${depDate.day.toString().padLeft(2, '0')}';
+    final depDate =
+        widget.initialDate ?? DateTime.now().add(const Duration(days: 14));
+    final depStr =
+        '${depDate.year}-${depDate.month.toString().padLeft(2, '0')}-${depDate.day.toString().padLeft(2, '0')}';
 
     _currentParams = FlightSearchParams(
       origin: widget.initialOrigin ?? '',
@@ -45,39 +49,10 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     );
 
     // Auto-trigger search if both origin and destination were passed
-    if ((widget.initialOrigin ?? '').isNotEmpty && (widget.initialDestination ?? '').isNotEmpty) {
+    if ((widget.initialOrigin ?? '').isNotEmpty &&
+        (widget.initialDestination ?? '').isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _performSearch(_currentParams);
-      });
-    }
-  }
-
-  void _exploreLowestFare(FlightInfo? cheapest) {
-    if (cheapest == null || _response == null) return;
-    int index = _response!.flights.indexOf(cheapest);
-    if (index == -1) {
-      index = _response!.flights.indexWhere((f) => f.priceNumeric == cheapest.priceNumeric);
-    }
-    if (index == -1) return;
-
-    setState(() {
-      if (_expandedFlightIndex == index) {
-        _expandedFlightIndex = null;
-      } else {
-        _expandedFlightIndex = index;
-      }
-    });
-
-    if (_expandedFlightIndex != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_cheapestCardKey.currentContext != null) {
-          Scrollable.ensureVisible(
-            _cheapestCardKey.currentContext!,
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOutCubic,
-            alignment: 0.1,
-          );
-        }
       });
     }
   }
@@ -86,7 +61,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     if (newCurrency == _currentParams.currency) return;
     final updated = _currentParams.copyWith(currency: newCurrency);
     _currentParams = updated;
-    _expandedFlightIndex = null;
+    _filterCriteria = const FlightFilterCriteria();
 
     // Instant 0ms repaint if this currency was already retrieved
     if (_currencyCache.containsKey(newCurrency)) {
@@ -106,7 +81,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       _currentParams = params;
       _isLoading = true;
       _errorMessage = null;
-      _expandedFlightIndex = null;
+      _filterCriteria = const FlightFilterCriteria();
     });
 
     final res = await FlightService.searchFlights(params);
@@ -119,7 +94,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           _currencyCache[params.currency] = res;
         }
         if (!res.success && !res.isMultiCity) {
-          _errorMessage = res.error ?? 'Could not retrieve flights at this time.';
+          _errorMessage =
+              res.error ?? 'Could not retrieve flights at this time.';
         }
       });
     }
@@ -149,7 +125,9 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
             Divider(
               height: 1,
               thickness: 1,
-              color: isDark ? AppColors.darkElevatedHighest : AppColors.iosGray5,
+              color: isDark
+                  ? AppColors.darkElevatedHighest
+                  : AppColors.iosGray5,
             ),
 
             // 2. Scrollable Body with strict clipping
@@ -194,7 +172,11 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
               color: AppColors.iosBlue.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.flight_takeoff_rounded, color: AppColors.iosBlue, size: 20),
+            child: Icon(
+              Icons.flight_takeoff_rounded,
+              color: AppColors.iosBlue,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -206,7 +188,9 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                    color: isDark
+                        ? AppColors.darkPrimary
+                        : AppColors.lightPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -214,7 +198,9 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                   'Live estimates with Google Flights fallback',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary,
+                    color: isDark
+                        ? AppColors.darkTertiary
+                        : AppColors.lightTertiary,
                   ),
                 ),
               ],
@@ -252,100 +238,69 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       _response!.flights,
       _currentParams.currency,
     );
-    final cheapestFlight = priceRange?.cheapestFlight;
-    int cheapestIndex = -1;
-    if (cheapestFlight != null) {
-      cheapestIndex = _response!.flights.indexOf(cheapestFlight);
-      if (cheapestIndex == -1 && priceRange != null) {
-        cheapestIndex = _response!.flights.indexWhere((f) => f.priceNumeric == priceRange.min);
-      }
-    }
-    final isCheapestExpanded = cheapestIndex != -1 && _expandedFlightIndex == cheapestIndex;
+
+    final availableAirlines = FlightFilterHelper.getAvailableAirlines(
+      _response!.flights,
+    );
+    final filteredFlights = FlightFilterHelper.applyFiltersAndSort(
+      _response!.flights,
+      _filterCriteria,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (priceRange != null) ...[
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _exploreLowestFare(priceRange.cheapestFlight),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.darkElevated
+                  : AppColors.lightSecondaryBg,
               borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkElevated : AppColors.lightSecondaryBg,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppColors.iosBlue.withValues(alpha: 0.25),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.insights_rounded, size: 18, color: AppColors.iosBlue),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Price Range: ${priceRange.minFormatted} – ${priceRange.maxFormatted}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Lowest fare from ${priceRange.bestAirline} · Typical: ~${priceRange.avgFormatted}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.iosBlue.withValues(alpha: isDark ? 0.2 : 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppColors.iosBlue.withValues(alpha: 0.35),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Explore Lowest',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.iosBlue,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            isCheapestExpanded
-                                ? Icons.keyboard_arrow_up_rounded
-                                : Icons.keyboard_arrow_down_rounded,
-                            size: 14,
-                            color: AppColors.iosBlue,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              border: Border.all(
+                color: AppColors.iosBlue.withValues(alpha: 0.25),
               ),
             ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.insights_rounded,
+                  size: 18,
+                  color: AppColors.iosBlue,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Price Range: ${priceRange.minFormatted} – ${priceRange.maxFormatted}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.lightPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Lowest fare from ${priceRange.bestAirline} · Typical: ~${priceRange.avgFormatted}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark
+                              ? AppColors.darkSecondary
+                              : AppColors.lightSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
         ],
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -359,104 +314,64 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
               ),
             ),
             TextButton.icon(
-              onPressed: () => FlightService.launchFlightUrl(_response!.fallbackUrl),
+              onPressed: () =>
+                  FlightService.launchFlightUrl(_response!.fallbackUrl),
               icon: const Icon(Icons.open_in_new_rounded, size: 14),
-              label: const Text('Open in Google Flights', style: TextStyle(fontSize: 12)),
+              label: const Text(
+                'Open in Google Flights',
+                style: TextStyle(fontSize: 12),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 8),
-        ..._response!.flights.asMap().entries.map((entry) {
-          final index = entry.key;
-          final flight = entry.value;
-          final isCheapestPrice = priceRange != null && flight.priceNumeric == priceRange.min;
-          final isFirstCheapest = index == cheapestIndex;
-          final isExpanded = _expandedFlightIndex == index;
+        FlightFilterBar(
+          criteria: _filterCriteria,
+          onChanged: (updated) => setState(() => _filterCriteria = updated),
+          availableAirlines: availableAirlines,
+          totalCount: _response!.flights.length,
+          visibleCount: filteredFlights.length,
+          isDark: isDark,
+        ),
+        const SizedBox(height: 8),
+        if (filteredFlights.isEmpty)
+          FlightCheckerEmptyFilterView(
+            isDark: isDark,
+            onReset: () =>
+                setState(() => _filterCriteria = const FlightFilterCriteria()),
+          )
+        else
+          ...filteredFlights.map((flight) {
+            final isLowestPrice =
+                priceRange != null && flight.priceNumeric == priceRange.min;
+            final keyId =
+                'flight_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
 
-          return FlightCard(
-            key: isFirstCheapest ? _cheapestCardKey : ValueKey('flight_card_$index'),
-            flight: flight,
-            isLowestFare: isCheapestPrice,
-            initiallyExpanded: isExpanded,
-          );
-        }),
+            return FlightCard(
+              key: ValueKey(keyId),
+              flight: flight,
+              isLowestFare: isLowestPrice,
+            );
+          }),
       ],
     );
   }
 
   Widget _buildLoadingState(bool isDark) {
-    return Column(
-      children: [
-        const SizedBox(height: 24),
-        CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.iosBlue),
-        const SizedBox(height: 14),
-        Text(
-          'Searching live flight prices…',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Checking airlines and fares',
-          style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary),
-        ),
-        const SizedBox(height: 24),
-      ],
-    );
+    return FlightCheckerLoadingView(isDark: isDark);
   }
 
   Widget _buildErrorFallback(bool isDark, {String? title, String? message}) {
-    final fallbackUrl = _response?.fallbackUrl ?? FlightService.buildGoogleFlightsFallbackUrl(_currentParams);
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkElevated : AppColors.lightSecondaryBg,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.airplane_ticket_outlined, size: 36, color: AppColors.iosBlue),
-          const SizedBox(height: 10),
-          Text(title ?? 'Live Preview Unavailable', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          const SizedBox(height: 6),
-          Text(
-            message ?? 'We couldn’t fetch real-time previews for this route, but you can view full live fares directly on Google Flights.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _performSearch(_currentParams),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.iosBlue,
-                  side: BorderSide(color: AppColors.iosBlue),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('Retry', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => FlightService.launchFlightUrl(fallbackUrl),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.iosBlue,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                label: const Text('View on Google Flights ↗', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ),
-        ],
-      ),
+    final fallbackUrl =
+        _response?.fallbackUrl ??
+        FlightService.buildGoogleFlightsFallbackUrl(_currentParams);
+    return FlightCheckerFallbackView(
+      isDark: isDark,
+      fallbackUrl: fallbackUrl,
+      title: title,
+      message: message,
+      onRetry: () => _performSearch(_currentParams),
+      onOpenFallback: FlightService.launchFlightUrl,
     );
   }
 
@@ -464,7 +379,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     return _buildErrorFallback(
       isDark,
       title: 'No Live Estimates Found',
-      message: 'No flights were matched for this date and route. Try selecting another date or check live schedules directly.',
+      message:
+          'No flights were matched for this date and route. Try selecting another date or check live schedules directly.',
     );
   }
 }
