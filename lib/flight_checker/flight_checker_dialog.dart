@@ -4,7 +4,7 @@ import 'models/flight_info.dart';
 import 'services/flight_service.dart';
 import 'utils/currency_helper.dart';
 import 'utils/flight_filter_helper.dart';
-import 'widgets/flight_card.dart';
+import 'widgets/flight_checker_dialog_header.dart';
 import 'widgets/flight_checker_status_views.dart';
 import 'widgets/flight_filter_bar.dart';
 import 'widgets/flight_leg_section_header.dart';
@@ -35,6 +35,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   String? _errorMessage;
   final Map<String, FlightSearchResponse> _currencyCache = {};
   FlightFilterCriteria _filterCriteria = const FlightFilterCriteria();
+  bool _isDepartingExpanded = true;
+  bool _isReturningExpanded = true;
 
   @override
   void initState() {
@@ -107,6 +109,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       _isLoading = true;
       _errorMessage = null;
       _filterCriteria = const FlightFilterCriteria();
+      _isDepartingExpanded = true;
+      _isReturningExpanded = true;
     });
 
     final res = await FlightService.searchFlights(params);
@@ -146,7 +150,11 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         child: Column(
           children: [
             // 1. Dialog Header with solid opaque background
-            _buildHeader(isDark, dialogBg),
+            FlightCheckerDialogHeader(
+              isDark: isDark,
+              bgColor: dialogBg,
+              onClose: () => Navigator.pop(context),
+            ),
             Divider(
               height: 1,
               thickness: 1,
@@ -179,66 +187,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(bool isDark, Color bgColor) {
-    return Container(
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.iosBlue.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              Icons.flight_takeoff_rounded,
-              color: AppColors.iosBlue,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Flight Price Checker',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: isDark
-                        ? AppColors.darkPrimary
-                        : AppColors.lightPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Search real-time flight fares and schedules',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark
-                        ? AppColors.darkTertiary
-                        : AppColors.lightTertiary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close_rounded),
-            tooltip: 'Close dialog',
-            onPressed: () => Navigator.pop(context),
-            color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
-          ),
-        ],
       ),
     );
   }
@@ -288,8 +236,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         ? FlightFilterHelper.applyFiltersAndSort(returnFlights, _filterCriteria)
         : const <FlightInfo>[];
 
-    final lowestOutbound = _findLowestPrice(outboundFlights);
-    final lowestReturn = isRoundTrip ? _findLowestPrice(returnFlights) : null;
+    final lowestOutbound = FlightLegSectionHeader.findLowestPrice(outboundFlights);
+    final lowestReturn = isRoundTrip ? FlightLegSectionHeader.findLowestPrice(returnFlights) : null;
     final combinedTotal = (lowestOutbound != null && lowestReturn != null)
         ? lowestOutbound + lowestReturn
         : null;
@@ -321,14 +269,57 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: Text(
-                'Found $totalFoundCount Flights',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
-                ),
-                overflow: TextOverflow.ellipsis,
+              child: Row(
+                children: [
+                  Text(
+                    'Found $totalFoundCount Flights',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (isRoundTrip) ...[
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () {
+                        final anyOpen = _isDepartingExpanded || _isReturningExpanded;
+                        setState(() {
+                          _isDepartingExpanded = !anyOpen;
+                          _isReturningExpanded = !anyOpen;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              (_isDepartingExpanded || _isReturningExpanded)
+                                  ? Icons.unfold_less_rounded
+                                  : Icons.unfold_more_rounded,
+                              size: 13,
+                              color: AppColors.iosBlue,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              (_isDepartingExpanded || _isReturningExpanded)
+                                  ? 'Collapse'
+                                  : 'Expand',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.iosBlue,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             TextButton.icon(
@@ -371,18 +362,24 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
               icon: Icons.flight_takeoff_rounded,
               accentColor: AppColors.iosBlue,
               isDark: isDark,
+              isCollapsible: true,
+              isExpanded: _isDepartingExpanded,
+              onToggleExpand: () =>
+                  setState(() => _isDepartingExpanded = !_isDepartingExpanded),
             ),
             const SizedBox(height: 6),
           ],
-          if (filteredOutbound.isEmpty)
-            FlightEmptyLegNotice(legName: 'departing', isDark: isDark)
-          else
-            ..._buildFlightCards(
-              flights: filteredOutbound,
-              lowestPrice: lowestOutbound,
-              bestFlight: bestOutbound,
-              legPrefix: 'outbound',
-            ),
+          if (_isDepartingExpanded || !isRoundTrip) ...[
+            if (filteredOutbound.isEmpty)
+              FlightEmptyLegNotice(legName: 'departing', isDark: isDark)
+            else
+              FlightLegCardsList(
+                flights: filteredOutbound,
+                lowestPrice: lowestOutbound,
+                bestFlight: bestOutbound,
+                legPrefix: 'outbound',
+              ),
+          ],
           if (isRoundTrip) ...[
             FlightLegSeparator(
               label: 'RETURNING OPTIONS (${_currentParams.destination} → ${_currentParams.origin})',
@@ -398,56 +395,27 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
               icon: Icons.flight_land_rounded,
               accentColor: AppColors.iosPurple,
               isDark: isDark,
+              isCollapsible: true,
+              isExpanded: _isReturningExpanded,
+              onToggleExpand: () =>
+                  setState(() => _isReturningExpanded = !_isReturningExpanded),
             ),
             const SizedBox(height: 6),
-            if (filteredReturn.isEmpty)
-              FlightEmptyLegNotice(legName: 'returning', isDark: isDark)
-            else
-              ..._buildFlightCards(
-                flights: filteredReturn,
-                lowestPrice: lowestReturn,
-                bestFlight: bestReturn,
-                legPrefix: 'return',
-              ),
+            if (_isReturningExpanded) ...[
+              if (filteredReturn.isEmpty)
+                FlightEmptyLegNotice(legName: 'returning', isDark: isDark)
+              else
+                FlightLegCardsList(
+                  flights: filteredReturn,
+                  lowestPrice: lowestReturn,
+                  bestFlight: bestReturn,
+                  legPrefix: 'return',
+                ),
+            ],
           ],
         ],
       ],
     );
-  }
-
-  List<Widget> _buildFlightCards({
-    required List<FlightInfo> flights,
-    required int? lowestPrice,
-    required FlightInfo? bestFlight,
-    required String legPrefix,
-  }) {
-    return flights.map((flight) {
-      final isLowestPrice = lowestPrice != null && flight.priceNumeric == lowestPrice;
-      final isBest = bestFlight != null &&
-          flight.airline == bestFlight.airline &&
-          flight.priceNumeric == bestFlight.priceNumeric &&
-          flight.departure.time == bestFlight.departure.time;
-      final keyId = 'flight_${legPrefix}_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
-
-      return FlightCard(
-        key: ValueKey(keyId),
-        flight: flight,
-        isLowestFare: isLowestPrice,
-        isBest: isBest,
-      );
-    }).toList();
-  }
-
-  int? _findLowestPrice(List<FlightInfo> flights) {
-    int? minPrice;
-    for (final f in flights) {
-      if (f.priceNumeric > 0) {
-        if (minPrice == null || f.priceNumeric < minPrice) {
-          minPrice = f.priceNumeric;
-        }
-      }
-    }
-    return minPrice;
   }
 
   Widget _buildLoadingState(bool isDark) =>

@@ -245,5 +245,33 @@ void main() {
       expect(find.text('RETURNING OPTIONS (PVG → PEN)'), findsOneWidget);
       expect(find.byIcon(Icons.sync_alt_rounded), findsOneWidget);
     });
+
+    testWidgets('FlightLegSectionHeader supports collapsible toggle callback', (tester) async {
+      bool toggled = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FlightLegSectionHeader(
+              title: 'Returning Flights',
+              routeSubtitle: 'PVG → PEN',
+              date: '2026-10-22',
+              count: 6,
+              lowestPrice: 400,
+              currency: 'MYR',
+              icon: Icons.flight_land_rounded,
+              isDark: false,
+              isCollapsible: true,
+              isExpanded: true,
+              onToggleExpand: () => toggled = true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsOneWidget);
+      await tester.tap(find.text('Returning Flights'));
+      await tester.pumpAndSettle();
+      expect(toggled, isTrue);
+    });
   });
 }

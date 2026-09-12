@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../models/flight_info.dart';
 import '../utils/currency_helper.dart';
+import 'flight_card.dart';
 
 /// Distinct section header for flight legs (Departing vs. Returning).
 /// Strictly under 500 lines (Hard limit: 500 lines).
@@ -14,6 +16,9 @@ class FlightLegSectionHeader extends StatelessWidget {
   final IconData icon;
   final Color accentColor;
   final bool isDark;
+  final bool isCollapsible;
+  final bool isExpanded;
+  final VoidCallback? onToggleExpand;
 
   const FlightLegSectionHeader({
     super.key,
@@ -26,11 +31,26 @@ class FlightLegSectionHeader extends StatelessWidget {
     required this.icon,
     this.accentColor = AppColors.iosBlue,
     required this.isDark,
+    this.isCollapsible = false,
+    this.isExpanded = true,
+    this.onToggleExpand,
   });
+
+  static int? findLowestPrice(List<FlightInfo> flights) {
+    int? minPrice;
+    for (final f in flights) {
+      if (f.priceNumeric > 0) {
+        if (minPrice == null || f.priceNumeric < minPrice) {
+          minPrice = f.priceNumeric;
+        }
+      }
+    }
+    return minPrice;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final headerContent = Container(
       margin: const EdgeInsets.only(top: 8, bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -122,9 +142,38 @@ class FlightLegSectionHeader extends StatelessWidget {
               ],
             ),
           ],
+          if (isCollapsible) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkElevatedHighest : AppColors.iosGray5,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: AnimatedRotation(
+                turns: isExpanded ? 0.0 : 0.5,
+                duration: const Duration(milliseconds: 200),
+                child: Icon(
+                  Icons.keyboard_arrow_up_rounded,
+                  size: 16,
+                  color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+
+    if (isCollapsible && onToggleExpand != null) {
+      return InkWell(
+        onTap: onToggleExpand,
+        borderRadius: BorderRadius.circular(10),
+        child: headerContent,
+      );
+    }
+
+    return headerContent;
   }
 }
 
@@ -250,6 +299,42 @@ class FlightEmptyLegNotice extends StatelessWidget {
           color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary,
         ),
       ),
+    );
+  }
+}
+
+/// Renders a list of FlightCards for a specific flight leg.
+class FlightLegCardsList extends StatelessWidget {
+  final List<FlightInfo> flights;
+  final int? lowestPrice;
+  final FlightInfo? bestFlight;
+  final String legPrefix;
+
+  const FlightLegCardsList({
+    super.key,
+    required this.flights,
+    required this.lowestPrice,
+    required this.bestFlight,
+    required this.legPrefix,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: flights.map((flight) {
+        final isLowest = lowestPrice != null && flight.priceNumeric == lowestPrice;
+        final isBest = bestFlight != null &&
+            flight.airline == bestFlight!.airline &&
+            flight.priceNumeric == bestFlight!.priceNumeric &&
+            flight.departure.time == bestFlight!.departure.time;
+        final keyId = 'flight_${legPrefix}_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
+        return FlightCard(
+          key: ValueKey(keyId),
+          flight: flight,
+          isLowestFare: isLowest,
+          isBest: isBest,
+        );
+      }).toList(),
     );
   }
 }
