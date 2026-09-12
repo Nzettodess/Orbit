@@ -4,8 +4,10 @@ import 'package:whereabouts/flight_checker/models/flight_info.dart';
 import 'package:whereabouts/flight_checker/services/flight_service.dart';
 import 'package:whereabouts/flight_checker/utils/airport_data.dart';
 import 'package:whereabouts/flight_checker/utils/currency_helper.dart';
+import 'package:whereabouts/flight_checker/widgets/flight_card.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_segment_timeline.dart';
 import 'package:whereabouts/flight_checker/widgets/passenger_selector.dart';
+import 'package:whereabouts/flight_checker/widgets/popup_selector_field.dart';
 
 void main() {
   group('Flight Models & Serialization Tests', () {
@@ -347,4 +349,133 @@ void main() {
       expect(find.text('2'), findsOneWidget); // Adults count is 2
     });
   });
+
+  group('FlightCard Whole-Card Click Interaction Tests', () {
+    const mockFlight = FlightInfo(
+      airline: 'AirAsia',
+      stops: 'Nonstop',
+      duration: '1 hr 15 min',
+      price: 'RM 188',
+      priceNumeric: 188,
+      departure: FlightEndpoint(airport: 'Penang (PEN)', time: '8:00 AM', date: '2026-10-15'),
+      arrival: FlightEndpoint(airport: 'Kuala Lumpur (KUL)', time: '9:15 AM', date: '2026-10-15'),
+      deepLink: 'https://google.com/flights',
+      segments: [
+        FlightSegment(
+          airline: 'AirAsia',
+          flightNumber: 'AK 6112',
+          aircraft: 'Airbus A320',
+          departureTime: '8:00 AM',
+          departureAirport: 'Penang',
+          departureCode: 'PEN',
+          arrivalTime: '9:15 AM',
+          arrivalAirport: 'Kuala Lumpur',
+          arrivalCode: 'KUL',
+          duration: '1 hr 15 min',
+          legroom: '29 in',
+        ),
+      ],
+    );
+
+    testWidgets('Tapping anywhere on flight card body toggles expanded details', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: FlightCard(flight: mockFlight),
+          ),
+        ),
+      );
+
+      // Initially, details should be collapsed (AK 6112 segment not yet in view)
+      expect(find.text('Details'), findsOneWidget);
+      expect(find.textContaining('AK 6112'), findsNothing);
+
+      // Tap on the card body (e.g. on the airline name "AirAsia")
+      await tester.tap(find.text('AirAsia').first);
+      await tester.pumpAndSettle();
+
+      // Card should now be expanded!
+      expect(find.text('Hide'), findsOneWidget);
+      expect(find.textContaining('AK 6112'), findsOneWidget);
+
+      // Tap again on the card body to collapse
+      await tester.tap(find.text('AirAsia').first);
+      await tester.pumpAndSettle();
+
+      // Card should be collapsed again
+      expect(find.text('Details'), findsOneWidget);
+      expect(find.textContaining('AK 6112'), findsNothing);
+    });
+
+    testWidgets('Tapping Details / Hide button explicitly also toggles expansion', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: FlightCard(flight: mockFlight),
+          ),
+        ),
+      );
+
+      // Tap the "Details" button
+      await tester.tap(find.text('Details'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hide'), findsOneWidget);
+      expect(find.textContaining('AK 6112'), findsOneWidget);
+
+      // Tap the "Hide" button
+      await tester.tap(find.text('Hide'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Details'), findsOneWidget);
+      expect(find.textContaining('AK 6112'), findsNothing);
+    });
+  });
+
+  group('PopupSelectorField Widget Tests', () {
+    testWidgets('renders display label and opens popup menu on tap', (tester) async {
+      String selected = 'MYR';
+      final items = [
+        {'value': 'MYR', 'label': 'MYR (RM)'},
+        {'value': 'USD', 'label': 'USD (\$)'},
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                return PopupSelectorField(
+                  label: 'Currency',
+                  value: selected,
+                  displayLabel: 'MYR (RM)',
+                  items: items,
+                  onSelected: (val) => setState(() => selected = val),
+                  bg: Colors.grey.shade200,
+                  isDark: false,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Currency'), findsOneWidget);
+      expect(find.text('MYR (RM)'), findsOneWidget);
+
+      // Tap the popup field to open options
+      await tester.tap(find.text('MYR (RM)'));
+      await tester.pumpAndSettle();
+
+      // Options should now be visible in popup menu
+      expect(find.text('USD (\$)'), findsOneWidget);
+
+      // Select USD
+      await tester.tap(find.text('USD (\$)'));
+      await tester.pumpAndSettle();
+
+      expect(selected, equals('USD'));
+    });
+  });
 }
+

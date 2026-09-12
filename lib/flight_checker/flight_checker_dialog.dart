@@ -100,6 +100,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
 
     return Dialog(
       backgroundColor: dialogBg,
+      clipBehavior: Clip.antiAlias,
       insetPadding: EdgeInsets.symmetric(
         horizontal: isMobile ? 12 : 24,
         vertical: isMobile ? 16 : 32,
@@ -109,26 +110,32 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
         child: Column(
           children: [
-            // 1. Dialog Header
-            _buildHeader(isDark),
-            const Divider(height: 1),
+            // 1. Dialog Header with solid opaque background
+            _buildHeader(isDark, dialogBg),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: isDark ? AppColors.darkElevatedHighest : AppColors.iosGray5,
+            ),
 
-            // 2. Scrollable Body
+            // 2. Scrollable Body with strict clipping
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    FlightSearchForm(
-                      initialParams: _currentParams,
-                      isLoading: _isLoading,
-                      onSearch: _performSearch,
-                      onCurrencyChanged: _handleCurrencyChanged,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildResultsSection(isDark),
-                  ],
+              child: ClipRect(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FlightSearchForm(
+                        initialParams: _currentParams,
+                        isLoading: _isLoading,
+                        onSearch: _performSearch,
+                        onCurrencyChanged: _handleCurrencyChanged,
+                      ),
+                      const SizedBox(height: 20),
+                      _buildResultsSection(isDark),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -138,8 +145,12 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     );
   }
 
-  Widget _buildHeader(bool isDark) {
-    return Padding(
+  Widget _buildHeader(bool isDark, Color bgColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+      ),
       padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
       child: Row(
         children: [

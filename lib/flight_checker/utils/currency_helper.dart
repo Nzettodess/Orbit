@@ -45,6 +45,14 @@ class CurrencyHelper {
     {'code': 'IDR', 'label': 'IDR (Rp)'},
   ];
 
+  /// Get user-friendly label for currency code (e.g. 'MYR (RM)')
+  static String getLabel(String currencyCode) {
+    for (final c in supportedCurrencies) {
+      if (c['code'] == currencyCode) return c['label']!;
+    }
+    return currencyCode;
+  }
+
   /// Format numeric price with standard currency symbols and commas
   static String formatAmount(num amount, String currencyCode) {
     final code = currencyCode.toUpperCase();

@@ -51,7 +51,6 @@ class _FlightCardState extends State<FlightCard> {
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
           margin: const EdgeInsets.symmetric(vertical: 6),
-          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: surfaceColor,
             borderRadius: BorderRadius.circular(14),
@@ -66,9 +65,17 @@ class _FlightCardState extends State<FlightCard> {
                   ]
                 : null,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => setState(() => _isExpanded = !_isExpanded),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
               // 1. Header: Airline Logo + Name + Stops Badge
               Row(
                 children: [
@@ -277,6 +284,9 @@ class _FlightCardState extends State<FlightCard> {
                   isDark: isDark,
                 ),
             ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

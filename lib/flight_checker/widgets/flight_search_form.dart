@@ -4,8 +4,10 @@ import '../../core/theme/app_colors.dart';
 import '../models/flight_info.dart';
 import '../services/flight_service.dart';
 import '../utils/airport_data.dart';
+import '../utils/currency_helper.dart';
 import 'airport_autocomplete_field.dart';
 import 'passenger_selector.dart';
+import 'popup_selector_field.dart';
 
 /// Flight search form component adhering to Vercel Web Interface Guidelines
 class FlightSearchForm extends StatefulWidget {
@@ -343,72 +345,42 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
 
 
   Widget _buildClassDropdown(Color bg, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Class', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary)),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _cabinClass,
-              isExpanded: true,
-              icon: const Icon(Icons.arrow_drop_down, size: 16),
-              items: const [
-                DropdownMenuItem(value: 'economy', child: Text('Economy', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'premiumeconomy', child: Text('Premium', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'business', child: Text('Business', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'first', child: Text('First', style: TextStyle(fontSize: 12))),
-              ],
-              onChanged: (val) {
-                if (val != null) setState(() => _cabinClass = val);
-              },
-            ),
-          ),
-        ),
-      ],
+    const items = [
+      {'value': 'economy', 'label': 'Economy'},
+      {'value': 'premiumeconomy', 'label': 'Premium'},
+      {'value': 'business', 'label': 'Business'},
+      {'value': 'first', 'label': 'First'},
+    ];
+    final display = items.firstWhere(
+      (i) => i['value'] == _cabinClass,
+      orElse: () => items.first,
+    )['label']!;
+    return PopupSelectorField(
+      label: 'Class',
+      value: _cabinClass,
+      displayLabel: display,
+      items: items,
+      onSelected: (val) => setState(() => _cabinClass = val),
+      bg: bg,
+      isDark: isDark,
     );
   }
 
   Widget _buildCurrencyDropdown(Color bg, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Currency', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary)),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _currency,
-              isExpanded: true,
-              icon: const Icon(Icons.arrow_drop_down, size: 16),
-              items: const [
-                DropdownMenuItem(value: 'MYR', child: Text('MYR (RM)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'USD', child: Text('USD (\$)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'SGD', child: Text('SGD (S\$)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'EUR', child: Text('EUR (€)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'GBP', child: Text('GBP (£)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'JPY', child: Text('JPY (¥)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'AUD', child: Text('AUD (A\$)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'CAD', child: Text('CAD (C\$)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'CNY', child: Text('CNY (¥)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'THB', child: Text('THB (฿)', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'IDR', child: Text('IDR (Rp)', style: TextStyle(fontSize: 12))),
-              ],
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _currency = val);
-                  widget.onCurrencyChanged?.call(val);
-                }
-              },
-            ),
-          ),
-        ),
-      ],
+    final items = CurrencyHelper.supportedCurrencies
+        .map((c) => {'value': c['code']!, 'label': c['label']!})
+        .toList();
+    return PopupSelectorField(
+      label: 'Currency',
+      value: _currency,
+      displayLabel: CurrencyHelper.getLabel(_currency),
+      items: items,
+      onSelected: (val) {
+        setState(() => _currency = val);
+        widget.onCurrencyChanged?.call(val);
+      },
+      bg: bg,
+      isDark: isDark,
     );
   }
 
