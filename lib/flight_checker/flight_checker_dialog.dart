@@ -7,6 +7,7 @@ import 'utils/flight_filter_helper.dart';
 import 'widgets/flight_card.dart';
 import 'widgets/flight_checker_status_views.dart';
 import 'widgets/flight_filter_bar.dart';
+import 'widgets/flight_leg_section_header.dart';
 import 'widgets/flight_leg_tab_bar.dart';
 import 'widgets/flight_search_form.dart';
 
@@ -33,7 +34,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   FlightSearchResponse? _response;
   String? _errorMessage;
   final Map<String, FlightSearchResponse> _currencyCache = {};
-  int _selectedLegIndex = 0;
   FlightFilterCriteria _filterCriteria = const FlightFilterCriteria();
 
   @override
@@ -90,7 +90,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       _currentParams = params;
       _isLoading = true;
       _errorMessage = null;
-      _selectedLegIndex = 0;
       _filterCriteria = const FlightFilterCriteria();
     });
 
@@ -250,103 +249,53 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
 
   Widget _buildFlightResults(bool isDark) {
     final isRoundTrip = _response?.returnFlights.isNotEmpty == true;
-    final activeFlights = isRoundTrip
-        ? (_selectedLegIndex == 0 ? _response!.outboundFlights : _response!.returnFlights)
-        : _response!.flights;
+
+    final outboundFlights = isRoundTrip ? _response!.outboundFlights : _response!.flights;
+    final returnFlights = isRoundTrip ? _response!.returnFlights : const <FlightInfo>[];
+    final allFlights = isRoundTrip ? [...outboundFlights, ...returnFlights] : outboundFlights;
 
     final priceRange = CurrencyHelper.calculatePriceRange(
-      activeFlights,
+      allFlights,
       _currentParams.currency,
     );
 
-    final availableAirlines = FlightFilterHelper.getAvailableAirlines(
-      activeFlights,
-    );
-    final airlineCounts = FlightFilterHelper.getAirlineCounts(
-      activeFlights,
-    );
-    final filteredFlights = FlightFilterHelper.applyFiltersAndSort(
-      activeFlights,
+    final availableAirlines = FlightFilterHelper.getAvailableAirlines(allFlights);
+    final airlineCounts = FlightFilterHelper.getAirlineCounts(allFlights);
+
+    final filteredOutbound = FlightFilterHelper.applyFiltersAndSort(
+      outboundFlights,
       _filterCriteria,
     );
+    final filteredReturn = isRoundTrip
+        ? FlightFilterHelper.applyFiltersAndSort(returnFlights, _filterCriteria)
+        : const <FlightInfo>[];
+
+    final lowestOutbound = _findLowestPrice(outboundFlights);
+    final lowestReturn = isRoundTrip ? _findLowestPrice(returnFlights) : null;
+    final combinedTotal = (lowestOutbound != null && lowestReturn != null)
+        ? lowestOutbound + lowestReturn
+        : null;
+
+    final bestOutbound = FlightFilterHelper.findBestFlight(outboundFlights);
+    final bestReturn = isRoundTrip ? FlightFilterHelper.findBestFlight(returnFlights) : null;
+
+    final totalFoundCount = outboundFlights.length + returnFlights.length;
+    final totalVisibleCount = filteredOutbound.length + filteredReturn.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (isRoundTrip) ...[
-          FlightLegTabBar(
-            selectedIndex: _selectedLegIndex,
-            onTabSelected: (idx) {
-              if (_selectedLegIndex != idx) {
-                setState(() {
-                  _selectedLegIndex = idx;
-                  _filterCriteria = const FlightFilterCriteria();
-                });
-              }
-            },
-            outboundFlights: _response!.outboundFlights,
-            returnFlights: _response!.returnFlights,
-            origin: _currentParams.origin,
-            destination: _currentParams.destination,
-            departureDate: _currentParams.departureDate,
-            returnDate: _currentParams.returnDate ?? '',
+        if (isRoundTrip && combinedTotal != null && combinedTotal > 0) ...[
+          FlightRoundTripSummaryBanner(
+            combinedTotal: combinedTotal,
+            lowestOutbound: lowestOutbound!,
+            lowestReturn: lowestReturn!,
             currency: _currentParams.currency,
             isDark: isDark,
           ),
-          const SizedBox(height: 12),
-        ],
-        if (priceRange != null) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppColors.darkElevated
-                  : AppColors.lightSecondaryBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: AppColors.iosBlue.withValues(alpha: 0.25),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.insights_rounded,
-                  size: 18,
-                  color: AppColors.iosBlue,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Price Range: ${priceRange.minFormatted} – ${priceRange.maxFormatted}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: isDark
-                              ? AppColors.darkPrimary
-                              : AppColors.lightPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Lowest fare from ${priceRange.bestAirline} · Typical: ~${priceRange.avgFormatted}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark
-                              ? AppColors.darkSecondary
-                              : AppColors.lightSecondary,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 6),
+        ] else if (priceRange != null) ...[
+          FlightPriceRangeInsight(priceRange: priceRange, isDark: isDark),
           const SizedBox(height: 12),
         ],
         Row(
@@ -355,7 +304,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           children: [
             Expanded(
               child: Text(
-                'Found ${activeFlights.length} Flights',
+                'Found $totalFoundCount Flights',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -381,43 +330,106 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           onChanged: (updated) => setState(() => _filterCriteria = updated),
           availableAirlines: availableAirlines,
           airlineCounts: airlineCounts,
-          totalCount: activeFlights.length,
-          visibleCount: filteredFlights.length,
+          totalCount: totalFoundCount,
+          visibleCount: totalVisibleCount,
           isDark: isDark,
         ),
-        const SizedBox(height: 8),
-        if (filteredFlights.isEmpty)
+        const SizedBox(height: 10),
+        if (totalVisibleCount == 0)
           FlightCheckerEmptyFilterView(
             isDark: isDark,
             onReset: () =>
                 setState(() => _filterCriteria = const FlightFilterCriteria()),
           )
         else ...[
-          () {
-            final bestFlight = FlightFilterHelper.findBestFlight(activeFlights);
-            return Column(
-              children: filteredFlights.map((flight) {
-                final isLowestPrice =
-                    priceRange != null && flight.priceNumeric == priceRange.min;
-                final isBest = bestFlight != null &&
-                    flight.airline == bestFlight.airline &&
-                    flight.priceNumeric == bestFlight.priceNumeric &&
-                    flight.departure.time == bestFlight.departure.time;
-                final keyId =
-                    'flight_${_selectedLegIndex}_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
-
-                return FlightCard(
-                  key: ValueKey(keyId),
-                  flight: flight,
-                  isLowestFare: isLowestPrice,
-                  isBest: isBest,
-                );
-              }).toList(),
-            );
-          }(),
+          if (isRoundTrip) ...[
+            FlightLegSectionHeader(
+              title: 'Departing Flights',
+              routeSubtitle: '${_currentParams.origin} → ${_currentParams.destination}',
+              date: _currentParams.departureDate,
+              count: filteredOutbound.length,
+              lowestPrice: lowestOutbound,
+              currency: _currentParams.currency,
+              icon: Icons.flight_takeoff_rounded,
+              accentColor: AppColors.iosBlue,
+              isDark: isDark,
+            ),
+            const SizedBox(height: 6),
+          ],
+          if (filteredOutbound.isEmpty)
+            FlightEmptyLegNotice(legName: 'departing', isDark: isDark)
+          else
+            ..._buildFlightCards(
+              flights: filteredOutbound,
+              lowestPrice: lowestOutbound,
+              bestFlight: bestOutbound,
+              legPrefix: 'outbound',
+            ),
+          if (isRoundTrip) ...[
+            FlightLegSeparator(
+              label: 'RETURNING OPTIONS (${_currentParams.destination} → ${_currentParams.origin})',
+              isDark: isDark,
+            ),
+            FlightLegSectionHeader(
+              title: 'Returning Flights',
+              routeSubtitle: '${_currentParams.destination} → ${_currentParams.origin}',
+              date: _currentParams.returnDate ?? '',
+              count: filteredReturn.length,
+              lowestPrice: lowestReturn,
+              currency: _currentParams.currency,
+              icon: Icons.flight_land_rounded,
+              accentColor: AppColors.iosPurple,
+              isDark: isDark,
+            ),
+            const SizedBox(height: 6),
+            if (filteredReturn.isEmpty)
+              FlightEmptyLegNotice(legName: 'returning', isDark: isDark)
+            else
+              ..._buildFlightCards(
+                flights: filteredReturn,
+                lowestPrice: lowestReturn,
+                bestFlight: bestReturn,
+                legPrefix: 'return',
+              ),
+          ],
         ],
       ],
     );
+  }
+
+  List<Widget> _buildFlightCards({
+    required List<FlightInfo> flights,
+    required int? lowestPrice,
+    required FlightInfo? bestFlight,
+    required String legPrefix,
+  }) {
+    return flights.map((flight) {
+      final isLowestPrice = lowestPrice != null && flight.priceNumeric == lowestPrice;
+      final isBest = bestFlight != null &&
+          flight.airline == bestFlight.airline &&
+          flight.priceNumeric == bestFlight.priceNumeric &&
+          flight.departure.time == bestFlight.departure.time;
+      final keyId = 'flight_${legPrefix}_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
+
+      return FlightCard(
+        key: ValueKey(keyId),
+        flight: flight,
+        isLowestFare: isLowestPrice,
+        isBest: isBest,
+      );
+    }).toList();
+  }
+
+  int? _findLowestPrice(List<FlightInfo> flights) {
+    int? minPrice;
+    for (final f in flights) {
+      if (f.priceNumeric > 0) {
+        if (minPrice == null || f.priceNumeric < minPrice) {
+          minPrice = f.priceNumeric;
+        }
+      }
+    }
+    return minPrice;
   }
 
   Widget _buildLoadingState(bool isDark) {

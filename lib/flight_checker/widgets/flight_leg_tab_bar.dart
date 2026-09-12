@@ -49,77 +49,12 @@ class FlightLegTabBar extends StatelessWidget {
       children: [
         // 1. Combined Trip Price Banner (if both legs available)
         if (combinedTotal != null && combinedTotal > 0) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            margin: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppColors.iosBlue.withValues(alpha: 0.12)
-                  : AppColors.iosBlue.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: AppColors.iosBlue.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.iosBlue.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.sync_alt_rounded,
-                    size: 16,
-                    color: AppColors.iosBlue,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Estimated Round-Trip Total: ',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? AppColors.darkSecondary
-                                  : AppColors.lightSecondary,
-                            ),
-                          ),
-                          Text(
-                            CurrencyHelper.formatAmount(combinedTotal, currency),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.iosBlue,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Outbound from ${CurrencyHelper.formatAmount(lowestOutbound!, currency)} + Return from ${CurrencyHelper.formatAmount(lowestReturn!, currency)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark
-                              ? AppColors.darkTertiary
-                              : AppColors.lightTertiary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          FlightRoundTripSummaryBanner(
+            combinedTotal: combinedTotal,
+            lowestOutbound: lowestOutbound!,
+            lowestReturn: lowestReturn!,
+            currency: currency,
+            isDark: isDark,
           ),
         ],
 
@@ -295,3 +230,98 @@ class FlightLegTabBar extends StatelessWidget {
     return minPrice;
   }
 }
+
+/// Standalone combined round-trip price banner widget.
+class FlightRoundTripSummaryBanner extends StatelessWidget {
+  final int combinedTotal;
+  final int lowestOutbound;
+  final int lowestReturn;
+  final String currency;
+  final bool isDark;
+
+  const FlightRoundTripSummaryBanner({
+    super.key,
+    required this.combinedTotal,
+    required this.lowestOutbound,
+    required this.lowestReturn,
+    required this.currency,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppColors.iosBlue.withValues(alpha: 0.12)
+            : AppColors.iosBlue.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppColors.iosBlue.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppColors.iosBlue.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.sync_alt_rounded,
+              size: 16,
+              color: AppColors.iosBlue,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Estimated Round-Trip Total: ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.darkSecondary
+                            : AppColors.lightSecondary,
+                      ),
+                    ),
+                    Text(
+                      CurrencyHelper.formatAmount(combinedTotal, currency),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.iosBlue,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Outbound from ${CurrencyHelper.formatAmount(lowestOutbound, currency)} + Return from ${CurrencyHelper.formatAmount(lowestReturn, currency)}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? AppColors.darkTertiary
+                        : AppColors.lightTertiary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

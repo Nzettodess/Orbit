@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:whereabouts/flight_checker/flight_checker_dialog.dart';
 import 'package:whereabouts/flight_checker/models/flight_info.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_card.dart';
+import 'package:whereabouts/flight_checker/widgets/flight_leg_section_header.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_leg_tab_bar.dart';
 
 void main() {
@@ -200,6 +201,49 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(selected, equals(1));
+    });
+  });
+
+  group('FlightLegSectionHeader & Separator Tests', () {
+    testWidgets('FlightLegSectionHeader renders route, count, and lowest price correctly', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: FlightLegSectionHeader(
+              title: 'Departing Flights',
+              routeSubtitle: 'PEN → PVG',
+              date: '2026-10-15',
+              count: 13,
+              lowestPrice: 608,
+              currency: 'MYR',
+              icon: Icons.flight_takeoff_rounded,
+              isDark: false,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Departing Flights'), findsOneWidget);
+      expect(find.text('13 options'), findsOneWidget);
+      expect(find.text('PEN → PVG · 2026-10-15'), findsOneWidget);
+      expect(find.text('RM 608'), findsOneWidget);
+      expect(find.byIcon(Icons.flight_takeoff_rounded), findsOneWidget);
+    });
+
+    testWidgets('FlightLegSeparator renders label and sync icon', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: FlightLegSeparator(
+              label: 'RETURNING OPTIONS (PVG → PEN)',
+              isDark: false,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('RETURNING OPTIONS (PVG → PEN)'), findsOneWidget);
+      expect(find.byIcon(Icons.sync_alt_rounded), findsOneWidget);
     });
   });
 }
