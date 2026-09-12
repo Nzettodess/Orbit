@@ -218,70 +218,9 @@ function parseStructuredBlock(block, curr, fallbackUrl) {
   return results;
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  let searchUrl = 'https://www.google.com/travel/flights?hl=en';
-  let fallbackUrl = searchUrl;
-
+async function scrapeGoogleFlights(query, currency, fallbackUrl, origin, destination, depDate, arrDate) {
+  const searchUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}&curr=${currency}&hl=en`;
   try {
-    const params = req.method === 'POST' ? (req.body || {}) : req.query;
-    const rawOrigin = (params.origin || '').trim();
-    const rawDestination = (params.destination || '').trim();
-    const departureDate = (params.departureDate || '').trim();
-    const returnDate = (params.returnDate || '').trim();
-    const tripType = (params.tripType || 'oneway').toLowerCase();
-    const adults = Math.max(1, parseInt(params.adults, 10) || 1);
-    const children = Math.max(0, parseInt(params.children, 10) || 0);
-    const cabinClass = (params.cabinClass || 'economy').toLowerCase();
-    const currency = (params.currency || 'MYR').toUpperCase();
-
-    const origin = normalizeLocation(rawOrigin) || rawOrigin;
-    const destination = normalizeLocation(rawDestination) || rawDestination;
-
-    let fallbackQuery = `Flights from ${origin || 'here'} to ${destination || 'anywhere'}`;
-    if (departureDate) fallbackQuery += ` on ${departureDate}`;
-    if (tripType === 'roundtrip' && returnDate) fallbackQuery += ` through ${returnDate}`;
-    fallbackUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(fallbackQuery)}&curr=${currency}&hl=en`;
-    searchUrl = fallbackUrl;
-
-    if (tripType === 'multicity') {
-      return res.status(200).json({
-        success: true,
-        isMultiCity: true,
-        message: 'Multi-city routes are best explored directly on Google Flights.',
-        flights: [],
-        fallbackUrl,
-      });
-    }
-
-    if (!origin || !destination || !departureDate) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required parameters: origin, destination, and departureDate are required.',
-        fallbackUrl,
-      });
-    }
-
-    let query = `Flights from ${origin} to ${destination} on ${departureDate}`;
-    if (tripType === 'roundtrip' && returnDate) {
-      query += ` through ${returnDate}`;
-    } else {
-      query += ' one way';
-    }
-
-    if (cabinClass === 'business') query += ' business class';
-    else if (cabinClass === 'first') query += ' first class';
-    else if (cabinClass === 'premiumeconomy') query += ' premium economy';
-
-    if (adults > 1) query += ` ${adults} adults`;
-    if (children > 0) query += ` ${children} children`;
-
-    searchUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}&curr=${currency}&hl=en`;
     const response = await fetch(searchUrl, {
       signal: AbortSignal.timeout(15000),
       headers: {
@@ -291,14 +230,7 @@ export default async function handler(req, res) {
       },
     });
 
-    if (!response.ok) {
-      return res.status(200).json({
-        success: false,
-        error: `Upstream response status: ${response.status}`,
-        flights: [],
-        fallbackUrl: searchUrl,
-      });
-    }
+    if (!response.ok) return [];
 
     const html = await response.text();
 
@@ -313,24 +245,17 @@ export default async function handler(req, res) {
         if (dataMatch) {
           try {
             const block = JSON.parse(dataMatch[1]);
-            const extracted = parseStructuredBlock(block, currency, searchUrl);
+            const extracted = parseStructuredBlock(block, currency, fallbackUrl);
             if (extracted.length > structuredFlights.length) {
               structuredFlights = extracted;
             }
-          } catch (e) {
-            // continue
-          }
+          } catch (e) {}
         }
       }
     }
 
     if (structuredFlights.length > 0) {
-      return res.status(200).json({
-        success: true,
-        count: structuredFlights.length,
-        flights: structuredFlights.slice(0, 20),
-        fallbackUrl: searchUrl,
-      });
+      return structuredFlights.slice(0, 20);
     }
 
     // 2. Fallback Strategy: Accessibility aria-label regex parser
@@ -376,14 +301,14 @@ export default async function handler(req, res) {
         departure: {
           airport: timesMatch ? timesMatch[1].trim() : origin,
           time: timesMatch ? timesMatch[2].trim() : '',
-          date: timesMatch ? timesMatch[3].trim() : departureDate,
+          date: timesMatch ? timesMatch[3].trim() : depDate,
         },
         arrival: {
           airport: timesMatch ? timesMatch[4].trim() : destination,
           time: timesMatch ? timesMatch[5].trim() : '',
-          date: timesMatch ? timesMatch[6].trim() : (returnDate || departureDate),
+          date: timesMatch ? timesMatch[6].trim() : arrDate,
         },
-        deepLink: searchUrl,
+        deepLink: fallbackUrl,
         layovers,
         segments: [],
       });
@@ -391,11 +316,105 @@ export default async function handler(req, res) {
       if (flights.length >= 15) break;
     }
 
+    return flights;
+  } catch (err) {
+    return [];
+  }
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  let searchUrl = 'https://www.google.com/travel/flights?hl=en';
+  let fallbackUrl = searchUrl;
+
+  try {
+    const params = req.method === 'POST' ? (req.body || {}) : req.query;
+    const rawOrigin = (params.origin || '').trim();
+    const rawDestination = (params.destination || '').trim();
+    const departureDate = (params.departureDate || '').trim();
+    const returnDate = (params.returnDate || '').trim();
+    const tripType = (params.tripType || 'oneway').toLowerCase();
+    const adults = Math.max(1, parseInt(params.adults, 10) || 1);
+    const children = Math.max(0, parseInt(params.children, 10) || 0);
+    const cabinClass = (params.cabinClass || 'economy').toLowerCase();
+    const currency = (params.currency || 'MYR').toUpperCase();
+
+    const origin = normalizeLocation(rawOrigin) || rawOrigin;
+    const destination = normalizeLocation(rawDestination) || rawDestination;
+
+    let fallbackQuery = `Flights from ${origin || 'here'} to ${destination || 'anywhere'}`;
+    if (departureDate) fallbackQuery += ` on ${departureDate}`;
+    if (tripType === 'roundtrip' && returnDate) fallbackQuery += ` through ${returnDate}`;
+    fallbackUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(fallbackQuery)}&curr=${currency}&hl=en`;
+    searchUrl = fallbackUrl;
+
+    if (tripType === 'multicity') {
+      return res.status(200).json({
+        success: true,
+        isMultiCity: true,
+        message: 'Multi-city routes are best explored directly on Google Flights.',
+        flights: [],
+        outboundFlights: [],
+        returnFlights: [],
+        fallbackUrl,
+      });
+    }
+
+    if (!origin || !destination || !departureDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameters: origin, destination, and departureDate are required.',
+        fallbackUrl,
+      });
+    }
+
+    function buildLegQuery(from, to, date) {
+      let q = `Flights from ${from} to ${to} on ${date} one way`;
+      if (cabinClass === 'business') q += ' business class';
+      else if (cabinClass === 'first') q += ' first class';
+      else if (cabinClass === 'premiumeconomy') q += ' premium economy';
+      if (adults > 1) q += ` ${adults} adults`;
+      if (children > 0) q += ` ${children} children`;
+      return q;
+    }
+
+    if (tripType === 'roundtrip' && returnDate) {
+      const outQuery = buildLegQuery(origin, destination, departureDate);
+      const retQuery = buildLegQuery(destination, origin, returnDate);
+
+      const [outbound, returning] = await Promise.all([
+        scrapeGoogleFlights(outQuery, currency, fallbackUrl, origin, destination, departureDate, returnDate),
+        scrapeGoogleFlights(retQuery, currency, fallbackUrl, destination, origin, returnDate, returnDate),
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        tripType: 'roundtrip',
+        count: outbound.length + returning.length,
+        outboundFlights: outbound,
+        returnFlights: returning,
+        flights: outbound,
+        fallbackUrl,
+      });
+    }
+
+    // One way search
+    const query = buildLegQuery(origin, destination, departureDate);
+    const flights = await scrapeGoogleFlights(query, currency, fallbackUrl, origin, destination, departureDate, departureDate);
+
     return res.status(200).json({
       success: true,
+      tripType: 'oneway',
       count: flights.length,
+      outboundFlights: flights,
+      returnFlights: [],
       flights,
-      fallbackUrl: searchUrl,
+      fallbackUrl,
     });
   } catch (error) {
     console.error('Flight check error:', error);
@@ -403,6 +422,8 @@ export default async function handler(req, res) {
       success: false,
       error: error.message || 'Error querying flights',
       flights: [],
+      outboundFlights: [],
+      returnFlights: [],
       fallbackUrl: searchUrl,
     });
   }

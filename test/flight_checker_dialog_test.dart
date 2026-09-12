@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:whereabouts/flight_checker/flight_checker_dialog.dart';
 import 'package:whereabouts/flight_checker/models/flight_info.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_card.dart';
+import 'package:whereabouts/flight_checker/widgets/flight_leg_tab_bar.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -135,6 +136,70 @@ void main() {
       await tester.tap(oneWayTab);
       await tester.pumpAndSettle();
       expect(find.text('Return'), findsNothing);
+    });
+  });
+
+  group('FlightLegTabBar & Round-Trip Multi-Leg Tests', () {
+    test('FlightSearchResponse correctly parses outboundFlights, returnFlights, and tripType', () {
+      final json = {
+        'success': true,
+        'tripType': 'roundtrip',
+        'count': 2,
+        'outboundFlights': [mockFlight1.toJson()],
+        'returnFlights': [mockFlight2.toJson()],
+        'flights': [mockFlight1.toJson()],
+        'fallbackUrl': 'https://google.com',
+      };
+
+      final response = FlightSearchResponse.fromJson(json);
+      expect(response.success, isTrue);
+      expect(response.isRoundTrip, isTrue);
+      expect(response.outboundFlights.length, equals(1));
+      expect(response.returnFlights.length, equals(1));
+      expect(response.outboundFlights.first.airline, equals('AirAsia'));
+      expect(response.returnFlights.first.airline, equals('Scoot'));
+    });
+
+    testWidgets('FlightLegTabBar renders legs, combined total, and handles tab switching', (tester) async {
+      int selected = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                return FlightLegTabBar(
+                  selectedIndex: selected,
+                  onTabSelected: (idx) => setState(() => selected = idx),
+                  outboundFlights: [mockFlight1],
+                  returnFlights: [mockFlight2],
+                  origin: 'KUL',
+                  destination: 'SIN',
+                  departureDate: '2026-10-15',
+                  returnDate: '2026-10-22',
+                  currency: 'MYR',
+                  isDark: false,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      // Verify Departing and Returning tabs rendered
+      expect(find.text('Departing'), findsOneWidget);
+      expect(find.text('Returning'), findsOneWidget);
+      expect(find.text('KUL → SIN'), findsOneWidget);
+      expect(find.text('SIN → KUL'), findsOneWidget);
+
+      // Verify combined price banner: mockFlight1 (120) + mockFlight2 (120) = 240
+      expect(find.text('Estimated Round-Trip Total: '), findsOneWidget);
+      expect(find.text('RM 240'), findsOneWidget);
+
+      // Tap Returning tab
+      await tester.tap(find.text('Returning'));
+      await tester.pumpAndSettle();
+
+      expect(selected, equals(1));
     });
   });
 }

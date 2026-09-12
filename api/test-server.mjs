@@ -221,6 +221,9 @@ async function runAllTests(baseUrl) {
     assert(res.status === 200, `Expected status 200, got ${res.status}`);
     const data = await res.json();
     assert(data.fallbackUrl.includes('through'), 'Expected roundtrip query format');
+    assert(data.tripType === 'roundtrip', 'Expected tripType to be roundtrip');
+    assert(Array.isArray(data.outboundFlights), 'Expected outboundFlights array');
+    assert(Array.isArray(data.returnFlights), 'Expected returnFlights array');
   });
 
   console.log('\n' + '='.repeat(60));

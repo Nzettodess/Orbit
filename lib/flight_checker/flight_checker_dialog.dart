@@ -7,6 +7,7 @@ import 'utils/flight_filter_helper.dart';
 import 'widgets/flight_card.dart';
 import 'widgets/flight_checker_status_views.dart';
 import 'widgets/flight_filter_bar.dart';
+import 'widgets/flight_leg_tab_bar.dart';
 import 'widgets/flight_search_form.dart';
 
 /// Modal dialog for querying flight prices with Google Flights fallback
@@ -32,6 +33,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   FlightSearchResponse? _response;
   String? _errorMessage;
   final Map<String, FlightSearchResponse> _currencyCache = {};
+  int _selectedLegIndex = 0;
   FlightFilterCriteria _filterCriteria = const FlightFilterCriteria();
 
   @override
@@ -88,6 +90,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       _currentParams = params;
       _isLoading = true;
       _errorMessage = null;
+      _selectedLegIndex = 0;
       _filterCriteria = const FlightFilterCriteria();
     });
 
@@ -242,25 +245,56 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       return _buildEmptyState(isDark);
     }
 
+    return _buildFlightResults(isDark);
+  }
+
+  Widget _buildFlightResults(bool isDark) {
+    final isRoundTrip = _response?.returnFlights.isNotEmpty == true;
+    final activeFlights = isRoundTrip
+        ? (_selectedLegIndex == 0 ? _response!.outboundFlights : _response!.returnFlights)
+        : _response!.flights;
+
     final priceRange = CurrencyHelper.calculatePriceRange(
-      _response!.flights,
+      activeFlights,
       _currentParams.currency,
     );
 
     final availableAirlines = FlightFilterHelper.getAvailableAirlines(
-      _response!.flights,
+      activeFlights,
     );
     final airlineCounts = FlightFilterHelper.getAirlineCounts(
-      _response!.flights,
+      activeFlights,
     );
     final filteredFlights = FlightFilterHelper.applyFiltersAndSort(
-      _response!.flights,
+      activeFlights,
       _filterCriteria,
     );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (isRoundTrip) ...[
+          FlightLegTabBar(
+            selectedIndex: _selectedLegIndex,
+            onTabSelected: (idx) {
+              if (_selectedLegIndex != idx) {
+                setState(() {
+                  _selectedLegIndex = idx;
+                  _filterCriteria = const FlightFilterCriteria();
+                });
+              }
+            },
+            outboundFlights: _response!.outboundFlights,
+            returnFlights: _response!.returnFlights,
+            origin: _currentParams.origin,
+            destination: _currentParams.destination,
+            departureDate: _currentParams.departureDate,
+            returnDate: _currentParams.returnDate ?? '',
+            currency: _currentParams.currency,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 12),
+        ],
         if (priceRange != null) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -321,7 +355,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           children: [
             Expanded(
               child: Text(
-                'Found ${_response!.flights.length} Flights',
+                'Found ${activeFlights.length} Flights',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -347,7 +381,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           onChanged: (updated) => setState(() => _filterCriteria = updated),
           availableAirlines: availableAirlines,
           airlineCounts: airlineCounts,
-          totalCount: _response!.flights.length,
+          totalCount: activeFlights.length,
           visibleCount: filteredFlights.length,
           isDark: isDark,
         ),
@@ -360,7 +394,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           )
         else ...[
           () {
-            final bestFlight = FlightFilterHelper.findBestFlight(_response!.flights);
+            final bestFlight = FlightFilterHelper.findBestFlight(activeFlights);
             return Column(
               children: filteredFlights.map((flight) {
                 final isLowestPrice =
@@ -370,7 +404,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                     flight.priceNumeric == bestFlight.priceNumeric &&
                     flight.departure.time == bestFlight.departure.time;
                 final keyId =
-                    'flight_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
+                    'flight_${_selectedLegIndex}_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
 
                 return FlightCard(
                   key: ValueKey(keyId),

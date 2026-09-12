@@ -286,29 +286,51 @@ class FlightSearchResponse {
   final bool success;
   final int count;
   final List<FlightInfo> flights;
+  final List<FlightInfo> outboundFlights;
+  final List<FlightInfo> returnFlights;
   final String fallbackUrl;
   final String? error;
+  final String tripType;
   final bool isMultiCity;
 
   const FlightSearchResponse({
     required this.success,
     this.count = 0,
     this.flights = const [],
+    this.outboundFlights = const [],
+    this.returnFlights = const [],
     required this.fallbackUrl,
     this.error,
+    this.tripType = 'oneway',
     this.isMultiCity = false,
   });
 
+  bool get isRoundTrip => tripType == 'roundtrip' || returnFlights.isNotEmpty;
+
   factory FlightSearchResponse.fromJson(Map<String, dynamic> json) {
     final rawFlights = json['flights'] as List<dynamic>? ?? [];
+    final rawOutbound = json['outboundFlights'] as List<dynamic>?;
+    final rawReturn = json['returnFlights'] as List<dynamic>?;
+
+    final parsedFlights = rawFlights
+        .map((f) => FlightInfo.fromJson(f as Map<String, dynamic>))
+        .toList();
+    final parsedOutbound = rawOutbound != null
+        ? rawOutbound.map((f) => FlightInfo.fromJson(f as Map<String, dynamic>)).toList()
+        : parsedFlights;
+    final parsedReturn = rawReturn != null
+        ? rawReturn.map((f) => FlightInfo.fromJson(f as Map<String, dynamic>)).toList()
+        : const <FlightInfo>[];
+
     return FlightSearchResponse(
       success: json['success'] as bool? ?? false,
-      count: (json['count'] as num?)?.toInt() ?? 0,
-      flights: rawFlights
-          .map((f) => FlightInfo.fromJson(f as Map<String, dynamic>))
-          .toList(),
+      count: (json['count'] as num?)?.toInt() ?? parsedFlights.length,
+      flights: parsedFlights,
+      outboundFlights: parsedOutbound,
+      returnFlights: parsedReturn,
       fallbackUrl: json['fallbackUrl'] as String? ?? '',
       error: json['error'] as String?,
+      tripType: json['tripType'] as String? ?? (parsedReturn.isNotEmpty ? 'roundtrip' : 'oneway'),
       isMultiCity: json['isMultiCity'] as bool? ?? false,
     );
   }
