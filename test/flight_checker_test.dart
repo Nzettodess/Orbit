@@ -269,6 +269,8 @@ void main() {
       expect(range.minFormatted, equals('RM 118'));
       expect(range.maxFormatted, equals('RM 450'));
       expect(range.bestAirline, equals('AirAsia'));
+      expect(range.cheapestFlight?.priceNumeric, equals(118));
+      expect(range.cheapestFlight?.airline, equals('AirAsia'));
       expect(range.average, equals(238)); // (118 + 145 + 450) / 3 = 237.66 -> 238
       expect(range.avgFormatted, equals('RM 238'));
     });
@@ -429,6 +431,18 @@ void main() {
 
       expect(find.text('Details'), findsOneWidget);
       expect(find.textContaining('AK 6112'), findsNothing);
+    });
+
+    testWidgets('Renders Lowest Fare badge when isLowestFare is true', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: FlightCard(flight: mockFlight, isLowestFare: true),
+          ),
+        ),
+      );
+
+      expect(find.text('Lowest Fare'), findsOneWidget);
     });
   });
 

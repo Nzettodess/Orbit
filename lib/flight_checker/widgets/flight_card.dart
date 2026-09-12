@@ -12,12 +12,16 @@ class FlightCard extends StatefulWidget {
   final FlightInfo flight;
   final String? displayPrice;
   final VoidCallback? onSelect;
+  final bool isLowestFare;
+  final bool initiallyExpanded;
 
   const FlightCard({
     super.key,
     required this.flight,
     this.displayPrice,
     this.onSelect,
+    this.isLowestFare = false,
+    this.initiallyExpanded = false,
   });
 
   @override
@@ -26,7 +30,21 @@ class FlightCard extends StatefulWidget {
 
 class _FlightCardState extends State<FlightCard> {
   bool _isHovered = false;
-  bool _isExpanded = false;
+  late bool _isExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.initiallyExpanded;
+  }
+
+  @override
+  void didUpdateWidget(FlightCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initiallyExpanded != oldWidget.initiallyExpanded) {
+      _isExpanded = widget.initiallyExpanded;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +56,9 @@ class _FlightCardState extends State<FlightCard> {
     final surfaceColor = isDark ? AppColors.darkSurface : AppColors.lightSurface;
     final borderColor = _isHovered
         ? AppColors.iosBlue.withValues(alpha: 0.5)
-        : (isDark ? AppColors.darkElevatedHighest : AppColors.iosGray4);
+        : (widget.isLowestFare
+            ? AppColors.iosGreen.withValues(alpha: 0.45)
+            : (isDark ? AppColors.darkElevatedHighest : AppColors.iosGray4));
 
     return Semantics(
       label: '${flight.airline}, $activePrice, ${flight.duration}, ${flight.stops}',
@@ -92,6 +112,10 @@ class _FlightCardState extends State<FlightCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (widget.isLowestFare) ...[
+                    _buildLowestFareBadge(),
+                    const SizedBox(width: 6),
+                  ],
                   _buildStopsBadge(isNonstop, flight.stops),
                 ],
               ),
@@ -333,6 +357,35 @@ class _FlightCardState extends State<FlightCard> {
       child: Text(
         text,
         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+      ),
+    );
+  }
+
+  Widget _buildLowestFareBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.iosGreen.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: AppColors.iosGreen.withValues(alpha: 0.35),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.bolt_rounded, size: 12, color: AppColors.iosGreen),
+          const SizedBox(width: 2),
+          Text(
+            'Lowest Fare',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: AppColors.iosGreen,
+            ),
+          ),
+        ],
       ),
     );
   }

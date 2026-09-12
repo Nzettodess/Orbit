@@ -13,6 +13,7 @@ class PriceRange {
   final String maxFormatted;
   final String avgFormatted;
   final String bestAirline;
+  final FlightInfo? cheapestFlight;
 
   const PriceRange({
     required this.min,
@@ -23,6 +24,7 @@ class PriceRange {
     required this.maxFormatted,
     required this.avgFormatted,
     required this.bestAirline,
+    this.cheapestFlight,
   });
 }
 
@@ -115,6 +117,7 @@ class CurrencyHelper {
       maxFormatted: formatAmount(max, currency),
       avgFormatted: formatAmount(avg, currency),
       bestAirline: priced.first.airline,
+      cheapestFlight: priced.first,
     );
   }
 }

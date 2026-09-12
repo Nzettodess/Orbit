@@ -29,6 +29,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   FlightSearchResponse? _response;
   String? _errorMessage;
   final Map<String, FlightSearchResponse> _currencyCache = {};
+  final GlobalKey _cheapestCardKey = GlobalKey();
+  String? _expandedFlightKeyId;
 
   @override
   void initState() {
@@ -50,10 +52,36 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     }
   }
 
+  void _exploreLowestFare(FlightInfo? cheapest) {
+    if (cheapest == null) return;
+    final keyId = '${cheapest.airline}-${cheapest.departure.time}-${cheapest.priceNumeric}';
+    setState(() {
+      if (_expandedFlightKeyId == keyId) {
+        _expandedFlightKeyId = null;
+      } else {
+        _expandedFlightKeyId = keyId;
+      }
+    });
+
+    if (_expandedFlightKeyId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_cheapestCardKey.currentContext != null) {
+          Scrollable.ensureVisible(
+            _cheapestCardKey.currentContext!,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+            alignment: 0.1,
+          );
+        }
+      });
+    }
+  }
+
   void _handleCurrencyChanged(String newCurrency) {
     if (newCurrency == _currentParams.currency) return;
     final updated = _currentParams.copyWith(currency: newCurrency);
     _currentParams = updated;
+    _expandedFlightKeyId = null;
 
     // Instant 0ms repaint if this currency was already retrieved
     if (_currencyCache.containsKey(newCurrency)) {
@@ -73,6 +101,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       _currentParams = params;
       _isLoading = true;
       _errorMessage = null;
+      _expandedFlightKeyId = null;
     });
 
     final res = await FlightService.searchFlights(params);
@@ -223,43 +252,84 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (priceRange != null) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkElevated : AppColors.lightSecondaryBg,
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _exploreLowestFare(priceRange.cheapestFlight),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: AppColors.iosBlue.withValues(alpha: 0.25),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.insights_rounded, size: 18, color: AppColors.iosBlue),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Price Range: ${priceRange.minFormatted} – ${priceRange.maxFormatted}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Lowest fare from ${priceRange.bestAirline} · Typical: ~${priceRange.avgFormatted}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
-                        ),
-                      ),
-                    ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkElevated : AppColors.lightSecondaryBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.iosBlue.withValues(alpha: 0.25),
                   ),
                 ),
-              ],
+                child: Row(
+                  children: [
+                    Icon(Icons.insights_rounded, size: 18, color: AppColors.iosBlue),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Price Range: ${priceRange.minFormatted} – ${priceRange.maxFormatted}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Lowest fare from ${priceRange.bestAirline} · Typical: ~${priceRange.avgFormatted}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.iosBlue.withValues(alpha: isDark ? 0.2 : 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.iosBlue.withValues(alpha: 0.35),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Explore Lowest',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.iosBlue,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            _expandedFlightKeyId ==
+                                    '${priceRange.cheapestFlight?.airline}-${priceRange.cheapestFlight?.departure.time}-${priceRange.cheapestFlight?.priceNumeric}'
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            size: 14,
+                            color: AppColors.iosBlue,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -283,7 +353,18 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           ],
         ),
         const SizedBox(height: 8),
-        ..._response!.flights.map((flight) => FlightCard(flight: flight)),
+        ..._response!.flights.map((flight) {
+          final isCheapest = priceRange != null && flight.priceNumeric == priceRange.min;
+          final keyId = '${flight.airline}-${flight.departure.time}-${flight.priceNumeric}';
+          final isExpanded = _expandedFlightKeyId == keyId;
+
+          return FlightCard(
+            key: isCheapest ? _cheapestCardKey : null,
+            flight: flight,
+            isLowestFare: isCheapest,
+            initiallyExpanded: isExpanded,
+          );
+        }),
       ],
     );
   }
