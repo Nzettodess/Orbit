@@ -337,8 +337,17 @@ export default async function handler(req, res) {
     const rawOrigin = (params.origin || '').trim();
     const rawDestination = (params.destination || '').trim();
     const departureDate = (params.departureDate || '').trim();
-    const returnDate = (params.returnDate || '').trim();
+    let returnDate = (params.returnDate || '').trim();
     const tripType = (params.tripType || 'oneway').toLowerCase();
+    if (tripType === 'roundtrip' && !returnDate && departureDate) {
+      try {
+        const depObj = new Date(departureDate);
+        if (!isNaN(depObj.getTime())) {
+          depObj.setDate(depObj.getDate() + 7);
+          returnDate = depObj.toISOString().split('T')[0];
+        }
+      } catch (_) {}
+    }
     const adults = Math.max(1, parseInt(params.adults, 10) || 1);
     const children = Math.max(0, parseInt(params.children, 10) || 0);
     const cabinClass = (params.cabinClass || 'economy').toLowerCase();

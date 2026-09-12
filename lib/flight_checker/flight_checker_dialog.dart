@@ -43,11 +43,16 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         widget.initialDate ?? DateTime.now().add(const Duration(days: 14));
     final depStr =
         '${depDate.year}-${depDate.month.toString().padLeft(2, '0')}-${depDate.day.toString().padLeft(2, '0')}';
+    final retDate = depDate.add(const Duration(days: 7));
+    final retStr =
+        '${retDate.year}-${retDate.month.toString().padLeft(2, '0')}-${retDate.day.toString().padLeft(2, '0')}';
 
     _currentParams = FlightSearchParams(
       origin: widget.initialOrigin ?? '',
       destination: widget.initialDestination ?? '',
       departureDate: depStr,
+      returnDate: retStr,
+      tripType: 'roundtrip',
     );
 
     // Auto-trigger search if both origin and destination were passed
@@ -81,7 +86,18 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   void _handleTripTypeChanged(String newTripType) {
     if (newTripType == _currentParams.tripType) return;
     setState(() {
-      _currentParams = _currentParams.copyWith(tripType: newTripType);
+      String? returnDate = _currentParams.returnDate;
+      if (newTripType == 'roundtrip' && (returnDate == null || returnDate.isEmpty)) {
+        final dep = DateTime.tryParse(_currentParams.departureDate) ??
+            DateTime.now().add(const Duration(days: 14));
+        final ret = dep.add(const Duration(days: 7));
+        returnDate =
+            '${ret.year}-${ret.month.toString().padLeft(2, '0')}-${ret.day.toString().padLeft(2, '0')}';
+      }
+      _currentParams = _currentParams.copyWith(
+        tripType: newTripType,
+        returnDate: newTripType == 'roundtrip' ? returnDate : null,
+      );
     });
   }
 
@@ -248,9 +264,11 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   }
 
   Widget _buildFlightResults(bool isDark) {
-    final isRoundTrip = _response?.returnFlights.isNotEmpty == true;
+    final isRoundTrip = _response?.isRoundTrip == true || _currentParams.tripType == 'roundtrip';
 
-    final outboundFlights = isRoundTrip ? _response!.outboundFlights : _response!.flights;
+    final outboundFlights = isRoundTrip
+        ? (_response!.outboundFlights.isNotEmpty ? _response!.outboundFlights : _response!.flights)
+        : _response!.flights;
     final returnFlights = isRoundTrip ? _response!.returnFlights : const <FlightInfo>[];
     final allFlights = isRoundTrip ? [...outboundFlights, ...returnFlights] : outboundFlights;
 
@@ -432,32 +450,26 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     return minPrice;
   }
 
-  Widget _buildLoadingState(bool isDark) {
-    return FlightCheckerLoadingView(isDark: isDark);
-  }
+  Widget _buildLoadingState(bool isDark) =>
+      FlightCheckerLoadingView(isDark: isDark);
 
-  Widget _buildErrorFallback(bool isDark, {String? title, String? message}) {
-    final fallbackUrl =
-        _response?.fallbackUrl ??
-        FlightService.buildGoogleFlightsFallbackUrl(_currentParams);
-    return FlightCheckerFallbackView(
-      isDark: isDark,
-      fallbackUrl: fallbackUrl,
-      title: title,
-      message: message,
-      onRetry: () => _performSearch(_currentParams),
-      onOpenFallback: FlightService.launchFlightUrl,
-    );
-  }
+  Widget _buildErrorFallback(bool isDark, {String? title, String? message}) =>
+      FlightCheckerFallbackView(
+        isDark: isDark,
+        fallbackUrl: _response?.fallbackUrl ??
+            FlightService.buildGoogleFlightsFallbackUrl(_currentParams),
+        title: title,
+        message: message,
+        onRetry: () => _performSearch(_currentParams),
+        onOpenFallback: FlightService.launchFlightUrl,
+      );
 
-  Widget _buildEmptyState(bool isDark) {
-    return _buildErrorFallback(
-      isDark,
-      title: 'No Live Estimates Found',
-      message:
-          'No flights were matched for this date and route. Try selecting another date or check live schedules directly.',
-    );
-  }
+  Widget _buildEmptyState(bool isDark) => _buildErrorFallback(
+        isDark,
+        title: 'No Live Estimates Found',
+        message:
+            'No flights were matched for this date and route. Try selecting another date or check live schedules directly.',
+      );
 }
 
 /// Helper function to open FlightCheckerDialog

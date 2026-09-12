@@ -56,9 +56,8 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
         DateTime.now().add(const Duration(days: 14));
     if (widget.initialParams.returnDate != null && widget.initialParams.returnDate!.isNotEmpty) {
       _returnDate = DateTime.tryParse(widget.initialParams.returnDate!);
-    } else if (_tripType == 'roundtrip') {
-      _returnDate = _departureDate.add(const Duration(days: 7));
     }
+    _returnDate ??= _departureDate.add(const Duration(days: 7));
     _adults = widget.initialParams.adults.clamp(1, 9);
     _children = widget.initialParams.children.clamp(0, 8);
     _cabinClass = widget.initialParams.cabinClass;
@@ -110,7 +109,8 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
 
   void _submit() {
     final depStr = DateFormat('yyyy-MM-dd').format(_departureDate);
-    final retStr = _returnDate != null ? DateFormat('yyyy-MM-dd').format(_returnDate!) : null;
+    final effectiveReturn = _returnDate ?? _departureDate.add(const Duration(days: 7));
+    final retStr = DateFormat('yyyy-MM-dd').format(effectiveReturn);
 
     final params = FlightSearchParams(
       origin: _originController.text.trim(),
@@ -346,7 +346,15 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
     return Expanded(
       child: InkWell(
         onTap: () {
-          setState(() => _tripType = key);
+          setState(() {
+            _tripType = key;
+            if (key == 'roundtrip') {
+              _returnDate ??= _departureDate.add(const Duration(days: 7));
+              if (_returnDate!.isBefore(_departureDate)) {
+                _returnDate = _departureDate.add(const Duration(days: 7));
+              }
+            }
+          });
           widget.onTripTypeChanged?.call(key);
         },
         borderRadius: BorderRadius.circular(8),
