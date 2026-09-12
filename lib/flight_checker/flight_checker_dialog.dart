@@ -28,8 +28,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   bool _isLoading = false;
   FlightSearchResponse? _response;
   String? _errorMessage;
-  String _queriedCurrency = 'MYR';
-  String _displayCurrency = 'MYR';
+  final Map<String, FlightSearchResponse> _currencyCache = {};
 
   @override
   void initState() {
@@ -42,8 +41,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       destination: widget.initialDestination ?? '',
       departureDate: depStr,
     );
-    _queriedCurrency = _currentParams.currency;
-    _displayCurrency = _currentParams.currency;
 
     // Auto-trigger search if both origin and destination were passed
     if ((widget.initialOrigin ?? '').isNotEmpty && (widget.initialDestination ?? '').isNotEmpty) {
@@ -53,11 +50,27 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     }
   }
 
+  void _handleCurrencyChanged(String newCurrency) {
+    if (newCurrency == _currentParams.currency) return;
+    final updated = _currentParams.copyWith(currency: newCurrency);
+    _currentParams = updated;
+
+    // Instant 0ms repaint if this currency was already retrieved
+    if (_currencyCache.containsKey(newCurrency)) {
+      setState(() {
+        _response = _currencyCache[newCurrency];
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } else if (_response != null && _response!.flights.isNotEmpty) {
+      // Query Google Flights live in the new currency for 100% genuine airline quotes
+      _performSearch(updated);
+    }
+  }
+
   Future<void> _performSearch(FlightSearchParams params) async {
     setState(() {
       _currentParams = params;
-      _queriedCurrency = params.currency;
-      _displayCurrency = params.currency;
       _isLoading = true;
       _errorMessage = null;
     });
@@ -68,6 +81,9 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       setState(() {
         _isLoading = false;
         _response = res;
+        if (res.success && res.flights.isNotEmpty) {
+          _currencyCache[params.currency] = res;
+        }
         if (!res.success && !res.isMultiCity) {
           _errorMessage = res.error ?? 'Could not retrieve flights at this time.';
         }
@@ -108,11 +124,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                       initialParams: _currentParams,
                       isLoading: _isLoading,
                       onSearch: _performSearch,
-                      onCurrencyChanged: (newCurr) {
-                        setState(() {
-                          _displayCurrency = newCurr;
-                        });
-                      },
+                      onCurrencyChanged: _handleCurrencyChanged,
                     ),
                     const SizedBox(height: 20),
                     _buildResultsSection(isDark),
@@ -191,9 +203,56 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       return _buildEmptyState(isDark);
     }
 
+    final priceRange = CurrencyHelper.calculatePriceRange(
+      _response!.flights,
+      _currentParams.currency,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (priceRange != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkElevated : AppColors.lightSecondaryBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppColors.iosBlue.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.insights_rounded, size: 18, color: AppColors.iosBlue),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Price Range: ${priceRange.minFormatted} – ${priceRange.maxFormatted}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Lowest fare from ${priceRange.bestAirline} · Typical: ~${priceRange.avgFormatted}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -213,16 +272,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           ],
         ),
         const SizedBox(height: 8),
-        ..._response!.flights.map(
-          (flight) => FlightCard(
-            flight: flight,
-            displayPrice: CurrencyHelper.convertAndFormat(
-              flight.priceNumeric,
-              from: _queriedCurrency,
-              to: _displayCurrency,
-            ),
-          ),
-        ),
+        ..._response!.flights.map((flight) => FlightCard(flight: flight)),
       ],
     );
   }

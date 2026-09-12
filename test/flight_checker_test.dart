@@ -212,7 +212,7 @@ void main() {
     });
   });
 
-  group('CurrencyHelper Conversion & Formatting Tests', () {
+  group('CurrencyHelper Formatting & Price Range Tests', () {
     test('formats various currencies with standard symbols', () {
       expect(CurrencyHelper.formatAmount(1365, 'MYR'), equals('RM 1,365'));
       expect(CurrencyHelper.formatAmount(340, 'USD'), equals('\$340'));
@@ -223,18 +223,52 @@ void main() {
       expect(CurrencyHelper.formatAmount(1500000, 'IDR'), equals('Rp 1,500,000'));
     });
 
-    test('convertAndFormat converts accurately between currencies without network', () {
-      // Same currency: returns exact formatted amount
-      expect(CurrencyHelper.convertAndFormat(1000, from: 'MYR', to: 'MYR'), equals('RM 1,000'));
+    test('calculates accurate live price range from flight results', () {
+      const dep = FlightEndpoint(airport: 'KUL', time: '8:00 AM', date: '2026-10-15');
+      const arr = FlightEndpoint(airport: 'SIN', time: '9:15 AM', date: '2026-10-15');
 
-      // MYR -> USD (1000 MYR / 4.45 ~ $225)
-      final inUsd = CurrencyHelper.convertAndFormat(1000, from: 'MYR', to: 'USD');
-      expect(inUsd, startsWith('\$'));
-      expect(inUsd, contains('225'));
+      final flights = [
+        const FlightInfo(
+          airline: 'AirAsia',
+          stops: 'Nonstop',
+          duration: '1 hr 15 min',
+          price: 'RM 118',
+          priceNumeric: 118,
+          departure: dep,
+          arrival: arr,
+          deepLink: '',
+        ),
+        const FlightInfo(
+          airline: 'Scoot',
+          stops: 'Nonstop',
+          duration: '1 hr 10 min',
+          price: 'RM 145',
+          priceNumeric: 145,
+          departure: dep,
+          arrival: arr,
+          deepLink: '',
+        ),
+        const FlightInfo(
+          airline: 'Singapore Airlines',
+          stops: 'Nonstop',
+          duration: '1 hr 15 min',
+          price: 'RM 450',
+          priceNumeric: 450,
+          departure: dep,
+          arrival: arr,
+          deepLink: '',
+        ),
+      ];
 
-      // USD -> SGD ($100 * 1.34 = S$134)
-      final inSgd = CurrencyHelper.convertAndFormat(100, from: 'USD', to: 'SGD');
-      expect(inSgd, equals('S\$134'));
+      final range = CurrencyHelper.calculatePriceRange(flights, 'MYR');
+      expect(range, isNotNull);
+      expect(range!.min, equals(118));
+      expect(range.max, equals(450));
+      expect(range.minFormatted, equals('RM 118'));
+      expect(range.maxFormatted, equals('RM 450'));
+      expect(range.bestAirline, equals('AirAsia'));
+      expect(range.average, equals(238)); // (118 + 145 + 450) / 3 = 237.66 -> 238
+      expect(range.avgFormatted, equals('RM 238'));
     });
   });
 

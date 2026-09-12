@@ -231,6 +231,30 @@ class FlightSearchParams {
     this.currency = 'MYR',
   });
 
+  FlightSearchParams copyWith({
+    String? origin,
+    String? destination,
+    String? departureDate,
+    String? returnDate,
+    String? tripType,
+    int? adults,
+    int? children,
+    String? cabinClass,
+    String? currency,
+  }) {
+    return FlightSearchParams(
+      origin: origin ?? this.origin,
+      destination: destination ?? this.destination,
+      departureDate: departureDate ?? this.departureDate,
+      returnDate: returnDate ?? this.returnDate,
+      tripType: tripType ?? this.tripType,
+      adults: adults ?? this.adults,
+      children: children ?? this.children,
+      cabinClass: cabinClass ?? this.cabinClass,
+      currency: currency ?? this.currency,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'origin': origin,
     'destination': destination,
