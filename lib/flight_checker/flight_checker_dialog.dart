@@ -80,8 +80,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       if (_scrollController.hasClients && _scrollController.offset > 0) {
         _scrollController.animateTo(
           0.0,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeInOutCubic,
         );
       }
       setState(() {
@@ -102,8 +102,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         _scrollController.offset > 0) {
       _scrollController.animateTo(
         0.0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeInOutCubic,
       );
     }
     setState(() => _isDepartingExpanded = !_isDepartingExpanded);
@@ -115,8 +115,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         _scrollController.offset > 0) {
       _scrollController.animateTo(
         0.0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeInOutCubic,
       );
     }
     setState(() => _isReturningExpanded = !_isReturningExpanded);

@@ -152,7 +152,8 @@ class FlightLegSectionHeader extends StatelessWidget {
               ),
               child: AnimatedRotation(
                 turns: isExpanded ? 0.0 : 0.5,
-                duration: const Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 360),
+                curve: Curves.easeInOutCubic,
                 child: Icon(
                   Icons.keyboard_arrow_up_rounded,
                   size: 16,
@@ -392,13 +393,14 @@ class _FlightLegSectionState extends State<FlightLegSection>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 360),
+      reverseDuration: const Duration(milliseconds: 260),
       value: widget.isExpanded ? 1.0 : 0.0,
     );
     _sizeFactor = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
+      curve: Curves.easeInOutCubic,
+      reverseCurve: Curves.easeInOutCubic,
     );
   }
 

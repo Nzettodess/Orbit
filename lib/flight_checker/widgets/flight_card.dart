@@ -191,7 +191,12 @@ class _FlightCardState extends State<FlightCard> {
                             TextButton.icon(
                               onPressed: () => setState(() => _isExpanded = !_isExpanded),
                               style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap, foregroundColor: isDark ? AppColors.darkSecondary : AppColors.lightSecondary),
-                              icon: Icon(_isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, size: 18),
+                              icon: AnimatedRotation(
+                                turns: _isExpanded ? 0.5 : 0.0,
+                                duration: const Duration(milliseconds: 320),
+                                curve: Curves.easeInOutCubic,
+                                child: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                              ),
                               label: Text(_isExpanded ? 'Hide' : 'Details', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                             ),
                             const SizedBox(width: 6),
@@ -206,12 +211,22 @@ class _FlightCardState extends State<FlightCard> {
                     ),
 
                     // 4. Expanded Segment Breakdown & Itinerary Timeline
-                    if (_isExpanded)
-                      FlightSegmentTimeline(
-                        segments: flight.segments,
-                        layovers: flight.layovers,
-                        isDark: isDark,
+                    ClipRect(
+                      child: AnimatedSize(
+                        duration: const Duration(milliseconds: 320),
+                        curve: Curves.easeInOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: _isExpanded
+                            ? RepaintBoundary(
+                                child: FlightSegmentTimeline(
+                                  segments: flight.segments,
+                                  layovers: flight.layovers,
+                                  isDark: isDark,
+                                ),
+                              )
+                            : const SizedBox(width: double.infinity, height: 0),
                       ),
+                    ),
                   ],
                 ),
               ),
