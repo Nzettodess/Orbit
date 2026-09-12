@@ -5,6 +5,7 @@ enum FlightSortBy {
   priceLowToHigh('Price: Low to High'),
   durationShortest('Duration: Shortest'),
   departureEarliest('Departure: Earliest'),
+  departureLatest('Departure: Latest'),
   nonstopFirst('Stops: Nonstop First');
 
   final String label;
@@ -195,6 +196,16 @@ class FlightFilterHelper {
           final tA = parseTimeToMinutes(a.departure.time);
           final tB = parseTimeToMinutes(b.departure.time);
           final timeCompare = tA.compareTo(tB);
+          if (timeCompare != 0) return timeCompare;
+          return a.priceNumeric.compareTo(b.priceNumeric);
+        });
+        break;
+
+      case FlightSortBy.departureLatest:
+        list.sort((a, b) {
+          final tA = parseTimeToMinutes(a.departure.time);
+          final tB = parseTimeToMinutes(b.departure.time);
+          final timeCompare = tB.compareTo(tA);
           if (timeCompare != 0) return timeCompare;
           return a.priceNumeric.compareTo(b.priceNumeric);
         });

@@ -76,6 +76,13 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     }
   }
 
+  void _handleTripTypeChanged(String newTripType) {
+    if (newTripType == _currentParams.tripType) return;
+    setState(() {
+      _currentParams = _currentParams.copyWith(tripType: newTripType);
+    });
+  }
+
   Future<void> _performSearch(FlightSearchParams params) async {
     setState(() {
       _currentParams = params;
@@ -93,7 +100,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         if (res.success && res.flights.isNotEmpty) {
           _currencyCache[params.currency] = res;
         }
-        if (!res.success && !res.isMultiCity) {
+        if (!res.success) {
           _errorMessage =
               res.error ?? 'Could not retrieve flights at this time.';
         }
@@ -143,6 +150,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                         isLoading: _isLoading,
                         onSearch: _performSearch,
                         onCurrencyChanged: _handleCurrencyChanged,
+                        onTripTypeChanged: _handleTripTypeChanged,
                       ),
                       const SizedBox(height: 20),
                       _buildResultsSection(isDark),

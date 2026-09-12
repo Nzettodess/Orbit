@@ -75,4 +75,14 @@ class PWAService {
       debugPrint('Error reloading page: $e');
     }
   }
+
+  /// Update PWA theme color and root background (critical for iOS Dynamic Island & notch)
+  void updateThemeColor(bool isDark) {
+    if (!kIsWeb) return;
+    try {
+      js.context.callMethod('updateOrbitTheme', [isDark]);
+    } catch (e) {
+      debugPrint('Error updating PWA theme color: $e');
+    }
+  }
 }

@@ -126,6 +126,7 @@ class FlightSegmentTimeline extends StatelessWidget {
                       child: Text(
                         '${seg.departureAirport}${seg.departureCode.isNotEmpty ? ' (${seg.departureCode})' : ''}',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -150,6 +151,7 @@ class FlightSegmentTimeline extends StatelessWidget {
                       child: Text(
                         '${seg.arrivalAirport}${seg.arrivalCode.isNotEmpty ? ' (${seg.arrivalCode})' : ''}',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -209,6 +211,18 @@ class FlightSegmentTimeline extends StatelessWidget {
                           style: TextStyle(fontSize: 10, color: AppColors.iosGreen, fontWeight: FontWeight.w600),
                         ),
                       ),
+                    if (seg.contrail.isNotEmpty)
+                      _buildAmenityChip(
+                        Icons.cloud_outlined,
+                        seg.contrail,
+                        detailColor,
+                      ),
+                    for (final amenity in seg.amenities)
+                      _buildAmenityChip(
+                        _amenityIcon(amenity),
+                        amenity,
+                        detailColor,
+                      ),
                   ],
                 ),
               ],
@@ -217,6 +231,36 @@ class FlightSegmentTimeline extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildAmenityChip(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _amenityIcon(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('wi-fi') || lower.contains('wifi')) return Icons.wifi_rounded;
+    if (lower.contains('power') || lower.contains('usb')) return Icons.power_rounded;
+    if (lower.contains('video') || lower.contains('entertainment')) return Icons.ondemand_video_rounded;
+    if (lower.contains('seat') || lower.contains('reclin')) return Icons.airline_seat_recline_extra_rounded;
+    return Icons.check_circle_outline_rounded;
   }
 
   Widget _buildLayoverBanner(FlightLayover lay) {
@@ -240,6 +284,7 @@ class FlightSegmentTimeline extends StatelessWidget {
                   ? lay.text
                   : '${lay.duration} layover · ${lay.city.isNotEmpty ? lay.city : lay.airportName} (${lay.airportCode})',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -268,6 +313,7 @@ class FlightSegmentTimeline extends StatelessWidget {
             child: Text(
               'Layover at $airport',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),

@@ -70,16 +70,22 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
       backgroundColor: Colors.transparent, // Glassmorphism base
       elevation: 0,
       titleSpacing: (effectiveWidth < 350 || screenWidth < 400) ? 0 : NavigationToolbar.kMiddleSpacing,
-      flexibleSpace: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            color: Theme.of(context).colorScheme.surface.withValues(
-              alpha: 0.7,
-            ), // Translucent using theme surface
-          ),
-        ),
-      ),
+      flexibleSpace: kIsWeb
+          ? Container(
+              color: Theme.of(context).colorScheme.surface.withValues(
+                alpha: 0.95,
+              ),
+            )
+          : ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  color: Theme.of(context).colorScheme.surface.withValues(
+                    alpha: 0.7,
+                  ),
+                ),
+              ),
+            ),
       title: GestureDetector(
         onTap: () {
           showDialog(

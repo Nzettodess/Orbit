@@ -129,6 +129,7 @@ class _FlightCardState extends State<FlightCard> {
                                   ? AppColors.darkPrimary
                                   : AppColors.lightPrimary,
                             ),
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -175,7 +176,7 @@ class _FlightCardState extends State<FlightCard> {
                                       ? AppColors.darkSecondary
                                       : AppColors.lightSecondary,
                                 ),
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
@@ -265,7 +266,7 @@ class _FlightCardState extends State<FlightCard> {
                                       ? AppColors.darkSecondary
                                       : AppColors.lightSecondary,
                                 ),
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.end,
                               ),

@@ -44,6 +44,8 @@ class FlightSegment {
   final String airline;
   final String delayInfo;
   final String emissions;
+  final List<String> amenities;
+  final String contrail;
 
   const FlightSegment({
     this.departureAirport = '',
@@ -59,6 +61,8 @@ class FlightSegment {
     this.airline = '',
     this.delayInfo = '',
     this.emissions = '',
+    this.amenities = const [],
+    this.contrail = '',
   });
 
   factory FlightSegment.fromJson(Map<String, dynamic> json) {
@@ -76,6 +80,11 @@ class FlightSegment {
       airline: json['airline'] as String? ?? '',
       delayInfo: json['delayInfo'] as String? ?? '',
       emissions: json['emissions'] as String? ?? '',
+      amenities: (json['amenities'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      contrail: json['contrail'] as String? ?? '',
     );
   }
 
@@ -93,6 +102,8 @@ class FlightSegment {
     'airline': airline,
     'delayInfo': delayInfo,
     'emissions': emissions,
+    'amenities': amenities,
+    'contrail': contrail,
   };
 }
 

@@ -23,20 +23,20 @@
   <meta name="description"
     content="Orbit: Keep your world in sync. A location and calendar coordination app for groups.">
 
-  <!-- Viewport for mobile responsiveness (CRITICAL for PWA) -->
+  <!-- Viewport for mobile responsiveness & Dynamic Island edge-to-edge (CRITICAL for iOS PWA) -->
   <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, interactive-widget=resizes-content">
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover, interactive-widget=resizes-content">
 
-  <!-- Theme color for browser chrome (supports dark/light mode) -->
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#673AB7">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212">
+  <!-- Theme color for browser chrome & Dynamic Island (supports dark/light mode) -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F2F7">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
 
   <!-- Prevent automatic detection/formatting of phone numbers, emails, addresses -->
   <meta name="format-detection" content="telephone=no">
 
-  <!-- iOS meta tags & icons -->
+  <!-- iOS meta tags & icons: black-translucent allows edge-to-edge under Dynamic Island & notch -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Orbit">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -58,7 +58,7 @@
       visibility: visible;
     }
 
-    /* PWA Keyboard/Viewport Fix: Force height to fill dynamic viewport */
+    /* PWA Keyboard/Viewport Fix & Dynamic Island Background: Default to OLED dark */
     html,
     body {
       height: 100dvh !important;
@@ -66,9 +66,17 @@
       margin: 0;
       padding: 0;
       overflow: hidden !important;
+      background-color: #000000;
       /* Remove position: fixed; for Android stability */
       top: 0;
       left: 0;
+    }
+
+    @media (prefers-color-scheme: light) {
+      html,
+      body {
+        background-color: #F2F2F7;
+      }
     }
 
     flt-glass-pane,
@@ -456,6 +464,19 @@
       // Expose function to check if app is already installed
       window.isAppInstalled = function () {
         return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      };
+
+      // Dynamic Island & Theme Color sync for iOS Safari PWA
+      window.updateOrbitTheme = function (isDark) {
+        var color = isDark ? '#000000' : '#F2F2F7';
+        document.documentElement.style.backgroundColor = color;
+        if (document.body) {
+          document.body.style.backgroundColor = color;
+        }
+        var metas = document.querySelectorAll('meta[name="theme-color"]');
+        metas.forEach(function (m) {
+          m.setAttribute('content', color);
+        });
       };
 
       // Show banner for iOS after short delay

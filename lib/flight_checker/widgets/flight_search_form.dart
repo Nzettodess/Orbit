@@ -14,6 +14,7 @@ class FlightSearchForm extends StatefulWidget {
   final FlightSearchParams initialParams;
   final ValueChanged<FlightSearchParams> onSearch;
   final ValueChanged<String>? onCurrencyChanged;
+  final ValueChanged<String>? onTripTypeChanged;
   final bool isLoading;
 
   const FlightSearchForm({
@@ -21,6 +22,7 @@ class FlightSearchForm extends StatefulWidget {
     required this.initialParams,
     required this.onSearch,
     this.onCurrencyChanged,
+    this.onTripTypeChanged,
     required this.isLoading,
   });
 
@@ -46,12 +48,8 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
     final initialOrigin = AirportHelper.findBestAirport(widget.initialParams.origin);
     final initialDest = AirportHelper.findBestAirport(widget.initialParams.destination);
 
-    _originController = TextEditingController(
-      text: initialOrigin.isNotEmpty ? initialOrigin : widget.initialParams.origin,
-    );
-    _destinationController = TextEditingController(
-      text: initialDest.isNotEmpty ? initialDest : widget.initialParams.destination,
-    );
+    _originController = TextEditingController(text: initialOrigin.isNotEmpty ? initialOrigin : widget.initialParams.origin);
+    _destinationController = TextEditingController(text: initialDest.isNotEmpty ? initialDest : widget.initialParams.destination);
 
     _tripType = widget.initialParams.tripType;
     _departureDate = DateTime.tryParse(widget.initialParams.departureDate) ??
@@ -141,40 +139,77 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
         _buildTripTypeSelector(isDark),
         const SizedBox(height: 14),
 
-        // 2. If Multi-City, show specialized handoff notice
-        if (_tripType == 'multicity') ...[
-          _buildMultiCityBanner(isDark),
-        ] else ...[
-          // Origin & Destination with Autocomplete and Swap button
-          Row(
-            children: [
-              Expanded(
-                child: AirportAutocompleteField(
-                  controller: _originController,
-                  label: 'From',
-                  hint: 'Origin city or airport…',
-                  icon: Icons.flight_takeoff_rounded,
-                  bg: fieldBg,
-                  isDark: isDark,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.swap_horiz_rounded),
-                tooltip: 'Swap locations',
-                onPressed: _swapLocations,
-                color: AppColors.iosBlue,
-              ),
-              Expanded(
-                child: AirportAutocompleteField(
-                  controller: _destinationController,
-                  label: 'To',
-                  hint: 'Destination city or airport…',
-                  icon: Icons.flight_land_rounded,
-                  bg: fieldBg,
-                  isDark: isDark,
-                ),
-              ),
-            ],
+        // Origin & Destination with Autocomplete and Swap button (Responsive)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+              final isCompact = constraints.maxWidth < 380 ||
+                  (constraints.maxWidth < 460 && textScale > 1.15);
+
+              final fromField = AirportAutocompleteField(
+                controller: _originController,
+                label: 'From',
+                hint: 'Origin city or airport…',
+                icon: Icons.flight_takeoff_rounded,
+                bg: fieldBg,
+                isDark: isDark,
+              );
+
+              final toField = AirportAutocompleteField(
+                controller: _destinationController,
+                label: 'To',
+                hint: 'Destination city or airport…',
+                icon: Icons.flight_land_rounded,
+                bg: fieldBg,
+                isDark: isDark,
+              );
+
+              if (isCompact) {
+                return Column(
+                  children: [
+                    fromField,
+                    const SizedBox(height: 6),
+                    Center(
+                      child: InkWell(
+                        onTap: _swapLocations,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: fieldBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.iosBlue.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.swap_vert_rounded, size: 15, color: AppColors.iosBlue),
+                              const SizedBox(width: 4),
+                              Text('Swap', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.iosBlue)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    toField,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: fromField),
+                  IconButton(
+                    icon: const Icon(Icons.swap_horiz_rounded),
+                    tooltip: 'Swap locations',
+                    onPressed: _swapLocations,
+                    color: AppColors.iosBlue,
+                  ),
+                  Expanded(child: toField),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
 
@@ -209,42 +244,42 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
           // Passengers, Class & Currency Row (Responsive for mobile viewports)
           LayoutBuilder(
             builder: (context, constraints) {
+              final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+              final isVeryNarrow = constraints.maxWidth < 340 || textScale > 1.2;
               final isNarrow = constraints.maxWidth < 450;
+              final passTile = PassengerTile(
+                adults: _adults,
+                children: _children,
+                isExpanded: _showPassengerPicker,
+                onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker),
+                bg: fieldBg,
+                isDark: isDark,
+              );
+
               if (isNarrow) {
                 return Column(
                   children: [
-                    PassengerTile(
-                      adults: _adults,
-                      children: _children,
-                      isExpanded: _showPassengerPicker,
-                      onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker),
-                      bg: fieldBg,
-                      isDark: isDark,
-                    ),
+                    passTile,
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: _buildClassDropdown(fieldBg, isDark)),
-                        const SizedBox(width: 8),
-                        Expanded(child: _buildCurrencyDropdown(fieldBg, isDark)),
-                      ],
-                    ),
+                    if (isVeryNarrow) ...[
+                      _buildClassDropdown(fieldBg, isDark),
+                      const SizedBox(height: 10),
+                      _buildCurrencyDropdown(fieldBg, isDark),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Expanded(child: _buildClassDropdown(fieldBg, isDark)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildCurrencyDropdown(fieldBg, isDark)),
+                        ],
+                      ),
+                    ],
                   ],
                 );
               }
               return Row(
                 children: [
-                  Expanded(
-                    flex: 3,
-                    child: PassengerTile(
-                      adults: _adults,
-                      children: _children,
-                      isExpanded: _showPassengerPicker,
-                      onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker),
-                      bg: fieldBg,
-                      isDark: isDark,
-                    ),
-                  ),
+                  Expanded(flex: 3, child: passTile),
                   const SizedBox(width: 8),
                   Expanded(flex: 2, child: _buildClassDropdown(fieldBg, isDark)),
                   const SizedBox(width: 8),
@@ -279,18 +314,13 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
               elevation: 0,
             ),
             icon: widget.isLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.search_rounded, size: 18),
             label: Text(
               widget.isLoading ? 'Searching flights…' : 'Find Flights',
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
             ),
           ),
-        ],
       ],
     );
   }
@@ -306,7 +336,6 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
         children: [
           _buildSegment('oneway', 'One-Way'),
           _buildSegment('roundtrip', 'Round-Trip'),
-          _buildSegment('multicity', 'Multi-City'),
         ],
       ),
     );
@@ -316,7 +345,10 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
     final isSelected = _tripType == key;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _tripType = key),
+        onTap: () {
+          setState(() => _tripType = key);
+          widget.onTripTypeChanged?.call(key);
+        },
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -325,12 +357,15 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.center,
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isSelected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? AppColors.darkSecondary : AppColors.lightSecondary),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? AppColors.darkSecondary : AppColors.lightSecondary),
+              ),
             ),
           ),
         ),
@@ -378,10 +413,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
       {'value': 'business', 'label': 'Business'},
       {'value': 'first', 'label': 'First'},
     ];
-    final display = items.firstWhere(
-      (i) => i['value'] == _cabinClass,
-      orElse: () => items.first,
-    )['label']!;
+    final display = items.firstWhere((i) => i['value'] == _cabinClass, orElse: () => items.first)['label']!;
     return PopupSelectorField(
       label: 'Class',
       value: _cabinClass,
@@ -394,9 +426,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
   }
 
   Widget _buildCurrencyDropdown(Color bg, bool isDark) {
-    final items = CurrencyHelper.supportedCurrencies
-        .map((c) => {'value': c['code']!, 'label': c['label']!})
-        .toList();
+    final items = CurrencyHelper.supportedCurrencies.map((c) => {'value': c['code']!, 'label': c['label']!}).toList();
     return PopupSelectorField(
       label: 'Currency',
       value: _currency,
@@ -408,54 +438,6 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
       },
       bg: bg,
       isDark: isDark,
-    );
-  }
-
-  Widget _buildMultiCityBanner(bool isDark) {
-    final fallbackUrl = FlightService.buildGoogleFlightsFallbackUrl(
-      FlightSearchParams(
-        origin: _originController.text,
-        destination: _destinationController.text,
-        departureDate: DateFormat('yyyy-MM-dd').format(_departureDate),
-        tripType: 'multicity',
-      ),
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.iosBlue.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.iosBlue.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.info_outline_rounded, color: AppColors.iosBlue, size: 18),
-              const SizedBox(width: 8),
-              const Text('Multi-City Route Planning', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Multi-city routes require interactive leg-by-leg selection. Open Google Flights directly to configure complex itineraries with real-time seat availability.',
-            style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            onPressed: () => FlightService.launchFlightUrl(fallbackUrl),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.iosBlue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            icon: const Icon(Icons.open_in_new_rounded, size: 16),
-            label: const Text('Configure on Google Flights', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -106,6 +106,8 @@ class AirportAutocompleteField extends StatelessWidget {
                         title: Text(
                           option.shortLabel,
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
                           '${option.name}, ${option.country}',

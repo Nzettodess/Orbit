@@ -102,5 +102,39 @@ void main() {
       expect(find.text('RM 120'), findsNWidgets(2));
       expect(find.text('RM 250'), findsOneWidget);
     });
+
+    testWidgets('Trip type selector only provides Round-Trip and One-Way, with Multi-City completely removed', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: FlightCheckerDialog(
+              initialOrigin: 'KUL',
+              initialDestination: 'SIN',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Multi-City tab should NOT exist anywhere in the dialog
+      expect(find.text('Multi-City'), findsNothing);
+      expect(find.text('Multi-City Route Planning'), findsNothing);
+
+      // Round-Trip and One-Way tabs are present
+      final roundTripTab = find.text('Round-Trip');
+      final oneWayTab = find.text('One-Way');
+      expect(roundTripTab, findsOneWidget);
+      expect(oneWayTab, findsOneWidget);
+
+      // Tap Round-Trip and verify Return date field appears
+      await tester.tap(roundTripTab);
+      await tester.pumpAndSettle();
+      expect(find.text('Return'), findsOneWidget);
+
+      // Tap One-Way and verify Return date field disappears
+      await tester.tap(oneWayTab);
+      await tester.pumpAndSettle();
+      expect(find.text('Return'), findsNothing);
+    });
   });
 }

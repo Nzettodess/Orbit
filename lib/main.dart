@@ -9,6 +9,8 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
+import 'package:flutter/services.dart';
+import 'services/pwa_service.dart';
 import 'theme.dart';
 import 'home.dart';
 
@@ -147,10 +149,34 @@ class _MyAppState extends State<MyApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: _themeMode,
       builder: (context, child) {
-        // Apply custom text scale factor for accessibility
+        final brightness = MediaQuery.of(context).platformBrightness;
+        final isDark = _themeMode == ThemeMode.dark ||
+            (_themeMode == ThemeMode.system && brightness == Brightness.dark);
+
+        // Synchronize native system overlay (iOS status bar & Android nav bar)
+        SystemChrome.setSystemUIOverlayStyle(
+          SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+            statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+            systemNavigationBarColor:
+                isDark ? Colors.black : const Color(0xFFF2F2F7),
+            systemNavigationBarIconBrightness:
+                isDark ? Brightness.light : Brightness.dark,
+          ),
+        );
+
+        // Synchronize PWA meta theme-color & Dynamic Island background on Web
+        PWAService().updateThemeColor(isDark);
+
+        // Apply clamped text scale factor to prevent UI overflows on narrow devices
+        final systemScaler = MediaQuery.of(context).textScaler;
+        final effectiveScale = (systemScaler.scale(1.0) * _textScaleFactor)
+            .clamp(0.85, 1.25);
+
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(_textScaleFactor),
+            textScaler: TextScaler.linear(effectiveScale),
           ),
           child: child!,
         );

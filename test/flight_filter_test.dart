@@ -153,6 +153,15 @@ void main() {
       expect(sorted.last.departure.time, equals('14:30'));
     });
 
+    test('Sorting by Departure: Latest', () {
+      final sorted = FlightFilterHelper.applyFiltersAndSort(
+        allFlights,
+        const FlightFilterCriteria(sortBy: FlightSortBy.departureLatest),
+      );
+      expect(sorted.first.departure.time, equals('14:30'));
+      expect(sorted.last.departure.time, equals('06:15'));
+    });
+
     test('Sorting by Nonstop First', () {
       final sorted = FlightFilterHelper.applyFiltersAndSort(
         allFlights,

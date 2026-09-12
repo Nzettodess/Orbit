@@ -152,6 +152,20 @@ function parseStructuredBlock(block, curr, fallbackUrl) {
       // Estimate CO2
       const co2Kg = seg[31] ? Math.round(seg[31] / 1000) : 0;
 
+      // In-flight amenities flags
+      const amenities = [];
+      const flags = Array.isArray(seg[12]) ? seg[12] : [];
+      if (flags[1] === 1) amenities.push('Free Wi-Fi');
+      if (flags[9] === 1) amenities.push('In-seat power & USB outlets');
+      if (flags[11] === 2 || flags[11] === 3) amenities.push('On-demand video');
+      if (flags[5] === 1) amenities.push('Extra reclining seat');
+
+      // Contrail warming potential
+      let contrail = '';
+      if (seg[32] === 1) contrail = 'Contrail: Low';
+      else if (seg[32] === 2) contrail = 'Contrail: Medium';
+      else if (seg[32] === 3) contrail = 'Contrail: High';
+
       segments.push({
         departureAirport: segDepName,
         departureCode: segDepCode,
@@ -166,6 +180,8 @@ function parseStructuredBlock(block, curr, fallbackUrl) {
         airline: segAirline,
         delayInfo: '',
         emissions: co2Kg ? `${co2Kg} kg CO2e` : '',
+        amenities,
+        contrail,
       });
     }
 
@@ -208,60 +224,63 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const params = req.method === 'POST' ? (req.body || {}) : req.query;
-  const rawOrigin = (params.origin || '').trim();
-  const rawDestination = (params.destination || '').trim();
-  const departureDate = (params.departureDate || '').trim();
-  const returnDate = (params.returnDate || '').trim();
-  const tripType = (params.tripType || 'oneway').toLowerCase();
-  const adults = Math.max(1, parseInt(params.adults, 10) || 1);
-  const children = Math.max(0, parseInt(params.children, 10) || 0);
-  const cabinClass = (params.cabinClass || 'economy').toLowerCase();
-  const currency = (params.currency || 'MYR').toUpperCase();
-
-  const origin = normalizeLocation(rawOrigin) || rawOrigin;
-  const destination = normalizeLocation(rawDestination) || rawDestination;
-
-  let fallbackQuery = `Flights from ${origin || 'here'} to ${destination || 'anywhere'}`;
-  if (departureDate) fallbackQuery += ` on ${departureDate}`;
-  if (tripType === 'roundtrip' && returnDate) fallbackQuery += ` through ${returnDate}`;
-  const fallbackUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(fallbackQuery)}&curr=${currency}&hl=en`;
-
-  if (tripType === 'multicity') {
-    return res.status(200).json({
-      success: true,
-      isMultiCity: true,
-      message: 'Multi-city routes are best explored directly on Google Flights.',
-      flights: [],
-      fallbackUrl,
-    });
-  }
-
-  if (!origin || !destination || !departureDate) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing required parameters: origin, destination, and departureDate are required.',
-      fallbackUrl,
-    });
-  }
-
-  let query = `Flights from ${origin} to ${destination} on ${departureDate}`;
-  if (tripType === 'roundtrip' && returnDate) {
-    query += ` through ${returnDate}`;
-  } else {
-    query += ' one way';
-  }
-
-  if (cabinClass === 'business') query += ' business class';
-  else if (cabinClass === 'first') query += ' first class';
-  else if (cabinClass === 'premiumeconomy') query += ' premium economy';
-
-  if (adults > 1) query += ` ${adults} adults`;
-  if (children > 0) query += ` ${children} children`;
-
-  const searchUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}&curr=${currency}&hl=en`;
+  let searchUrl = 'https://www.google.com/travel/flights?hl=en';
+  let fallbackUrl = searchUrl;
 
   try {
+    const params = req.method === 'POST' ? (req.body || {}) : req.query;
+    const rawOrigin = (params.origin || '').trim();
+    const rawDestination = (params.destination || '').trim();
+    const departureDate = (params.departureDate || '').trim();
+    const returnDate = (params.returnDate || '').trim();
+    const tripType = (params.tripType || 'oneway').toLowerCase();
+    const adults = Math.max(1, parseInt(params.adults, 10) || 1);
+    const children = Math.max(0, parseInt(params.children, 10) || 0);
+    const cabinClass = (params.cabinClass || 'economy').toLowerCase();
+    const currency = (params.currency || 'MYR').toUpperCase();
+
+    const origin = normalizeLocation(rawOrigin) || rawOrigin;
+    const destination = normalizeLocation(rawDestination) || rawDestination;
+
+    let fallbackQuery = `Flights from ${origin || 'here'} to ${destination || 'anywhere'}`;
+    if (departureDate) fallbackQuery += ` on ${departureDate}`;
+    if (tripType === 'roundtrip' && returnDate) fallbackQuery += ` through ${returnDate}`;
+    fallbackUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(fallbackQuery)}&curr=${currency}&hl=en`;
+    searchUrl = fallbackUrl;
+
+    if (tripType === 'multicity') {
+      return res.status(200).json({
+        success: true,
+        isMultiCity: true,
+        message: 'Multi-city routes are best explored directly on Google Flights.',
+        flights: [],
+        fallbackUrl,
+      });
+    }
+
+    if (!origin || !destination || !departureDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameters: origin, destination, and departureDate are required.',
+        fallbackUrl,
+      });
+    }
+
+    let query = `Flights from ${origin} to ${destination} on ${departureDate}`;
+    if (tripType === 'roundtrip' && returnDate) {
+      query += ` through ${returnDate}`;
+    } else {
+      query += ' one way';
+    }
+
+    if (cabinClass === 'business') query += ' business class';
+    else if (cabinClass === 'first') query += ' first class';
+    else if (cabinClass === 'premiumeconomy') query += ' premium economy';
+
+    if (adults > 1) query += ` ${adults} adults`;
+    if (children > 0) query += ` ${children} children`;
+
+    searchUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}&curr=${currency}&hl=en`;
     const response = await fetch(searchUrl, {
       signal: AbortSignal.timeout(15000),
       headers: {

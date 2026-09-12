@@ -1,0 +1,12 @@
+{
+  "name": "orbit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "api:start": "node api/local-dev-server.js",
+    "api:dev": "node --watch api/local-dev-server.js",
+    "api:test": "node api/test-server.mjs",
+    "test": "node api/test-server.mjs"
+  }
+}
