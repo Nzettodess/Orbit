@@ -9,6 +9,7 @@ import 'widgets/flight_checker_status_views.dart';
 import 'widgets/flight_filter_bar.dart';
 import 'widgets/flight_leg_section_header.dart';
 import 'widgets/flight_leg_tab_bar.dart';
+import 'widgets/flight_results_header_bar.dart';
 import 'widgets/flight_search_form.dart';
 
 /// Modal dialog for querying flight prices with Google Flights fallback
@@ -37,6 +38,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   FlightFilterCriteria _filterCriteria = const FlightFilterCriteria();
   bool _isDepartingExpanded = true;
   bool _isReturningExpanded = true;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -64,6 +66,60 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         _performSearch(_currentParams);
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _toggleAllLegs() {
+    final anyOpen = _isDepartingExpanded || _isReturningExpanded;
+    if (anyOpen) {
+      if (_scrollController.hasClients && _scrollController.offset > 0) {
+        _scrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+        );
+      }
+      setState(() {
+        _isDepartingExpanded = false;
+        _isReturningExpanded = false;
+      });
+    } else {
+      setState(() {
+        _isDepartingExpanded = true;
+        _isReturningExpanded = true;
+      });
+    }
+  }
+
+  void _toggleDeparting() {
+    if (_isDepartingExpanded &&
+        _scrollController.hasClients &&
+        _scrollController.offset > 0) {
+      _scrollController.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    setState(() => _isDepartingExpanded = !_isDepartingExpanded);
+  }
+
+  void _toggleReturning() {
+    if (_isReturningExpanded &&
+        _scrollController.hasClients &&
+        _scrollController.offset > 0) {
+      _scrollController.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    setState(() => _isReturningExpanded = !_isReturningExpanded);
   }
 
   void _handleCurrencyChanged(String newCurrency) {
@@ -167,6 +223,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
             Expanded(
               child: ClipRect(
                 child: SingleChildScrollView(
+                  controller: _scrollController,
                   padding: EdgeInsets.all(isMobile ? 12 : 18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -264,74 +321,14 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           FlightPriceRangeInsight(priceRange: priceRange, isDark: isDark),
           const SizedBox(height: 12),
         ],
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Text(
-                    'Found $totalFoundCount Flights',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (isRoundTrip) ...[
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () {
-                        final anyOpen = _isDepartingExpanded || _isReturningExpanded;
-                        setState(() {
-                          _isDepartingExpanded = !anyOpen;
-                          _isReturningExpanded = !anyOpen;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              (_isDepartingExpanded || _isReturningExpanded)
-                                  ? Icons.unfold_less_rounded
-                                  : Icons.unfold_more_rounded,
-                              size: 13,
-                              color: AppColors.iosBlue,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              (_isDepartingExpanded || _isReturningExpanded)
-                                  ? 'Collapse'
-                                  : 'Expand',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.iosBlue,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () =>
-                  FlightService.launchFlightUrl(_response!.fallbackUrl),
-              icon: const Icon(Icons.open_in_new_rounded, size: 14),
-              label: const Text(
-                'Open in Google Flights',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
-          ],
+        FlightResultsHeaderBar(
+          totalFoundCount: totalFoundCount,
+          isRoundTrip: isRoundTrip,
+          isAllExpanded: _isDepartingExpanded || _isReturningExpanded,
+          onToggleAllExpanded: isRoundTrip ? _toggleAllLegs : null,
+          onOpenGoogleFlights: () =>
+              FlightService.launchFlightUrl(_response!.fallbackUrl),
+          isDark: isDark,
         ),
         const SizedBox(height: 8),
         FlightFilterBar(
@@ -364,8 +361,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
               isDark: isDark,
               isCollapsible: true,
               isExpanded: _isDepartingExpanded,
-              onToggleExpand: () =>
-                  setState(() => _isDepartingExpanded = !_isDepartingExpanded),
+              onToggleExpand: _toggleDeparting,
               flights: filteredOutbound,
               bestFlight: bestOutbound,
               legPrefix: 'outbound',
@@ -397,8 +393,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
               isDark: isDark,
               isCollapsible: true,
               isExpanded: _isReturningExpanded,
-              onToggleExpand: () =>
-                  setState(() => _isReturningExpanded = !_isReturningExpanded),
+              onToggleExpand: _toggleReturning,
               flights: filteredReturn,
               bestFlight: bestReturn,
               legPrefix: 'return',

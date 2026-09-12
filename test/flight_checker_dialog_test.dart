@@ -5,6 +5,7 @@ import 'package:whereabouts/flight_checker/models/flight_info.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_card.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_leg_section_header.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_leg_tab_bar.dart';
+import 'package:whereabouts/flight_checker/widgets/flight_results_header_bar.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -273,5 +274,100 @@ void main() {
       await tester.pumpAndSettle();
       expect(toggled, isTrue);
     });
+
+    testWidgets('FlightResultsHeaderBar renders Found count, Collapse button, and triggers callbacks', (tester) async {
+      bool toggleClicked = false;
+      bool googleFlightsClicked = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FlightResultsHeaderBar(
+              totalFoundCount: 24,
+              isRoundTrip: true,
+              isAllExpanded: true,
+              onToggleAllExpanded: () => toggleClicked = true,
+              onOpenGoogleFlights: () => googleFlightsClicked = true,
+              isDark: false,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Found 24 Flights'), findsOneWidget);
+      expect(find.text('Collapse'), findsOneWidget);
+      expect(find.text('Open in Google Flights'), findsOneWidget);
+
+      await tester.tap(find.text('Collapse'));
+      await tester.pumpAndSettle();
+      expect(toggleClicked, isTrue);
+
+      await tester.tap(find.text('Open in Google Flights'));
+      await tester.pumpAndSettle();
+      expect(googleFlightsClicked, isTrue);
+    });
+
+    testWidgets('FlightLegSection animates SizeTransition correctly on collapse and expand', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: FlightLegSection(
+                title: 'Departing Flights',
+                routeSubtitle: 'KUL → SIN',
+                date: '2026-10-15',
+                count: 1,
+                currency: 'MYR',
+                icon: Icons.flight_takeoff_rounded,
+                isDark: false,
+                isCollapsible: true,
+                isExpanded: true,
+                flights: [mockFlight1],
+                bestFlight: mockFlight1,
+                legPrefix: 'outbound',
+                legName: 'departing',
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('AirAsia'), findsOneWidget);
+
+      // Now rebuild with isExpanded = false
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: FlightLegSection(
+                title: 'Departing Flights',
+                routeSubtitle: 'KUL → SIN',
+                date: '2026-10-15',
+                count: 1,
+                currency: 'MYR',
+                icon: Icons.flight_takeoff_rounded,
+                isDark: false,
+                isCollapsible: true,
+                isExpanded: false,
+                flights: [mockFlight1],
+                bestFlight: mockFlight1,
+                legPrefix: 'outbound',
+                legName: 'departing',
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Wait for SizeTransition animation to finish smoothly
+      await tester.pumpAndSettle();
+
+      // Find the SizeTransition widget and assert its sizeFactor is 0.0
+      final sizeTransitionFinder = find.byType(SizeTransition);
+      expect(sizeTransitionFinder, findsOneWidget);
+      final sizeTransitionWidget = tester.widget<SizeTransition>(sizeTransitionFinder);
+      expect(sizeTransitionWidget.sizeFactor.value, equals(0.0));
+    });
   });
 }
+

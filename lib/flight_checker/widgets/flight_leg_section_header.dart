@@ -340,7 +340,7 @@ class FlightLegCardsList extends StatelessWidget {
 }
 
 /// Composite expandable/collapsible flight leg section with smooth transition.
-class FlightLegSection extends StatelessWidget {
+class FlightLegSection extends StatefulWidget {
   final String title;
   final String routeSubtitle;
   final String date;
@@ -379,54 +379,85 @@ class FlightLegSection extends StatelessWidget {
   });
 
   @override
+  State<FlightLegSection> createState() => _FlightLegSectionState();
+}
+
+class _FlightLegSectionState extends State<FlightLegSection>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _sizeFactor;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+      value: widget.isExpanded ? 1.0 : 0.0,
+    );
+    _sizeFactor = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+  }
+
+  @override
+  void didUpdateWidget(FlightLegSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isExpanded != oldWidget.isExpanded) {
+      if (widget.isExpanded) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final content = widget.flights.isEmpty
+        ? FlightEmptyLegNotice(legName: widget.legName, isDark: widget.isDark)
+        : FlightLegCardsList(
+            flights: widget.flights,
+            lowestPrice: widget.lowestPrice,
+            bestFlight: widget.bestFlight,
+            legPrefix: widget.legPrefix,
+          );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         FlightLegSectionHeader(
-          title: title,
-          routeSubtitle: routeSubtitle,
-          date: date,
-          count: count,
-          lowestPrice: lowestPrice,
-          currency: currency,
-          icon: icon,
-          accentColor: accentColor,
-          isDark: isDark,
-          isCollapsible: isCollapsible,
-          isExpanded: isExpanded,
-          onToggleExpand: onToggleExpand,
+          title: widget.title,
+          routeSubtitle: widget.routeSubtitle,
+          date: widget.date,
+          count: widget.count,
+          lowestPrice: widget.lowestPrice,
+          currency: widget.currency,
+          icon: widget.icon,
+          accentColor: widget.accentColor,
+          isDark: widget.isDark,
+          isCollapsible: widget.isCollapsible,
+          isExpanded: widget.isExpanded,
+          onToggleExpand: widget.onToggleExpand,
         ),
         const SizedBox(height: 6),
-        if (isCollapsible)
-          AnimatedCrossFade(
-            firstChild: flights.isEmpty
-                ? FlightEmptyLegNotice(legName: legName, isDark: isDark)
-                : FlightLegCardsList(
-                    flights: flights,
-                    lowestPrice: lowestPrice,
-                    bestFlight: bestFlight,
-                    legPrefix: legPrefix,
-                  ),
-            secondChild: const SizedBox(width: double.infinity, height: 0),
-            crossFadeState: isExpanded
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
-            duration: const Duration(milliseconds: 180),
-            firstCurve: Curves.easeOutQuad,
-            secondCurve: Curves.easeInQuad,
-            sizeCurve: Curves.fastOutSlowIn,
+        if (widget.isCollapsible)
+          SizeTransition(
+            sizeFactor: _sizeFactor,
+            axisAlignment: -1.0,
+            child: RepaintBoundary(child: content),
           )
         else
-          flights.isEmpty
-              ? FlightEmptyLegNotice(legName: legName, isDark: isDark)
-              : FlightLegCardsList(
-                  flights: flights,
-                  lowestPrice: lowestPrice,
-                  bestFlight: bestFlight,
-                  legPrefix: legPrefix,
-                ),
+          content,
       ],
     );
   }
