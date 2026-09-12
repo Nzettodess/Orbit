@@ -435,6 +435,7 @@ void main() {
       );
 
       expect(find.byIcon(Icons.warning_amber_rounded), findsNWidgets(2));
+      expect(find.text('Long wait time'), findsOneWidget);
       expect(find.text('6 hr 25 min CAN'), findsOneWidget);
       expect(find.text('1 stop'), findsOneWidget);
     });

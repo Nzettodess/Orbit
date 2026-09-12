@@ -144,10 +144,17 @@ class _FlightCardState extends State<FlightCard> {
                           ),
                           const SizedBox(width: 6),
                         ],
+                        if (hasLongLayover) ...[
+                          _buildTopBadge(
+                            text: 'Long wait time',
+                            icon: Icons.warning_amber_rounded,
+                            color: AppColors.iosRed,
+                          ),
+                          const SizedBox(width: 6),
+                        ],
                         _buildStopsBadge(
                           isNonstop: isNonstop,
                           text: stopsText,
-                          hasLongLayover: hasLongLayover,
                         ),
                       ],
                     ),
@@ -347,36 +354,21 @@ class _FlightCardState extends State<FlightCard> {
   Widget _buildStopsBadge({
     required bool isNonstop,
     required String text,
-    required bool hasLongLayover,
   }) {
-    final color = isNonstop
-        ? AppColors.iosGreen
-        : (hasLongLayover ? AppColors.iosRed : AppColors.iosOrange);
+    final color = isNonstop ? AppColors.iosGreen : AppColors.iosOrange;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
-        border: hasLongLayover
-            ? Border.all(color: AppColors.iosRed.withValues(alpha: 0.4), width: 0.8)
-            : null,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (hasLongLayover) ...[
-            const Icon(Icons.warning_amber_rounded, size: 12, color: AppColors.iosRed),
-            const SizedBox(width: 3),
-          ],
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
