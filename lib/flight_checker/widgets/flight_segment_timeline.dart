@@ -199,24 +199,6 @@ class FlightSegmentTimeline extends StatelessWidget {
                           ],
                         ),
                       ),
-                    if (seg.emissions.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.iosGreen.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          seg.emissions,
-                          style: TextStyle(fontSize: 10, color: AppColors.iosGreen, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    if (seg.contrail.isNotEmpty)
-                      _buildAmenityChip(
-                        Icons.cloud_outlined,
-                        seg.contrail,
-                        detailColor,
-                      ),
                     for (final amenity in seg.amenities)
                       _buildAmenityChip(
                         _amenityIcon(amenity),
