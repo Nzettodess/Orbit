@@ -186,37 +186,39 @@ export function normalizeLocation(raw) {
   // Strip emoji characters
   str = str.replace(/[\u{1F300}-\u{1F6FF}|\u{1F1E6}-\u{1F1FF}|\u{2700}-\u{27BF}]/gu, '').trim();
 
-  // Match "City (IATA)" format e.g. "Penang (PEN)" or "Tokyo (HND)"
+  // 1. Explicit IATA code in parentheses e.g. "Penang (PEN)", "Subang (SZB)", "Tokyo (HND)"
   const withCodeMatch = str.match(/^(.+?)\s*\(([A-Z0-9]{3})\)$/i);
   if (withCodeMatch) {
-    const cityName = withCodeMatch[1].trim();
-    const code = withCodeMatch[2].toUpperCase();
-    if (IATA_TO_CITY[code]) return IATA_TO_CITY[code];
-    return cityName;
+    return withCodeMatch[2].toUpperCase();
   }
 
-  // Standalone 3-letter IATA code e.g. "PEN", "KUL", "NRT"
-  const upper = str.toUpperCase();
-  if (IATA_TO_CITY[upper]) {
-    return IATA_TO_CITY[upper];
+  // 2. Standalone 3-letter IATA code e.g. "PEN", "SZB", "KUL", "NRT"
+  if (/^[A-Za-z0-9]{3}$/.test(str)) {
+    return str.toUpperCase();
   }
 
-  // Comma or bullet separated location e.g. "Penang, Malaysia" or "Tokyo, Japan"
+  // 3. Known special secondary/regional airport cities
+  const lower = str.toLowerCase();
+  if (lower === 'subang') return 'SZB';
+  if (lower === 'penang') return 'PEN';
+
+  // 4. Comma or bullet separated location e.g. "Penang (PEN), Malaysia" or "Penang, Malaysia"
   if (str.includes(',') || str.includes('•') || str.includes('-')) {
     const parts = str.split(/[,•-]/).map(s => s.trim()).filter(Boolean);
-    // Prefer the most specific city/state part that isn't a generic country
     for (const p of parts) {
-      const pUpper = p.toUpperCase();
-      if (IATA_TO_CITY[pUpper]) return IATA_TO_CITY[pUpper];
+      const codeMatch = p.match(/\(([A-Z0-9]{3})\)/i);
+      if (codeMatch) return codeMatch[1].toUpperCase();
+      if (/^[A-Za-z0-9]{3}$/.test(p)) return p.toUpperCase();
       const pLower = p.toLowerCase();
+      if (pLower === 'subang') return 'SZB';
+      if (pLower === 'penang') return 'PEN';
       if (!COUNTRY_TO_HUB[pLower] && p.length > 1) {
         return p;
       }
     }
   }
 
-  // Country name e.g. "Malaysia" -> "Kuala Lumpur"
-  const lower = str.toLowerCase();
+  // 5. Country name e.g. "Malaysia" -> "Kuala Lumpur"
   if (COUNTRY_TO_HUB[lower]) {
     return COUNTRY_TO_HUB[lower];
   }

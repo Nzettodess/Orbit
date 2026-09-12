@@ -222,7 +222,7 @@ export default async function handler(req, res) {
   const origin = normalizeLocation(rawOrigin) || rawOrigin;
   const destination = normalizeLocation(rawDestination) || rawDestination;
 
-  let fallbackQuery = `Flights to ${destination || 'anywhere'} from ${origin || 'here'}`;
+  let fallbackQuery = `Flights from ${origin || 'here'} to ${destination || 'anywhere'}`;
   if (departureDate) fallbackQuery += ` on ${departureDate}`;
   if (tripType === 'roundtrip' && returnDate) fallbackQuery += ` through ${returnDate}`;
   const fallbackUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(fallbackQuery)}&curr=${currency}&hl=en`;
@@ -245,7 +245,7 @@ export default async function handler(req, res) {
     });
   }
 
-  let query = `Flights to ${destination} from ${origin} on ${departureDate}`;
+  let query = `Flights from ${origin} to ${destination} on ${departureDate}`;
   if (tripType === 'roundtrip' && returnDate) {
     query += ` through ${returnDate}`;
   } else {
