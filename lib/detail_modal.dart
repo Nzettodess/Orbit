@@ -14,6 +14,7 @@ import 'edit_member_dialog.dart';
 import 'widgets/user_profile_dialog.dart';
 import 'widgets/rich_description_viewer.dart';
 import 'widgets/event_detail_dialog.dart';
+import 'flight_checker/flight_checker_dialog.dart';
 
 class DetailModal extends StatefulWidget {
   final DateTime date;
@@ -1104,6 +1105,30 @@ class _DetailModalState extends State<DetailModal> {
                                 tooltip: isPinned ? 'Unpin member' : 'Pin member to top',
                                 onPressed: () => _togglePin(element.userId),
                               ),
+                              // Check flights to this member's location on this date
+                              if (element.nation != "No location selected")
+                                IconButton(
+                                  icon: Icon(Icons.flight_takeoff_rounded, size: iconSize, color: Theme.of(context).colorScheme.primary),
+                                  padding: EdgeInsets.all(iconPadding),
+                                  constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
+                                  tooltip: 'Check flights to $name (${element.state != null && element.state!.isNotEmpty ? element.state : element.nation})',
+                                  onPressed: () {
+                                    final myLoc = widget.locations.where((l) => l.userId == widget.currentUserId).firstOrNull;
+                                    final originStr = myLoc != null && myLoc.nation != "No location selected"
+                                        ? "${myLoc.state != null && myLoc.state!.isNotEmpty ? '${myLoc.state}, ' : ''}${myLoc.nation}"
+                                        : '';
+                                    final destStr = "${element.state != null && element.state!.isNotEmpty ? '${element.state}, ' : ''}${element.nation}";
+
+                                    showDialog(
+                                      context: context,
+                                      builder: (dialogCtx) => FlightCheckerDialog(
+                                        initialOrigin: originStr.isNotEmpty ? originStr : null,
+                                        initialDestination: destStr,
+                                        initialDate: widget.date,
+                                      ),
+                                    );
+                                  },
+                                ),
 
                             ],
                           );

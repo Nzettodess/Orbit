@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models.dart';
+import '../core/theme/app_colors.dart';
+import '../flight_checker/flight_checker_dialog.dart';
 import 'rich_description_viewer.dart';
 
 /// A custom dialog for displaying event details with full markdown support.
@@ -125,7 +127,41 @@ class EventDetailDialog extends StatelessWidget {
                         venue: event.venue!,
                         style: const TextStyle(fontSize: 14),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () {
+                          Navigator.pop(context);
+                          showFlightCheckerDialog(
+                            context,
+                            destination: event.venue,
+                            date: event.date,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.flight_takeoff_rounded,
+                                size: 15,
+                                color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Check Flights to Venue ↗',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
                     ],
                     
                     // Description with full markdown support

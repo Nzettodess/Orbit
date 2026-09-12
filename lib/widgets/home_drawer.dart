@@ -15,6 +15,7 @@ class HomeDrawer extends StatelessWidget {
   final VoidCallback onBirthdayBabyTap;
   final VoidCallback onRSVPManagementTap;
   final VoidCallback onSettingsTap;
+  final VoidCallback? onFlightCheckerTap;
 
   const HomeDrawer({
     super.key,
@@ -27,6 +28,7 @@ class HomeDrawer extends StatelessWidget {
     required this.onBirthdayBabyTap,
     required this.onRSVPManagementTap,
     required this.onSettingsTap,
+    this.onFlightCheckerTap,
   });
 
   @override
@@ -102,6 +104,19 @@ class HomeDrawer extends StatelessWidget {
                             onRSVPManagementTap();
                           },
                         ),
+                        if (onFlightCheckerTap != null) ...[
+                          _buildDivider(context),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.flight_takeoff_rounded,
+                            iconColor: AppColors.iosBlue,
+                            title: 'Flights',
+                            onTap: () {
+                              Navigator.pop(context);
+                              onFlightCheckerTap!();
+                            },
+                          ),
+                        ],
                       ],
                     ),
                     

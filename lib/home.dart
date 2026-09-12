@@ -36,6 +36,8 @@ import 'widgets/skeleton_loading.dart';
 import 'widgets/delayed_empty_state.dart';
 import 'widgets/home_speed_dial.dart';
 import 'widgets/home_app_bar.dart';
+import 'flight_checker/flight_checker_dialog.dart';
+import 'flight_checker/utils/airport_data.dart';
 
 class HomeWithLogin extends StatefulWidget {
   const HomeWithLogin({super.key});
@@ -1389,6 +1391,27 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     );
   }
 
+  void _openFlightChecker({String? destination, DateTime? date}) {
+    String origin = '';
+    if (_user != null) {
+      final userDoc = _allUsers.firstWhere(
+        (u) => u['uid'] == _user!.uid,
+        orElse: () => <String, dynamic>{},
+      );
+      final defaultLoc = userDoc['defaultLocation'] as String?;
+      if (defaultLoc != null && defaultLoc.isNotEmpty) {
+        origin = AirportHelper.findBestAirport(defaultLoc);
+      }
+    }
+    final resolvedDest = AirportHelper.findBestAirport(destination);
+    showFlightCheckerDialog(
+      context,
+      origin: origin,
+      destination: resolvedDest.isNotEmpty ? resolvedDest : destination,
+      date: date,
+    );
+  }
+
   void _openLocationPicker() async {
     if (!_checkCanWrite()) return;
     if (_user == null) return;
@@ -1534,6 +1557,17 @@ class _HomeWithLoginState extends State<HomeWithLogin>
                       "to ${state != null ? '$state, ' : ''}$country for $dateRange",
                     ),
                     backgroundColor: Colors.green,
+                    duration: const Duration(seconds: 6),
+                    action: SnackBarAction(
+                      label: 'Check Flights ✈',
+                      textColor: Colors.white,
+                      onPressed: () {
+                        _openFlightChecker(
+                          destination: state != null && state.isNotEmpty ? '$country, $state' : country,
+                          date: startDate,
+                        );
+                      },
+                    ),
                   ),
                 );
               }
@@ -1776,6 +1810,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
                   RSVPManagementDialog(currentUserId: _user!.uid),
             );
           },
+          onFlightCheckerTap: () => _openFlightChecker(),
           onSettingsTap: () {
             if (!_checkCanWrite()) return;
             if (_user != null) {
