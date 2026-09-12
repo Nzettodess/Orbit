@@ -85,7 +85,7 @@ class _AirlineFilterDialogState extends State<AirlineFilterDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 480),
+        constraints: const BoxConstraints(maxWidth: 400, maxHeight: 500),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -179,16 +179,24 @@ class _AirlineFilterDialogState extends State<AirlineFilterDialog> {
 
             // 3. Footer actions
             Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
                   TextButton(
                     onPressed: _selectedAirlines.isNotEmpty ? _clearAll : null,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     child: Text(
                       'Clear',
                       style: TextStyle(
                         fontSize: 13,
-                        color: _selectedAirlines.isNotEmpty ? AppColors.iosRed : secondaryTextColor,
+                        fontWeight: FontWeight.w500,
+                        color: _selectedAirlines.isNotEmpty
+                            ? AppColors.iosRed
+                            : secondaryTextColor.withValues(alpha: 0.4),
                       ),
                     ),
                   ),
@@ -202,13 +210,14 @@ class _AirlineFilterDialogState extends State<AirlineFilterDialog> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.iosBlue,
                       foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     ),
                     child: Text(
                       _selectedAirlines.isEmpty || allSelected
-                          ? 'Show All Flights ($widget.totalCount)'
-                          : 'Apply ($selectedCount flights)',
+                          ? 'Show All (${widget.totalCount})'
+                          : 'Apply ($selectedCount)',
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                   ),
