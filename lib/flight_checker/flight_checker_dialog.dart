@@ -242,6 +242,9 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     final availableAirlines = FlightFilterHelper.getAvailableAirlines(
       _response!.flights,
     );
+    final airlineCounts = FlightFilterHelper.getAirlineCounts(
+      _response!.flights,
+    );
     final filteredFlights = FlightFilterHelper.applyFiltersAndSort(
       _response!.flights,
       _filterCriteria,
@@ -329,6 +332,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           criteria: _filterCriteria,
           onChanged: (updated) => setState(() => _filterCriteria = updated),
           availableAirlines: availableAirlines,
+          airlineCounts: airlineCounts,
           totalCount: _response!.flights.length,
           visibleCount: filteredFlights.length,
           isDark: isDark,

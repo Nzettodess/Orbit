@@ -116,6 +116,14 @@ void main() {
       },
     );
 
+    test('getAirlineCounts returns accurate frequency count map', () {
+      final counts = FlightFilterHelper.getAirlineCounts(allFlights);
+      expect(counts['AirAsia'], equals(1));
+      expect(counts['Malaysia Airlines'], equals(1));
+      expect(counts['Scoot'], equals(1));
+      expect(counts['Batik Air'], equals(1));
+    });
+
     test('Sorting by Price: Low to High', () {
       final sorted = FlightFilterHelper.applyFiltersAndSort(
         allFlights,

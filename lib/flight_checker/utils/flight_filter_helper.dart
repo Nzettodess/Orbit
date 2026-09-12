@@ -120,6 +120,18 @@ class FlightFilterHelper {
     return list;
   }
 
+  /// Extract frequency count of each airline across all returned flights
+  static Map<String, int> getAirlineCounts(List<FlightInfo> flights) {
+    final counts = <String, int>{};
+    for (final f in flights) {
+      final name = f.airline.trim();
+      if (name.isNotEmpty) {
+        counts[name] = (counts[name] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }
+
   /// Apply active stops filter, airline filter, and sort order to flight list
   static List<FlightInfo> applyFiltersAndSort(
     List<FlightInfo> flights,
