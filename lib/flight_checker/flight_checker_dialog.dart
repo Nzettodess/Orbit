@@ -315,18 +315,19 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           ),
           const SizedBox(height: 12),
         ],
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
-          runSpacing: 4,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              'Found ${_response!.flights.length} Flights',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+            Expanded(
+              child: Text(
+                'Found ${_response!.flights.length} Flights',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             TextButton.icon(

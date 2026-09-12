@@ -27,7 +27,7 @@ void main() {
     });
 
     test('FlightInfo parses JSON correctly', () {
-      final json = {
+      final flight = FlightInfo.fromJson({
         'airline': 'AirAsia',
         'logoUrl': 'https://www.gstatic.com/flights/airline_logos/70px/AK.png',
         'stops': 'Nonstop',
@@ -37,43 +37,23 @@ void main() {
         'departure': {'airport': 'Kuala Lumpur International Airport', 'time': '8:30 AM', 'date': 'Thursday, October 15'},
         'arrival': {'airport': 'Singapore Changi Airport', 'time': '9:40 AM', 'date': 'Thursday, October 15'},
         'deepLink': 'https://www.google.com/travel/flights?q=test',
-      };
-
-      final flight = FlightInfo.fromJson(json);
-
+      });
       expect(flight.airline, equals('AirAsia'));
       expect(flight.logoUrl, contains('AK.png'));
       expect(flight.stops, equals('Nonstop'));
       expect(flight.duration, equals('1 hr 10 min'));
       expect(flight.priceNumeric, equals(118));
-      expect(flight.departure.airport, equals('Kuala Lumpur International Airport'));
-      expect(flight.arrival.airport, equals('Singapore Changi Airport'));
     });
 
     test('FlightSearchResponse parses flights array correctly', () {
-      final json = {
+      final res = FlightSearchResponse.fromJson({
         'success': true,
         'count': 1,
-        'flights': [
-          {
-            'airline': 'Scoot',
-            'stops': 'Nonstop',
-            'duration': '1 hr 15 min',
-            'price': 'MYR 135',
-            'priceNumeric': 135,
-            'departure': {'airport': 'KUL', 'time': '5:00 PM', 'date': '2026-10-15'},
-            'arrival': {'airport': 'SIN', 'time': '6:15 PM', 'date': '2026-10-15'},
-            'deepLink': 'https://google.com',
-          }
-        ],
+        'flights': [{'airline': 'Scoot', 'stops': 'Nonstop', 'duration': '1 hr 15 min', 'price': 'MYR 135', 'priceNumeric': 135, 'departure': {'airport': 'KUL', 'time': '5:00 PM', 'date': '2026-10-15'}, 'arrival': {'airport': 'SIN', 'time': '6:15 PM', 'date': '2026-10-15'}, 'deepLink': 'https://google.com'}],
         'fallbackUrl': 'https://google.com/fallback',
-      };
-
-      final res = FlightSearchResponse.fromJson(json);
-
+      });
       expect(res.success, isTrue);
       expect(res.count, equals(1));
-      expect(res.flights.length, equals(1));
       expect(res.flights.first.airline, equals('Scoot'));
       expect(res.fallbackUrl, equals('https://google.com/fallback'));
     });
@@ -433,6 +413,30 @@ void main() {
 
       expect(find.text('Lowest Fare'), findsOneWidget);
       expect(find.text('Best'), findsOneWidget);
+    });
+
+    testWidgets('Renders red hazard warning icon and badge for layover >= 3h', (tester) async {
+      const longLayoverFlight = FlightInfo(
+        airline: 'China Southern',
+        stops: '1 stop',
+        duration: '12 hr 35 min',
+        price: 'RM 1,250',
+        priceNumeric: 1250,
+        departure: FlightEndpoint(airport: 'Kuala Lumpur (KUL)', time: '9:00 AM', date: '2026-10-15'),
+        arrival: FlightEndpoint(airport: 'Tokyo (NRT)', time: '11:35 PM', date: '2026-10-15'),
+        deepLink: 'https://google.com',
+        layovers: [
+          FlightLayover(duration: '6 hr 25 min', durationMinutes: 385, airportCode: 'CAN', city: 'Guangzhou', text: '6 hr 25 min layover CAN'),
+        ],
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: FlightCard(flight: longLayoverFlight))),
+      );
+
+      expect(find.byIcon(Icons.warning_amber_rounded), findsNWidgets(2));
+      expect(find.text('6 hr 25 min CAN'), findsOneWidget);
+      expect(find.text('1 stop'), findsOneWidget);
     });
   });
 

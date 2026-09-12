@@ -131,6 +131,13 @@ class FlightFilterHelper {
     return 1;
   }
 
+  /// Get accurate stops count from flight info, verifying layovers and segments
+  static int getFlightStopsCount(FlightInfo flight) {
+    if (flight.layovers.isNotEmpty) return flight.layovers.length;
+    if (flight.segments.length > 1) return flight.segments.length - 1;
+    return getStopsCount(flight.stops);
+  }
+
   /// Extract unique airline names in original appearance order
   static List<String> getAvailableAirlines(List<FlightInfo> flights) {
     final seen = <String>{};
@@ -161,7 +168,7 @@ class FlightFilterHelper {
   static double calculateConvenienceScore(FlightInfo flight) {
     final price = flight.priceNumeric > 0 ? flight.priceNumeric.toDouble() : 99999.0;
     final dur = parseDurationMinutes(flight.duration);
-    final stops = getStopsCount(flight.stops);
+    final stops = getFlightStopsCount(flight);
     return price + (dur * 0.4) + (stops * 80.0);
   }
 
@@ -192,10 +199,11 @@ class FlightFilterHelper {
     // 1. Filtering
     var list = flights.where((f) {
       // Stops filter
+      final stopsCount = getFlightStopsCount(f);
       if (criteria.stopsFilter == FlightStopsFilter.nonstopOnly) {
-        if (getStopsCount(f.stops) > 0) return false;
+        if (stopsCount > 0) return false;
       } else if (criteria.stopsFilter == FlightStopsFilter.maxOneStop) {
-        if (getStopsCount(f.stops) > 1) return false;
+        if (stopsCount > 1) return false;
       }
 
       // Airline filter (multi-select)

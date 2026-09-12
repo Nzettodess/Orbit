@@ -103,7 +103,7 @@ function parseStructuredBlock(block, curr, fallbackUrl) {
     const depAirportCode = flightData[3] || (rawSegments[0] ? rawSegments[0][3] : '');
     const arrAirportCode = flightData[6] || (rawSegments.length > 0 ? rawSegments[rawSegments.length - 1][6] : '');
     const totalDurationMin = flightData[9] || 0;
-    const stopsCount = flightData[10] || 0;
+    const rawStops = typeof flightData[10] === 'number' ? flightData[10] : 0;
 
     // Layovers
     const layovers = [];
@@ -185,6 +185,7 @@ function parseStructuredBlock(block, curr, fallbackUrl) {
       });
     }
 
+    const stopsCount = Math.max(rawStops, layovers.length, Math.max(0, rawSegments.length - 1));
     const stops = stopsCount === 0 ? 'Nonstop' : `${stopsCount} stop${stopsCount > 1 ? 's' : ''}`;
     const key = `${airlineName}-${totalDurationMin}-${priceNumeric}-${depAirportCode}-${arrAirportCode}`;
     if (seen.has(key)) continue;
