@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:whereabouts/flight_checker/models/flight_info.dart';
 import 'package:whereabouts/flight_checker/services/flight_service.dart';
 import 'package:whereabouts/flight_checker/utils/airport_data.dart';
+import 'package:whereabouts/flight_checker/utils/currency_helper.dart';
+import 'package:whereabouts/flight_checker/widgets/flight_segment_timeline.dart';
 import 'package:whereabouts/flight_checker/widgets/passenger_selector.dart';
 
 void main() {
@@ -207,6 +209,47 @@ void main() {
       expect(AirportHelper.cleanLocationName('Singapore'), equals('Singapore'));
       expect(AirportHelper.cleanLocationName(''), equals(''));
       expect(AirportHelper.cleanLocationName(null), equals(''));
+    });
+  });
+
+  group('CurrencyHelper Conversion & Formatting Tests', () {
+    test('formats various currencies with standard symbols', () {
+      expect(CurrencyHelper.formatAmount(1365, 'MYR'), equals('RM 1,365'));
+      expect(CurrencyHelper.formatAmount(340, 'USD'), equals('\$340'));
+      expect(CurrencyHelper.formatAmount(180, 'SGD'), equals('S\$180'));
+      expect(CurrencyHelper.formatAmount(290, 'EUR'), equals('€290'));
+      expect(CurrencyHelper.formatAmount(250, 'GBP'), equals('£250'));
+      expect(CurrencyHelper.formatAmount(48000, 'JPY'), equals('¥48,000'));
+      expect(CurrencyHelper.formatAmount(1500000, 'IDR'), equals('Rp 1,500,000'));
+    });
+
+    test('convertAndFormat converts accurately between currencies without network', () {
+      // Same currency: returns exact formatted amount
+      expect(CurrencyHelper.convertAndFormat(1000, from: 'MYR', to: 'MYR'), equals('RM 1,000'));
+
+      // MYR -> USD (1000 MYR / 4.45 ~ $225)
+      final inUsd = CurrencyHelper.convertAndFormat(1000, from: 'MYR', to: 'USD');
+      expect(inUsd, startsWith('\$'));
+      expect(inUsd, contains('225'));
+
+      // USD -> SGD ($100 * 1.34 = S$134)
+      final inSgd = CurrencyHelper.convertAndFormat(100, from: 'USD', to: 'SGD');
+      expect(inSgd, equals('S\$134'));
+    });
+  });
+
+  group('Legroom Label Formatting Tests', () {
+    test('ensures clear units for ambiguous numeric strings', () {
+      // String with pair of numbers like "18 23"
+      expect(FlightSegmentTimeline.formatLegroomLabel('18 23'), equals('18–23 in legroom'));
+      // Single number like "28"
+      expect(FlightSegmentTimeline.formatLegroomLabel('28'), equals('28 in legroom'));
+      // Already has unit
+      expect(FlightSegmentTimeline.formatLegroomLabel('28 in'), equals('28 in legroom'));
+      expect(FlightSegmentTimeline.formatLegroomLabel('31 inches'), equals('31 inches legroom'));
+      expect(FlightSegmentTimeline.formatLegroomLabel('76 cm'), equals('76 cm legroom'));
+      // Empty
+      expect(FlightSegmentTimeline.formatLegroomLabel(''), equals(''));
     });
   });
 
