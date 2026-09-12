@@ -169,13 +169,17 @@ class PassengerControlPanel extends StatelessWidget {
             onIncrement: () => _updateChildren(1),
             isDark: isDark,
           ),
+          Divider(
+            height: 18,
+            color: isDark ? AppColors.darkElevatedHighest : AppColors.iosGray5,
+          ),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Text(
-                  'Max 9 passengers per search',
+                  'Max 9 passengers',
                   style: TextStyle(
                     fontSize: 11,
                     color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary,

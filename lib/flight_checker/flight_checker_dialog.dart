@@ -357,19 +357,30 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
             onReset: () =>
                 setState(() => _filterCriteria = const FlightFilterCriteria()),
           )
-        else
-          ...filteredFlights.map((flight) {
-            final isLowestPrice =
-                priceRange != null && flight.priceNumeric == priceRange.min;
-            final keyId =
-                'flight_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
+        else ...[
+          () {
+            final bestFlight = FlightFilterHelper.findBestFlight(_response!.flights);
+            return Column(
+              children: filteredFlights.map((flight) {
+                final isLowestPrice =
+                    priceRange != null && flight.priceNumeric == priceRange.min;
+                final isBest = bestFlight != null &&
+                    flight.airline == bestFlight.airline &&
+                    flight.priceNumeric == bestFlight.priceNumeric &&
+                    flight.departure.time == bestFlight.departure.time;
+                final keyId =
+                    'flight_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
 
-            return FlightCard(
-              key: ValueKey(keyId),
-              flight: flight,
-              isLowestFare: isLowestPrice,
+                return FlightCard(
+                  key: ValueKey(keyId),
+                  flight: flight,
+                  isLowestFare: isLowestPrice,
+                  isBest: isBest,
+                );
+              }).toList(),
             );
-          }),
+          }(),
+        ],
       ],
     );
   }

@@ -227,6 +227,7 @@ class FlightSearchParams {
   final String tripType; // 'oneway' | 'roundtrip' | 'multicity'
   final int adults;
   final int children;
+  final int cabinClassIndex;
   final String cabinClass; // 'economy' | 'premiumeconomy' | 'business' | 'first'
   final String currency;
 
@@ -240,7 +241,7 @@ class FlightSearchParams {
     this.children = 0,
     this.cabinClass = 'economy',
     this.currency = 'MYR',
-  });
+  }) : cabinClassIndex = 0;
 
   FlightSearchParams copyWith({
     String? origin,

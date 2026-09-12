@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../utils/flight_filter_helper.dart';
 import 'airline_filter_dialog.dart';
+import 'layover_filter_dialog.dart';
 
 /// Modern iOS/Vercel-inspired filter and sorting control bar
 /// Strictly under 500 lines (Hard limit: 500 lines)
@@ -33,7 +34,7 @@ class FlightFilterBar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Dropdowns: Sort By + Airline Dropdown (if >= 2) + Reset Action
+        // 1. Dropdowns: Sort By + Airline Dropdown (if >= 2) + Layover + Reset Action
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -42,6 +43,7 @@ class FlightFilterBar extends StatelessWidget {
             _buildSortDropdown(chipBg),
             if (availableAirlines.length >= 2)
               _buildAirlineDropdown(context, chipBg, borderColor),
+            _buildLayoverDropdown(context, chipBg, borderColor),
             if (criteria.isFiltered)
               TextButton.icon(
                 onPressed: () => onChanged(const FlightFilterCriteria()),
@@ -253,6 +255,88 @@ class FlightFilterBar extends StatelessWidget {
             InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () => onChanged(criteria.copyWith(clearAirlines: true)),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(2, 6, 8, 6),
+                child: Icon(Icons.cancel_rounded, size: 15, color: AppColors.iosBlue),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLayoverDropdown(BuildContext context, Color chipBg, Color borderColor) {
+    final hasLayoverFilter = criteria.maxLayoverMinutes != null;
+
+    final String label;
+    if (hasLayoverFilter) {
+      final m = criteria.maxLayoverMinutes!;
+      final h = m ~/ 60;
+      final min = m % 60;
+      label = min == 0 ? 'Layover: < ${h}h' : 'Layover: < ${h}h${min}m';
+    } else {
+      label = 'Layover';
+    }
+
+    final activeBg = hasLayoverFilter ? AppColors.iosBlue.withValues(alpha: 0.12) : chipBg;
+    final activeBorder = hasLayoverFilter ? AppColors.iosBlue : AppColors.iosBlue.withValues(alpha: 0.35);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: activeBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: activeBorder, width: 0.9),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () async {
+              final result = await showDialog<int?>(
+                context: context,
+                builder: (ctx) => LayoverFilterDialog(
+                  initialMaxMinutes: criteria.maxLayoverMinutes,
+                  isDark: isDark,
+                ),
+              );
+              if (result != criteria.maxLayoverMinutes) {
+                onChanged(criteria.copyWith(
+                  maxLayoverMinutes: result,
+                  clearMaxLayover: result == null,
+                ));
+              }
+            },
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 10,
+                right: hasLayoverFilter ? 4 : 8,
+                top: 6,
+                bottom: 6,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.hourglass_bottom_rounded, size: 14, color: AppColors.iosBlue),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: hasLayoverFilter ? AppColors.iosBlue : (isDark ? AppColors.darkPrimary : AppColors.lightPrimary),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.iosBlue),
+                ],
+              ),
+            ),
+          ),
+          if (hasLayoverFilter)
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => onChanged(criteria.copyWith(clearMaxLayover: true)),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(2, 6, 8, 6),
                 child: Icon(Icons.cancel_rounded, size: 15, color: AppColors.iosBlue),

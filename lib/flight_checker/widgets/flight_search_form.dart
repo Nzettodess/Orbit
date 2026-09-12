@@ -262,7 +262,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
                     passTile,
                     const SizedBox(height: 10),
                     if (isVeryNarrow) ...[
-                      _buildClassDropdown(fieldBg, isDark),
+                       _buildClassDropdown(fieldBg, isDark),
                       const SizedBox(height: 10),
                       _buildCurrencyDropdown(fieldBg, isDark),
                     ] else ...[

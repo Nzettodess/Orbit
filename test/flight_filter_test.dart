@@ -239,5 +239,69 @@ void main() {
       expect(result[0].priceNumeric, equals(120)); // AirAsia
       expect(result[1].priceNumeric, equals(250)); // Malaysia Airlines
     });
+
+    test('Filter by Layover Duration excludes flights with long layovers', () {
+      final flightWithShortLayover = FlightInfo(
+        airline: 'Singapore Airlines',
+        stops: '1 stop',
+        duration: '4 hr',
+        price: 'RM 500',
+        priceNumeric: 500,
+        departure: const FlightEndpoint(airport: 'PEN', time: '10:00', date: '2026-10-15'),
+        arrival: const FlightEndpoint(airport: 'NRT', time: '18:00', date: '2026-10-15'),
+        deepLink: 'https://example.com',
+        layovers: const [FlightLayover(duration: '1 hr 30 min', durationMinutes: 90)],
+      );
+
+      final flightWithLongLayover = FlightInfo(
+        airline: 'Cathay Pacific',
+        stops: '1 stop',
+        duration: '8 hr',
+        price: 'RM 450',
+        priceNumeric: 450,
+        departure: const FlightEndpoint(airport: 'PEN', time: '10:00', date: '2026-10-15'),
+        arrival: const FlightEndpoint(airport: 'NRT', time: '22:00', date: '2026-10-15'),
+        deepLink: 'https://example.com',
+        layovers: const [FlightLayover(duration: '5 hr', durationMinutes: 300)],
+      );
+
+      final testFlights = [f1, flightWithShortLayover, flightWithLongLayover];
+
+      // Max layover 2 hr (120 min) -> keeps nonstop f1 and flightWithShortLayover (90 min), drops flightWithLongLayover (300 min)
+      final filtered = FlightFilterHelper.applyFiltersAndSort(
+        testFlights,
+        const FlightFilterCriteria(maxLayoverMinutes: 120),
+      );
+
+      expect(filtered.length, equals(2));
+      expect(filtered.contains(f1), isTrue); // Nonstop is kept
+      expect(filtered.contains(flightWithShortLayover), isTrue);
+      expect(filtered.contains(flightWithLongLayover), isFalse);
+    });
+
+    test('FlightFilterCriteria layover duration state & isFiltered', () {
+      const criteria = FlightFilterCriteria(maxLayoverMinutes: 180);
+      expect(criteria.isFiltered, isTrue);
+      expect(criteria.maxLayoverMinutes, equals(180));
+
+      final cleared = criteria.copyWith(clearMaxLayover: true);
+      expect(cleared.isFiltered, isFalse);
+      expect(cleared.maxLayoverMinutes, isNull);
+    });
+
+    test('findBestFlight balances price and convenience', () {
+      // f1 (AirAsia, RM 120, nonstop, 70m) vs f3 (Scoot, RM 95, 1 stop, 200m)
+      final best = FlightFilterHelper.findBestFlight(allFlights);
+      expect(best, isNotNull);
+      expect(best!.airline, equals('AirAsia')); // Nonstop & fast beats slower 1-stop
+    });
+
+    test('Sorting by Best Flights ranks best trade-off first', () {
+      final sorted = FlightFilterHelper.applyFiltersAndSort(
+        allFlights,
+        const FlightFilterCriteria(sortBy: FlightSortBy.best),
+      );
+      expect(sorted.first.airline, equals('AirAsia'));
+    });
   });
 }

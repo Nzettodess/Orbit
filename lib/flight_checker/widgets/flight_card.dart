@@ -13,6 +13,7 @@ class FlightCard extends StatefulWidget {
   final String? displayPrice;
   final VoidCallback? onSelect;
   final bool isLowestFare;
+  final bool isBest;
   final bool initiallyExpanded;
 
   const FlightCard({
@@ -21,6 +22,7 @@ class FlightCard extends StatefulWidget {
     this.displayPrice,
     this.onSelect,
     this.isLowestFare = false,
+    this.isBest = false,
     this.initiallyExpanded = false,
   });
 
@@ -53,17 +55,18 @@ class _FlightCardState extends State<FlightCard> {
     final isNonstop = flight.stops.toLowerCase().contains('nonstop');
     final activePrice = widget.displayPrice ?? flight.price;
 
-    final surfaceColor = isDark
-        ? AppColors.darkSurface
-        : AppColors.lightSurface;
-    final borderWidth = widget.isLowestFare ? 2.0 : (_isHovered ? 1.5 : 1.0);
+    final surfaceColor = isDark ? AppColors.darkSurface : AppColors.lightSurface;
+    final hasSpecialBadge = widget.isLowestFare || widget.isBest;
+    final borderWidth = hasSpecialBadge ? 2.0 : (_isHovered ? 1.5 : 1.0);
     final borderColor = _isHovered
         ? (widget.isLowestFare
-              ? AppColors.iosGreen
-              : AppColors.iosBlue.withValues(alpha: 0.5))
+            ? AppColors.iosGreen
+            : (widget.isBest ? AppColors.iosBlue : AppColors.iosBlue.withValues(alpha: 0.5)))
         : (widget.isLowestFare
-              ? AppColors.iosGreen.withValues(alpha: 0.85)
-              : (isDark ? AppColors.darkElevatedHighest : AppColors.iosGray4));
+            ? AppColors.iosGreen.withValues(alpha: 0.85)
+            : (widget.isBest
+                ? AppColors.iosBlue.withValues(alpha: 0.85)
+                : (isDark ? AppColors.darkElevatedHighest : AppColors.iosGray4)));
 
     return Semantics(
       label:
@@ -133,8 +136,20 @@ class _FlightCardState extends State<FlightCard> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (widget.isBest) ...[
+                          _buildTopBadge(
+                            text: 'Best',
+                            icon: Icons.thumb_up_alt_rounded,
+                            color: AppColors.iosBlue,
+                          ),
+                          const SizedBox(width: 6),
+                        ],
                         if (widget.isLowestFare) ...[
-                          _buildLowestFareBadge(),
+                          _buildTopBadge(
+                            text: 'Lowest Fare',
+                            icon: Icons.bolt_rounded,
+                            color: AppColors.iosGreen,
+                          ),
                           const SizedBox(width: 6),
                         ],
                         _buildStopsBadge(isNonstop, flight.stops),
@@ -447,28 +462,29 @@ class _FlightCardState extends State<FlightCard> {
     );
   }
 
-  Widget _buildLowestFareBadge() {
+  Widget _buildTopBadge({
+    required String text,
+    required IconData icon,
+    required Color color,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.iosGreen.withValues(alpha: 0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: AppColors.iosGreen.withValues(alpha: 0.35),
-          width: 0.8,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.bolt_rounded, size: 12, color: AppColors.iosGreen),
-          const SizedBox(width: 2),
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 3),
           Text(
-            'Lowest Fare',
+            text,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: AppColors.iosGreen,
+              color: color,
             ),
           ),
         ],

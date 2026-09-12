@@ -2,7 +2,8 @@ import '../models/flight_info.dart';
 
 /// Available sorting modes for flight search results
 enum FlightSortBy {
-  priceLowToHigh('Price: Low to High'),
+  best('Best Flights'),
+  priceLowToHigh('Cheapest First'),
   durationShortest('Duration: Shortest'),
   departureEarliest('Departure: Earliest'),
   departureLatest('Departure: Latest'),
@@ -27,11 +28,13 @@ class FlightFilterCriteria {
   final FlightSortBy sortBy;
   final FlightStopsFilter stopsFilter;
   final Set<String> selectedAirlines;
+  final int? maxLayoverMinutes;
 
   const FlightFilterCriteria({
-    this.sortBy = FlightSortBy.priceLowToHigh,
+    this.sortBy = FlightSortBy.best,
     this.stopsFilter = FlightStopsFilter.all,
     this.selectedAirlines = const <String>{},
+    this.maxLayoverMinutes,
   });
 
   /// Single airline backward compatibility getter
@@ -39,7 +42,9 @@ class FlightFilterCriteria {
       selectedAirlines.length == 1 ? selectedAirlines.first : null;
 
   bool get isFiltered =>
-      stopsFilter != FlightStopsFilter.all || selectedAirlines.isNotEmpty;
+      stopsFilter != FlightStopsFilter.all ||
+      selectedAirlines.isNotEmpty ||
+      maxLayoverMinutes != null;
 
   FlightFilterCriteria copyWith({
     FlightSortBy? sortBy,
@@ -48,6 +53,8 @@ class FlightFilterCriteria {
     String? selectedAirline,
     bool clearAirlines = false,
     bool clearAirline = false,
+    int? maxLayoverMinutes,
+    bool clearMaxLayover = false,
   }) {
     Set<String> newAirlines;
     if (clearAirlines || clearAirline) {
@@ -66,6 +73,9 @@ class FlightFilterCriteria {
       sortBy: sortBy ?? this.sortBy,
       stopsFilter: stopsFilter ?? this.stopsFilter,
       selectedAirlines: newAirlines,
+      maxLayoverMinutes: clearMaxLayover
+          ? null
+          : (maxLayoverMinutes ?? this.maxLayoverMinutes),
     );
   }
 }
@@ -93,29 +103,29 @@ class FlightFilterHelper {
     return total;
   }
 
-  /// Parse flight departure time (e.g. "10:35 PM", "8:30 AM", "14:20") into minutes from midnight
+  /// Parse time string like "9:00 AM", "11:30 PM", "08:15" into minutes from midnight (0..1439)
   static int parseTimeToMinutes(String timeStr) {
-    if (timeStr.isEmpty) return 0;
-    final match = RegExp(
-      r'(\d+):(\d+)\s*(AM|PM)?',
-      caseSensitive: false,
-    ).firstMatch(timeStr);
+    final clean = timeStr.replaceAll('\u202F', ' ').replaceAll('\u00A0', ' ').trim();
+    final match = RegExp(r'^(\d{1,2}):(\d{2})(?:\s*([APap][Mm]))?').firstMatch(clean);
     if (match == null) return 0;
 
     int hour = int.tryParse(match.group(1)!) ?? 0;
-    final minute = int.tryParse(match.group(2)!) ?? 0;
+    final min = int.tryParse(match.group(2)!) ?? 0;
     final ampm = match.group(3)?.toUpperCase();
 
     if (ampm == 'PM' && hour < 12) hour += 12;
     if (ampm == 'AM' && hour == 12) hour = 0;
 
-    return hour * 60 + minute;
+    return hour * 60 + min;
   }
 
-  /// Get stops count from stops string (e.g. "Nonstop" -> 0, "1 stop" -> 1)
+  /// Helper to convert stops string to integer count:
+  /// "Nonstop" -> 0, "1 stop" -> 1, "2 stops" -> 2
   static int getStopsCount(String stops) {
     final lower = stops.toLowerCase();
-    if (lower.contains('nonstop')) return 0;
+    if (lower.contains('nonstop') || lower.contains('non-stop') || lower.contains('direct')) {
+      return 0;
+    }
     final match = RegExp(r'(\d+)').firstMatch(lower);
     if (match != null) return int.tryParse(match.group(1)!) ?? 1;
     return 1;
@@ -147,7 +157,34 @@ class FlightFilterHelper {
     return counts;
   }
 
-  /// Apply active stops filter, airline filter, and sort order to flight list
+  /// Calculate convenience & price score (lower is better, matching Google Flights Best algorithm)
+  static double calculateConvenienceScore(FlightInfo flight) {
+    final price = flight.priceNumeric > 0 ? flight.priceNumeric.toDouble() : 99999.0;
+    final dur = parseDurationMinutes(flight.duration);
+    final stops = getStopsCount(flight.stops);
+    return price + (dur * 0.4) + (stops * 80.0);
+  }
+
+  /// Find the "Best" flight balancing price, duration, and stops
+  /// (following Google Flights criteria: stress-free travel balancing price & convenience)
+  static FlightInfo? findBestFlight(List<FlightInfo> flights) {
+    if (flights.isEmpty) return null;
+    final priced = flights.where((f) => f.priceNumeric > 0).toList();
+    if (priced.isEmpty) return flights.first;
+
+    FlightInfo best = priced.first;
+    double bestScore = double.infinity;
+    for (final f in priced) {
+      final score = calculateConvenienceScore(f);
+      if (score < bestScore) {
+        bestScore = score;
+        best = f;
+      }
+    }
+    return best;
+  }
+
+  /// Apply active stops filter, airline filter, layover duration, and sort order to flight list
   static List<FlightInfo> applyFiltersAndSort(
     List<FlightInfo> flights,
     FlightFilterCriteria criteria,
@@ -168,11 +205,34 @@ class FlightFilterHelper {
         if (!matches) return false;
       }
 
+      // Layover duration filter
+      if (criteria.maxLayoverMinutes != null) {
+        if (f.layovers.isNotEmpty) {
+          final exceeds = f.layovers.any((lay) {
+            final dur = lay.durationMinutes > 0
+                ? lay.durationMinutes
+                : parseDurationMinutes(lay.duration.isNotEmpty ? lay.duration : lay.text);
+            return dur > criteria.maxLayoverMinutes!;
+          });
+          if (exceeds) return false;
+        }
+      }
+
       return true;
     }).toList();
 
     // 2. Sorting
     switch (criteria.sortBy) {
+      case FlightSortBy.best:
+        list.sort((a, b) {
+          final sA = calculateConvenienceScore(a);
+          final sB = calculateConvenienceScore(b);
+          final scoreComp = sA.compareTo(sB);
+          if (scoreComp != 0) return scoreComp;
+          return a.priceNumeric.compareTo(b.priceNumeric);
+        });
+        break;
+
       case FlightSortBy.priceLowToHigh:
         list.sort((a, b) {
           final pA = a.priceNumeric > 0 ? a.priceNumeric : 9999999;
