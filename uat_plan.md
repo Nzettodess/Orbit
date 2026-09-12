@@ -74,11 +74,23 @@ This document serves as the master checklist to ensure that refactoring and modu
 ## 8. Development & Build Verification
 
 - [ ] **8.1 Local Pre-deploy Verification (`check.bat`):** Run `check.bat` in the repository root.
-  - *Expected:* Analyzer passes with zero critical errors, and all 27 unit/widget tests pass (including models, helpers, and role hierarchy).
+  - *Expected:* Analyzer passes with zero critical errors, and all 63 unit/widget tests pass across models, helpers, filters, and widgets.
 - [ ] **8.2 Web Chrome Launch:** Run `flutter run -d chrome`.
   - *Expected:* Launches without IndexedDB transaction locks or `Future not completed` timeout.
 - [ ] **8.3 Automated Deploy Guard (`deploy.bat`):** Run `deploy.bat`.
   - *Expected:* Automatically runs test suite first; halts deployment if any test fails; seamlessly proceeds to `flutter build web --release` and Vercel deployment upon success.
 
+## 9. Flight Checker & Smart Location Autocomplete
 
-
+- [ ] **9.1 Live Flight Search:** Enter Origin (e.g. `PEN`), Destination (e.g. `KUL`), select dates and search.
+  - *Expected:* Queries `/api/check-flights` and loads live flight cards with airline logos, departure/arrival times, stops, and durations.
+- [ ] **9.2 Multi-Currency Instant Repaint:** Switch currency from MYR to USD, SGD, or JPY in the dialog header.
+  - *Expected:* Prices recalculate and repaint immediately without re-triggering network queries or page flickers.
+- [ ] **9.3 Lowest Fare Visual Highlight:** View flight results with varied prices.
+  - *Expected:* Cheapest flight card is emphasized with a 2.0px green border (`AppColors.iosGreen`), ambient glow, and `⚡ Lowest Fare` badge.
+- [ ] **9.4 Multi-Select Airline Filter:** Tap the Airlines pill in the filter bar.
+  - *Expected:* Opens `AirlineFilterDialog` modal; allows selecting multiple airlines with real-time flight counts; "Apply (X)" filters results to selected carriers; "Clear" or tapping `✕` resets.
+- [ ] **9.5 Full Card Click & Legroom Details:** Tap anywhere on a flight card body.
+  - *Expected:* Expands to show legroom with explicit inch units (e.g. `29 in`), carbon emissions, aircraft type, and Google Flights booking link.
+- [ ] **9.6 Smart Location Autocomplete:** In Location Picker, type a city or island (e.g. `Bali`, `Penang`, or `Tokyo`).
+  - *Expected:* Direct state/city match appears as top suggestion (e.g. `🇮🇩 Bali, Indonesia`); tapping it simultaneously populates Country to `Indonesia` and State to `Bali` with country flag.

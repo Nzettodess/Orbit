@@ -6,6 +6,7 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 
 ## ✨ Features
 
+- **Flight Checker & Fare Tracking**: Live Google Flights search for one-way, round-trip, and multi-city routes with multi-currency conversion, lowest fare highlighting, and multi-airline filtering.
 - **Group Management**: Create and join groups to coordinate with family, friends, or colleagues.
 - **Location Sharing**: Share your current location with group members for specific dates.
 - **Event Scheduling**: Create and manage group events with RSVP functionality.
@@ -17,6 +18,24 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 - **Admin Controls**: Role-based access and member management.
 
 ## 📝 Update Log
+
+### [1.0.3] - 2026-09-12
+
+- **✈️ Live Flight Checker & Fare Intelligence**:
+  - Integrated Google Flights scraping backend (`api/check-flights.js`) deployable as a serverless function on Vercel or locally via `node api/local-dev-server.js`.
+  - Supports round-trip, one-way, and multi-city flight searches with accurate departure/arrival times, durations, airline logos, layovers, and booking deep links.
+  - Real-time client-side multi-currency converter across 10 global currencies (MYR, SGD, USD, EUR, GBP, JPY, AUD, CAD, CNY, THB) with zero network round-trips and instant repaints.
+  - Visual lowest fare highlight with a thick green accent border (`AppColors.iosGreen`), ambient glow, and `⚡ Lowest Fare` badge.
+  - Full-card clickable navigation to view legroom details (with explicit inch units), carbon emission stats, and aircraft models.
+- **🎛️ Multi-Select Airline Filter & Sorting Bar**:
+  - Interactive modal dialog (`AirlineFilterDialog`) with carrier checkboxes, dynamic flight counts, "Select All", "Deselect All", and compact "Apply" / "Clear" buttons.
+  - Instant client-side sorting (Price low-to-high, Duration shortest, Departure earliest, Nonstop first) and stops filter (All, Nonstop, ≤ 1 Stop).
+- **🗺️ Smart Location Autocomplete (e.g. "Bali" → "Indonesia, Bali")**:
+  - High-accuracy subdivision detection: typing a city, island, or region (e.g. "Bali", "Penang", "Tokyo", "Seoul") automatically recognizes the parent country and auto-populates both Country and State fields simultaneously.
+  - Comma-separated query parsing support (`"Bali, Indonesia"`).
+  - Modular architecture strictly adhering to `< 500 lines` limits (`location_database.dart`, `location_input_tiles.dart`, `location_data.dart`).
+- **🧪 Expanded Automated Test Suite**:
+  - Increased test coverage from 27 to **63 passing tests** across unit, widget, and integration tests (`flight_filter_test.dart`, `flight_checker_dialog_test.dart`, `location_data_test.dart`, `location_picker_test.dart`, and `models_and_helpers_test.dart`).
 
 ### [1.0.2] - 2026-09-12
 
@@ -82,11 +101,27 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
    GOOGLE_API_KEY=your_google_calendar_api_key
    ```
 
-5. Run the app:
+5. (Optional) Run the local Flight Checker backend:
+
+   ```bash
+   node api/local-dev-server.js
+   ```
+   *Note: In production (Vercel), flight queries are handled automatically by the serverless function `/api/check-flights` with zero server management.*
+
+6. Run the app:
 
    ```bash
    flutter run -d chrome
    ```
+
+### 🚢 Deployment
+
+To test, build, and deploy Orbit to Vercel production with automated test protection:
+
+```bash
+deploy.bat
+```
+*(Runs full Flutter test suite, compiles web release bundle to `build/web`, and deploys via Vercel CLI).*
 
 ## ⚠️ Known Issues
 
