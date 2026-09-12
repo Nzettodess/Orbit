@@ -173,13 +173,17 @@ class PassengerControlPanel extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Max 9 passengers per search',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary,
+              Expanded(
+                child: Text(
+                  'Max 9 passengers per search',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               TextButton(
                 onPressed: onDone,
                 style: TextButton.styleFrom(

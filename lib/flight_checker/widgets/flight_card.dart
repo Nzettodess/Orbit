@@ -277,11 +277,15 @@ class _FlightCardState extends State<FlightCard> {
                     const SizedBox(height: 14),
 
                     // 3. Price & Interactive Expand Action
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               activePrice,
@@ -306,6 +310,7 @@ class _FlightCardState extends State<FlightCard> {
                           ],
                         ),
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             // Expand / Collapse Segment Details
                             TextButton.icon(
@@ -313,9 +318,11 @@ class _FlightCardState extends State<FlightCard> {
                                   setState(() => _isExpanded = !_isExpanded),
                               style: TextButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
+                                  horizontal: 8,
+                                  vertical: 6,
                                 ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 foregroundColor: isDark
                                     ? AppColors.darkSecondary
                                     : AppColors.lightSecondary,
@@ -349,10 +356,10 @@ class _FlightCardState extends State<FlightCard> {
                                 backgroundColor: AppColors.iosBlue,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
+                                  horizontal: 12,
                                   vertical: 8,
                                 ),
-                                minimumSize: const Size(0, 36),
+                                minimumSize: const Size(0, 34),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),

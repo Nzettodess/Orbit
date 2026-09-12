@@ -206,25 +206,52 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
           ),
           const SizedBox(height: 12),
 
-          // Passengers, Class & Currency Row
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: PassengerTile(
-                  adults: _adults,
-                  children: _children,
-                  isExpanded: _showPassengerPicker,
-                  onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker),
-                  bg: fieldBg,
-                  isDark: isDark,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(flex: 2, child: _buildClassDropdown(fieldBg, isDark)),
-              const SizedBox(width: 8),
-              Expanded(flex: 2, child: _buildCurrencyDropdown(fieldBg, isDark)),
-            ],
+          // Passengers, Class & Currency Row (Responsive for mobile viewports)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 450;
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    PassengerTile(
+                      adults: _adults,
+                      children: _children,
+                      isExpanded: _showPassengerPicker,
+                      onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker),
+                      bg: fieldBg,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: _buildClassDropdown(fieldBg, isDark)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildCurrencyDropdown(fieldBg, isDark)),
+                      ],
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: PassengerTile(
+                      adults: _adults,
+                      children: _children,
+                      isExpanded: _showPassengerPicker,
+                      onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker),
+                      bg: fieldBg,
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(flex: 2, child: _buildClassDropdown(fieldBg, isDark)),
+                  const SizedBox(width: 8),
+                  Expanded(flex: 2, child: _buildCurrencyDropdown(fieldBg, isDark)),
+                ],
+              );
+            },
           ),
           if (_showPassengerPicker) ...[
             const SizedBox(height: 10),

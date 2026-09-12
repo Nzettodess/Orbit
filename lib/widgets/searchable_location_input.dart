@@ -325,14 +325,18 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    "State / Province / City (Optional)",
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: theme.hintColor,
+                  Expanded(
+                    child: Text(
+                      "State / Province / City (Optional)",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: theme.hintColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   if (currentCountry != null && currentCountry.states.isNotEmpty)
                     Text(
                       "${currentCountry.states.length} known regions",

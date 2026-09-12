@@ -134,7 +134,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
             Expanded(
               child: ClipRect(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(18),
+                  padding: EdgeInsets.all(isMobile ? 12 : 18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -296,6 +296,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                               ? AppColors.darkSecondary
                               : AppColors.lightSecondary,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -305,8 +307,11 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           ),
           const SizedBox(height: 12),
         ],
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             Text(
               'Found ${_response!.flights.length} Flights',

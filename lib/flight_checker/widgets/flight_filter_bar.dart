@@ -33,15 +33,15 @@ class FlightFilterBar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Dropdowns Row: Sort By + Airline Dropdown (if >= 2) + Reset Action
-        Row(
+        // 1. Dropdowns: Sort By + Airline Dropdown (if >= 2) + Reset Action
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _buildSortDropdown(chipBg),
-            if (availableAirlines.length >= 2) ...[
-              const SizedBox(width: 8),
+            if (availableAirlines.length >= 2)
               _buildAirlineDropdown(context, chipBg, borderColor),
-            ],
-            const Spacer(),
             if (criteria.isFiltered)
               TextButton.icon(
                 onPressed: () => onChanged(const FlightFilterCriteria()),
@@ -59,35 +59,42 @@ class FlightFilterBar extends StatelessWidget {
         const SizedBox(height: 8),
 
         // 2. Stops Segments + Showing X of Y count
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 6,
           children: [
-            Row(
-              children: [
-                _buildFilterChip(
-                  label: 'All Stops',
-                  isSelected: criteria.stopsFilter == FlightStopsFilter.all,
-                  onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.all)),
-                  chipBg: chipBg,
-                  borderColor: borderColor,
-                ),
-                const SizedBox(width: 6),
-                _buildFilterChip(
-                  label: 'Nonstop Only',
-                  isSelected: criteria.stopsFilter == FlightStopsFilter.nonstopOnly,
-                  onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.nonstopOnly)),
-                  chipBg: chipBg,
-                  borderColor: borderColor,
-                ),
-                const SizedBox(width: 6),
-                _buildFilterChip(
-                  label: '≤ 1 Stop',
-                  isSelected: criteria.stopsFilter == FlightStopsFilter.maxOneStop,
-                  onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.maxOneStop)),
-                  chipBg: chipBg,
-                  borderColor: borderColor,
-                ),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildFilterChip(
+                    label: 'All Stops',
+                    isSelected: criteria.stopsFilter == FlightStopsFilter.all,
+                    onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.all)),
+                    chipBg: chipBg,
+                    borderColor: borderColor,
+                  ),
+                  const SizedBox(width: 6),
+                  _buildFilterChip(
+                    label: 'Nonstop Only',
+                    isSelected: criteria.stopsFilter == FlightStopsFilter.nonstopOnly,
+                    onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.nonstopOnly)),
+                    chipBg: chipBg,
+                    borderColor: borderColor,
+                  ),
+                  const SizedBox(width: 6),
+                  _buildFilterChip(
+                    label: '≤ 1 Stop',
+                    isSelected: criteria.stopsFilter == FlightStopsFilter.maxOneStop,
+                    onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.maxOneStop)),
+                    chipBg: chipBg,
+                    borderColor: borderColor,
+                  ),
+                ],
+              ),
             ),
             Text(
               'Showing $visibleCount of $totalCount',
