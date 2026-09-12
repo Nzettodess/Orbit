@@ -25,32 +25,46 @@ enum FlightStopsFilter {
 class FlightFilterCriteria {
   final FlightSortBy sortBy;
   final FlightStopsFilter stopsFilter;
-  final String? selectedAirline; // null or empty means All Airlines
+  final Set<String> selectedAirlines;
 
   const FlightFilterCriteria({
     this.sortBy = FlightSortBy.priceLowToHigh,
     this.stopsFilter = FlightStopsFilter.all,
-    this.selectedAirline,
+    this.selectedAirlines = const <String>{},
   });
 
+  /// Single airline backward compatibility getter
+  String? get selectedAirline =>
+      selectedAirlines.length == 1 ? selectedAirlines.first : null;
+
   bool get isFiltered =>
-      stopsFilter != FlightStopsFilter.all ||
-      (selectedAirline != null &&
-          selectedAirline!.isNotEmpty &&
-          selectedAirline != 'ALL');
+      stopsFilter != FlightStopsFilter.all || selectedAirlines.isNotEmpty;
 
   FlightFilterCriteria copyWith({
     FlightSortBy? sortBy,
     FlightStopsFilter? stopsFilter,
+    Set<String>? selectedAirlines,
     String? selectedAirline,
+    bool clearAirlines = false,
     bool clearAirline = false,
   }) {
+    Set<String> newAirlines;
+    if (clearAirlines || clearAirline) {
+      newAirlines = const <String>{};
+    } else if (selectedAirlines != null) {
+      newAirlines = selectedAirlines;
+    } else if (selectedAirline != null) {
+      newAirlines = selectedAirline.isNotEmpty && selectedAirline != 'ALL'
+          ? {selectedAirline}
+          : const <String>{};
+    } else {
+      newAirlines = this.selectedAirlines;
+    }
+
     return FlightFilterCriteria(
       sortBy: sortBy ?? this.sortBy,
       stopsFilter: stopsFilter ?? this.stopsFilter,
-      selectedAirline: clearAirline
-          ? null
-          : (selectedAirline ?? this.selectedAirline),
+      selectedAirlines: newAirlines,
     );
   }
 }
@@ -146,14 +160,11 @@ class FlightFilterHelper {
         if (getStopsCount(f.stops) > 1) return false;
       }
 
-      // Airline filter
-      if (criteria.selectedAirline != null &&
-          criteria.selectedAirline!.isNotEmpty &&
-          criteria.selectedAirline != 'ALL') {
-        if (f.airline.trim().toLowerCase() !=
-            criteria.selectedAirline!.trim().toLowerCase()) {
-          return false;
-        }
+      // Airline filter (multi-select)
+      if (criteria.selectedAirlines.isNotEmpty) {
+        final matches = criteria.selectedAirlines.any((sel) =>
+            sel.trim().toLowerCase() == f.airline.trim().toLowerCase());
+        if (!matches) return false;
       }
 
       return true;

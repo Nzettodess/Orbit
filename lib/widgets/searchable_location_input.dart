@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'location_data.dart';
+import 'location_input_tiles.dart';
 
 /// A modern, responsive location input widget that supports:
-/// 1. Instant search and autocomplete from standard world countries and states.
+/// 1. Instant smart search across countries, states, provinces, and cities (e.g. "Bali" -> Indonesia, Bali).
 /// 2. 100% free-text input: type any country, province, or custom location.
 /// 3. Click-stable suggestion overlays using TapRegion (prevents premature dismiss on web).
-/// 4. One-tap popular country chips.
+/// 4. One-tap popular country and state chips.
+/// Strictly under 500 lines (Hard limit: 500 lines)
 class SearchableLocationInput extends StatefulWidget {
   final String? initialCountry;
   final String? initialState;
@@ -32,7 +34,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
 
   bool _showCountrySuggestions = false;
   bool _showStateSuggestions = false;
-  List<CountryInfo> _countryMatches = [];
+  List<LocationMatch> _locationMatches = [];
   List<String> _stateMatches = [];
 
   @override
@@ -44,7 +46,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
     _countryController = TextEditingController(text: cleanCountry);
     _stateController = TextEditingController(text: cleanState);
 
-    _countryMatches = LocationData.searchCountries(_countryController.text);
+    _locationMatches = LocationData.searchLocations(_countryController.text);
     _stateMatches = LocationData.searchStates(_countryController.text, _stateController.text);
   }
 
@@ -55,7 +57,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
       final clean = LocationData.cleanText(widget.initialCountry ?? '');
       if (clean != _countryController.text) {
         _countryController.text = clean;
-        _countryMatches = LocationData.searchCountries(clean);
+        _locationMatches = LocationData.searchLocations(clean);
         _stateMatches = LocationData.searchStates(clean, _stateController.text);
       }
     }
@@ -79,22 +81,49 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
 
   void _onCountryTextChanged(String val) {
     final cleaned = LocationData.cleanText(val);
+
+    // Check if user typed "State, Country" or "Country, State" directly
+    final resolved = LocationData.resolveLocation(cleaned);
+    if (resolved != null && resolved.isState && resolved.stateName != null) {
+      if (cleaned.contains(',')) {
+        _countryController.text = resolved.countryName;
+        _stateController.text = resolved.stateName!;
+        widget.onCountryChanged(resolved.countryName);
+        widget.onStateChanged(resolved.stateName);
+        setState(() {
+          _showCountrySuggestions = false;
+          _locationMatches = LocationData.searchLocations(resolved.countryName);
+          _stateMatches = LocationData.searchStates(resolved.countryName, resolved.stateName!);
+        });
+        return;
+      }
+    }
+
     widget.onCountryChanged(cleaned);
     setState(() {
       _showCountrySuggestions = true;
-      _countryMatches = LocationData.searchCountries(cleaned);
+      _locationMatches = LocationData.searchLocations(cleaned);
       _stateMatches = LocationData.searchStates(cleaned, _stateController.text);
     });
   }
 
-  void _selectCountry(CountryInfo country) {
-    _countryController.text = country.name;
-    widget.onCountryChanged(country.name);
+  void _selectLocationMatch(LocationMatch match) {
+    _countryController.text = match.countryName;
+    widget.onCountryChanged(match.countryName);
+
+    if (match.isState && match.stateName != null) {
+      _stateController.text = match.stateName!;
+      widget.onStateChanged(match.stateName);
+    } else {
+      _stateController.clear();
+      widget.onStateChanged(null);
+    }
+
     _countryFocus.unfocus();
     setState(() {
       _showCountrySuggestions = false;
-      _countryMatches = LocationData.searchCountries(country.name);
-      _stateMatches = LocationData.searchStates(country.name, _stateController.text);
+      _locationMatches = LocationData.searchLocations(match.countryName);
+      _stateMatches = LocationData.searchStates(match.countryName, _stateController.text);
     });
   }
 
@@ -137,7 +166,7 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // COUNTRY SECTION (Using TapRegion to prevent focus-drop on click)
+        // COUNTRY / LOCATION SECTION (Using TapRegion to prevent focus-drop on click)
         TapRegion(
           groupId: 'country_search_region',
           onTapOutside: (_) {
@@ -165,12 +194,12 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                 onTap: () {
                   setState(() {
                     _showCountrySuggestions = true;
-                    _countryMatches = LocationData.searchCountries(_countryController.text);
+                    _locationMatches = LocationData.searchLocations(_countryController.text);
                   });
                 },
                 onChanged: _onCountryTextChanged,
                 decoration: InputDecoration(
-                  hintText: "Search country or type custom location…",
+                  hintText: "Search country or city (e.g. Bali, Tokyo, Paris)…",
                   prefixIcon: Center(
                     widthFactor: 1.0,
                     heightFactor: 1.0,
@@ -211,11 +240,11 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                 ),
               ),
 
-              // COUNTRY SUGGESTIONS OVERLAY
+              // COUNTRY / CITY SUGGESTIONS OVERLAY
               if (_showCountrySuggestions) ...[
                 const SizedBox(height: 6),
                 Container(
-                  constraints: const BoxConstraints(maxHeight: 220),
+                  constraints: const BoxConstraints(maxHeight: 240),
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
                     borderRadius: BorderRadius.circular(10),
@@ -234,58 +263,17 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                       shrinkWrap: true,
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       children: [
-                        // Custom location tile if user typed text
                         if (_countryController.text.trim().isNotEmpty &&
                             !LocationData.countries.any((c) =>
                                 c.name.toLowerCase() == _countryController.text.trim().toLowerCase()))
-                          Material(
-                            color: colorScheme.primaryContainer.withValues(alpha: 0.15),
-                            child: InkWell(
-                              onTap: () => _selectCustomCountry(_countryController.text.trim()),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.add_location_alt_outlined, color: Colors.blue, size: 20),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        'Use custom location: "${_countryController.text.trim()}"',
-                                        style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.blue),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          LocationCustomTile(
+                            text: _countryController.text.trim(),
+                            labelPrefix: 'Use custom location',
+                            onTap: () => _selectCustomCountry(_countryController.text.trim()),
                           ),
-                        ..._countryMatches.take(20).map((country) => Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                mouseCursor: SystemMouseCursors.click,
-                                onTap: () => _selectCountry(country),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  child: Row(
-                                    children: [
-                                      Text(country.flag, style: const TextStyle(fontSize: 20)),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          country.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                                        ),
-                                      ),
-                                      Text(
-                                        country.code,
-                                        style: TextStyle(fontSize: 12, color: theme.hintColor),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                        ..._locationMatches.take(20).map((match) => LocationSuggestionTile(
+                              match: match,
+                              onTap: () => _selectLocationMatch(match),
                             )),
                       ],
                     ),
@@ -305,7 +293,9 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                         child: ActionChip(
                           avatar: Text(c.flag, style: const TextStyle(fontSize: 14)),
                           label: Text(c.name, style: const TextStyle(fontSize: 12)),
-                          onPressed: () => _selectCountry(c),
+                          onPressed: () => _selectLocationMatch(
+                            LocationMatch(countryName: c.name, flag: c.flag, code: c.code, isState: false),
+                          ),
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -419,28 +409,10 @@ class _SearchableLocationInputState extends State<SearchableLocationInput> {
                         if (_stateController.text.trim().isNotEmpty &&
                             !_stateMatches.any((s) =>
                                 s.toLowerCase() == _stateController.text.trim().toLowerCase()))
-                          Material(
-                            color: colorScheme.primaryContainer.withValues(alpha: 0.15),
-                            child: InkWell(
-                              onTap: () {
-                                _selectState(_stateController.text.trim());
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.edit_location_alt_outlined, color: Colors.blue, size: 18),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Use custom region: "${_stateController.text.trim()}"',
-                                        style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.blue),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          LocationCustomTile(
+                            text: _stateController.text.trim(),
+                            labelPrefix: 'Use custom region',
+                            onTap: () => _selectState(_stateController.text.trim()),
                           ),
                         ..._stateMatches.take(15).map((stateName) => Material(
                               color: Colors.transparent,

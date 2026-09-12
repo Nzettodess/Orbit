@@ -184,13 +184,38 @@ void main() {
       expect(filtered.any((f) => f.stops == '2 stops'), isFalse);
     });
 
-    test('Filter by Airline', () {
+    test('Filter by Single Airline', () {
       final filtered = FlightFilterHelper.applyFiltersAndSort(
         allFlights,
-        const FlightFilterCriteria(selectedAirline: 'AirAsia'),
+        const FlightFilterCriteria(selectedAirlines: {'AirAsia'}),
       );
       expect(filtered.length, equals(1));
       expect(filtered.first.airline, equals('AirAsia'));
+      expect(
+        const FlightFilterCriteria(selectedAirlines: {'AirAsia'}).selectedAirline,
+        equals('AirAsia'),
+      );
+    });
+
+    test('Filter by Multiple Airlines', () {
+      final filtered = FlightFilterHelper.applyFiltersAndSort(
+        allFlights,
+        const FlightFilterCriteria(selectedAirlines: {'AirAsia', 'Scoot'}),
+      );
+      expect(filtered.length, equals(2));
+      expect(filtered.map((f) => f.airline).toSet(), equals({'AirAsia', 'Scoot'}));
+      expect(
+        const FlightFilterCriteria(selectedAirlines: {'AirAsia', 'Scoot'}).selectedAirline,
+        isNull,
+      );
+    });
+
+    test('Empty airline filter returns all flights', () {
+      final filtered = FlightFilterHelper.applyFiltersAndSort(
+        allFlights,
+        const FlightFilterCriteria(selectedAirlines: {}),
+      );
+      expect(filtered.length, equals(4));
     });
 
     test('Combined filter: Nonstop + Price Low to High', () {

@@ -87,6 +87,35 @@ void main() {
       expect(selectedCountry, 'South Korea');
     });
 
+    testWidgets('smart location search: typing "Bali" suggests "Bali, Indonesia" and auto-populates country and state', (WidgetTester tester) async {
+      String selectedCountry = '';
+      String? selectedState;
+
+      await tester.pumpWidget(
+        createTestableWidget(
+          SearchableLocationInput(
+            onCountryChanged: (c) => selectedCountry = c,
+            onStateChanged: (s) => selectedState = s,
+          ),
+        ),
+      );
+
+      final countryField = find.byKey(const Key('location_country_field'));
+      await tester.tap(countryField);
+      await tester.pump();
+      await tester.enterText(countryField, 'Bali');
+      await tester.pump();
+
+      expect(find.text('Bali, Indonesia'), findsWidgets);
+
+      // Tap on the Bali, Indonesia suggestion tile
+      await tester.tap(find.text('Bali, Indonesia').first);
+      await tester.pump();
+
+      expect(selectedCountry, 'Indonesia');
+      expect(selectedState, 'Bali');
+    });
+
     testWidgets('allows selecting custom location via suggestion tile', (WidgetTester tester) async {
       String selectedCountry = '';
 
