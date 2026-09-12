@@ -221,7 +221,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Live estimates with Google Flights fallback',
+                  'Search real-time flight fares and schedules',
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark
