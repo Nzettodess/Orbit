@@ -11,12 +11,14 @@ import 'passenger_selector.dart';
 class FlightSearchForm extends StatefulWidget {
   final FlightSearchParams initialParams;
   final ValueChanged<FlightSearchParams> onSearch;
+  final ValueChanged<String>? onCurrencyChanged;
   final bool isLoading;
 
   const FlightSearchForm({
     super.key,
     required this.initialParams,
     required this.onSearch,
+    this.onCurrencyChanged,
     required this.isLoading,
   });
 
@@ -398,7 +400,10 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
                 DropdownMenuItem(value: 'IDR', child: Text('IDR (Rp)', style: TextStyle(fontSize: 12))),
               ],
               onChanged: (val) {
-                if (val != null) setState(() => _currency = val);
+                if (val != null) {
+                  setState(() => _currency = val);
+                  widget.onCurrencyChanged?.call(val);
+                }
               },
             ),
           ),

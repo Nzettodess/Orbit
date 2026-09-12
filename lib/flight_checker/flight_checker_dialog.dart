@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import 'models/flight_info.dart';
 import 'services/flight_service.dart';
+import 'utils/currency_helper.dart';
 import 'widgets/flight_card.dart';
 import 'widgets/flight_search_form.dart';
 
@@ -27,6 +28,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   bool _isLoading = false;
   FlightSearchResponse? _response;
   String? _errorMessage;
+  String _queriedCurrency = 'MYR';
+  String _displayCurrency = 'MYR';
 
   @override
   void initState() {
@@ -39,6 +42,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       destination: widget.initialDestination ?? '',
       departureDate: depStr,
     );
+    _queriedCurrency = _currentParams.currency;
+    _displayCurrency = _currentParams.currency;
 
     // Auto-trigger search if both origin and destination were passed
     if ((widget.initialOrigin ?? '').isNotEmpty && (widget.initialDestination ?? '').isNotEmpty) {
@@ -51,6 +56,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   Future<void> _performSearch(FlightSearchParams params) async {
     setState(() {
       _currentParams = params;
+      _queriedCurrency = params.currency;
+      _displayCurrency = params.currency;
       _isLoading = true;
       _errorMessage = null;
     });
@@ -101,6 +108,11 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                       initialParams: _currentParams,
                       isLoading: _isLoading,
                       onSearch: _performSearch,
+                      onCurrencyChanged: (newCurr) {
+                        setState(() {
+                          _displayCurrency = newCurr;
+                        });
+                      },
                     ),
                     const SizedBox(height: 20),
                     _buildResultsSection(isDark),
@@ -201,7 +213,16 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           ],
         ),
         const SizedBox(height: 8),
-        ..._response!.flights.map((flight) => FlightCard(flight: flight)),
+        ..._response!.flights.map(
+          (flight) => FlightCard(
+            flight: flight,
+            displayPrice: CurrencyHelper.convertAndFormat(
+              flight.priceNumeric,
+              from: _queriedCurrency,
+              to: _displayCurrency,
+            ),
+          ),
+        ),
       ],
     );
   }

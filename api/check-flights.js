@@ -46,6 +46,39 @@ export function formatCurrencyPrice(amount, currencyCode = 'MYR') {
   }
 }
 
+export function formatLegroom(val) {
+  if (!val && val !== 0) return '';
+  if (Array.isArray(val)) val = val.filter(x => x !== null && x !== undefined).join(' ');
+  let str = String(val).trim();
+  if (!str) return '';
+
+  if (/in(ch(es)?)?/i.test(str)) {
+    const numMatch = str.match(/(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s*in/i);
+    if (numMatch) return `${numMatch[1]} in legroom`;
+    return str.replace(/inches/i, 'in');
+  }
+
+  if (/cm/i.test(str)) {
+    return str.includes('legroom') ? str : `${str} legroom`;
+  }
+
+  const numbers = str.match(/\d+(?:\.\d+)?/g);
+  if (numbers && numbers.length > 0) {
+    if (numbers.length === 1) {
+      const n = parseFloat(numbers[0]);
+      return n > 50 ? `${n} cm legroom` : `${n} in legroom`;
+    } else if (numbers.length >= 2) {
+      const n1 = parseFloat(numbers[0]);
+      const n2 = parseFloat(numbers[1]);
+      if (n1 >= 25 && n2 >= 25) return `${n1}–${n2} in legroom`;
+      if (n1 < 25 && n2 >= 25) return `${n2} in legroom (${n1} in width)`;
+      return `${n1}–${n2} in legroom`;
+    }
+  }
+
+  return str.includes('legroom') ? str : `${str} legroom`;
+}
+
 function parseStructuredBlock(block, curr, fallbackUrl) {
   if (!block || !Array.isArray(block)) return [];
   const flightSections = [];
@@ -127,7 +160,7 @@ function parseStructuredBlock(block, curr, fallbackUrl) {
         arrivalCode: segArrCode,
         arrivalTime: segArrTime,
         duration: segDuration,
-        legroom: legroom ? `${legroom} legroom` : '',
+        legroom: formatLegroom(seg[14] || seg[30] || ''),
         aircraft,
         flightNumber,
         airline: segAirline,
