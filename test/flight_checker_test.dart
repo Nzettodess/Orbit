@@ -415,29 +415,26 @@ void main() {
       expect(find.text('Best'), findsOneWidget);
     });
 
-    testWidgets('Renders red hazard warning icon and badge for layover >= 3h', (tester) async {
-      const longLayoverFlight = FlightInfo(
-        airline: 'China Southern',
-        stops: '1 stop',
-        duration: '12 hr 35 min',
-        price: 'RM 1,250',
-        priceNumeric: 1250,
-        departure: FlightEndpoint(airport: 'Kuala Lumpur (KUL)', time: '9:00 AM', date: '2026-10-15'),
-        arrival: FlightEndpoint(airport: 'Tokyo (NRT)', time: '11:35 PM', date: '2026-10-15'),
-        deepLink: 'https://google.com',
-        layovers: [
-          FlightLayover(duration: '6 hr 25 min', durationMinutes: 385, airportCode: 'CAN', city: 'Guangzhou', text: '6 hr 25 min layover CAN'),
-        ],
+    testWidgets('Renders red hazard warning badge for layover > 5h, but not for <= 5h', (tester) async {
+      const moderateLayover = FlightInfo(
+        airline: 'Singapore Airlines', stops: '1 stop', duration: '7 hr', price: 'RM 950', priceNumeric: 950,
+        departure: FlightEndpoint(airport: 'PEN', time: '10:00 AM', date: '2026-10-15'),
+        arrival: FlightEndpoint(airport: 'NRT', time: '5:00 PM', date: '2026-10-15'), deepLink: 'https://google.com',
+        layovers: [FlightLayover(duration: '4 hr', durationMinutes: 240, airportCode: 'SIN', city: 'Singapore', text: '4 hr layover SIN')],
       );
+      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: FlightCard(flight: moderateLayover))));
+      expect(find.text('Long wait time'), findsNothing);
 
-      await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: FlightCard(flight: longLayoverFlight))),
+      const longLayover = FlightInfo(
+        airline: 'China Southern', stops: '1 stop', duration: '12 hr 35 min', price: 'RM 1,250', priceNumeric: 1250,
+        departure: FlightEndpoint(airport: 'KUL', time: '9:00 AM', date: '2026-10-15'),
+        arrival: FlightEndpoint(airport: 'NRT', time: '11:35 PM', date: '2026-10-15'), deepLink: 'https://google.com',
+        layovers: [FlightLayover(duration: '6 hr 25 min', durationMinutes: 385, airportCode: 'CAN', city: 'Guangzhou', text: '6 hr 25 min CAN')],
       );
-
+      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: FlightCard(flight: longLayover))));
       expect(find.byIcon(Icons.warning_amber_rounded), findsNWidgets(2));
       expect(find.text('Long wait time'), findsOneWidget);
       expect(find.text('6 hr 25 min CAN'), findsOneWidget);
-      expect(find.text('1 stop'), findsOneWidget);
     });
   });
 

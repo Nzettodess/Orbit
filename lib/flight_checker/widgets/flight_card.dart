@@ -65,7 +65,7 @@ class _FlightCardState extends State<FlightCard> {
     FlightLayover? longLayover;
     for (final lay in flight.layovers) {
       final m = lay.durationMinutes > 0 ? lay.durationMinutes : FlightFilterHelper.parseDurationMinutes(lay.duration);
-      if (m >= 180) { longLayover = lay; break; }
+      if (m > 300) { longLayover = lay; break; }
     }
     final hasLongLayover = longLayover != null;
 

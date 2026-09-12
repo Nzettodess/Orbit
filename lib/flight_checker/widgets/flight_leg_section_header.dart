@@ -338,3 +338,96 @@ class FlightLegCardsList extends StatelessWidget {
     );
   }
 }
+
+/// Composite expandable/collapsible flight leg section with smooth transition.
+class FlightLegSection extends StatelessWidget {
+  final String title;
+  final String routeSubtitle;
+  final String date;
+  final int count;
+  final int? lowestPrice;
+  final String currency;
+  final IconData icon;
+  final Color accentColor;
+  final bool isDark;
+  final bool isCollapsible;
+  final bool isExpanded;
+  final VoidCallback? onToggleExpand;
+  final List<FlightInfo> flights;
+  final FlightInfo? bestFlight;
+  final String legPrefix;
+  final String legName;
+
+  const FlightLegSection({
+    super.key,
+    required this.title,
+    required this.routeSubtitle,
+    required this.date,
+    required this.count,
+    this.lowestPrice,
+    required this.currency,
+    required this.icon,
+    this.accentColor = AppColors.iosBlue,
+    required this.isDark,
+    this.isCollapsible = false,
+    this.isExpanded = true,
+    this.onToggleExpand,
+    required this.flights,
+    this.bestFlight,
+    required this.legPrefix,
+    required this.legName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FlightLegSectionHeader(
+          title: title,
+          routeSubtitle: routeSubtitle,
+          date: date,
+          count: count,
+          lowestPrice: lowestPrice,
+          currency: currency,
+          icon: icon,
+          accentColor: accentColor,
+          isDark: isDark,
+          isCollapsible: isCollapsible,
+          isExpanded: isExpanded,
+          onToggleExpand: onToggleExpand,
+        ),
+        const SizedBox(height: 6),
+        if (isCollapsible)
+          AnimatedCrossFade(
+            firstChild: flights.isEmpty
+                ? FlightEmptyLegNotice(legName: legName, isDark: isDark)
+                : FlightLegCardsList(
+                    flights: flights,
+                    lowestPrice: lowestPrice,
+                    bestFlight: bestFlight,
+                    legPrefix: legPrefix,
+                  ),
+            secondChild: const SizedBox(width: double.infinity, height: 0),
+            crossFadeState: isExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 180),
+            firstCurve: Curves.easeOutQuad,
+            secondCurve: Curves.easeInQuad,
+            sizeCurve: Curves.fastOutSlowIn,
+          )
+        else
+          flights.isEmpty
+              ? FlightEmptyLegNotice(legName: legName, isDark: isDark)
+              : FlightLegCardsList(
+                  flights: flights,
+                  lowestPrice: lowestPrice,
+                  bestFlight: bestFlight,
+                  legPrefix: legPrefix,
+                ),
+      ],
+    );
+  }
+}

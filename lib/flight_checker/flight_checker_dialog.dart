@@ -351,8 +351,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                 setState(() => _filterCriteria = const FlightFilterCriteria()),
           )
         else ...[
-          if (isRoundTrip) ...[
-            FlightLegSectionHeader(
+          if (isRoundTrip)
+            FlightLegSection(
               title: 'Departing Flights',
               routeSubtitle: '${_currentParams.origin} → ${_currentParams.destination}',
               date: _currentParams.departureDate,
@@ -366,26 +366,26 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
               isExpanded: _isDepartingExpanded,
               onToggleExpand: () =>
                   setState(() => _isDepartingExpanded = !_isDepartingExpanded),
+              flights: filteredOutbound,
+              bestFlight: bestOutbound,
+              legPrefix: 'outbound',
+              legName: 'departing',
+            )
+          else if (filteredOutbound.isEmpty)
+            FlightEmptyLegNotice(legName: 'departing', isDark: isDark)
+          else
+            FlightLegCardsList(
+              flights: filteredOutbound,
+              lowestPrice: lowestOutbound,
+              bestFlight: bestOutbound,
+              legPrefix: 'outbound',
             ),
-            const SizedBox(height: 6),
-          ],
-          if (_isDepartingExpanded || !isRoundTrip) ...[
-            if (filteredOutbound.isEmpty)
-              FlightEmptyLegNotice(legName: 'departing', isDark: isDark)
-            else
-              FlightLegCardsList(
-                flights: filteredOutbound,
-                lowestPrice: lowestOutbound,
-                bestFlight: bestOutbound,
-                legPrefix: 'outbound',
-              ),
-          ],
           if (isRoundTrip) ...[
             FlightLegSeparator(
               label: 'RETURNING OPTIONS (${_currentParams.destination} → ${_currentParams.origin})',
               isDark: isDark,
             ),
-            FlightLegSectionHeader(
+            FlightLegSection(
               title: 'Returning Flights',
               routeSubtitle: '${_currentParams.destination} → ${_currentParams.origin}',
               date: _currentParams.returnDate ?? '',
@@ -399,19 +399,11 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
               isExpanded: _isReturningExpanded,
               onToggleExpand: () =>
                   setState(() => _isReturningExpanded = !_isReturningExpanded),
+              flights: filteredReturn,
+              bestFlight: bestReturn,
+              legPrefix: 'return',
+              legName: 'returning',
             ),
-            const SizedBox(height: 6),
-            if (_isReturningExpanded) ...[
-              if (filteredReturn.isEmpty)
-                FlightEmptyLegNotice(legName: 'returning', isDark: isDark)
-              else
-                FlightLegCardsList(
-                  flights: filteredReturn,
-                  lowestPrice: lowestReturn,
-                  bestFlight: bestReturn,
-                  legPrefix: 'return',
-                ),
-            ],
           ],
         ],
       ],
