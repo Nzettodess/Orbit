@@ -170,4 +170,11 @@ class AirportHelper {
     }
     return trimmed;
   }
+
+  /// Checks if a given location string maps to a recognized airport with an IATA code
+  static bool hasKnownAirport(String? locationString) {
+    if (locationString == null || locationString.trim().isEmpty) return false;
+    final best = findBestAirport(locationString);
+    return RegExp(r'\([A-Z0-9]{3}\)').hasMatch(best);
+  }
 }

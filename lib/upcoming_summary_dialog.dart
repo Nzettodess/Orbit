@@ -5,6 +5,8 @@ import 'models.dart';
 import 'models/upcoming_item.dart';
 import 'add_event_modal.dart';
 import 'widgets/event_detail_dialog.dart';
+import 'flight_checker/flight_checker_dialog.dart';
+import 'flight_checker/utils/airport_data.dart';
 
 /// Dialog showing upcoming events, location changes, and birthdays
 /// grouped by date. Only dates with items are displayed.
@@ -513,6 +515,141 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
                         ),
                       ),
                       SizedBox(width: isVeryNarrow ? 2 : 4),
+                      // Holiday Getaway Flights Shortcut
+                      if (item.type == UpcomingItemType.holiday)
+                        InkWell(
+                          onTap: () {
+                            String origin = '';
+                            final userDoc = widget.allUsers.firstWhere(
+                              (u) => u['uid'] == widget.currentUserId,
+                              orElse: () => <String, dynamic>{},
+                            );
+                            final defaultLoc = userDoc['defaultLocation'] as String?;
+                            if (defaultLoc != null && defaultLoc.isNotEmpty) {
+                              origin = AirportHelper.findBestAirport(defaultLoc);
+                            }
+                            showFlightCheckerDialog(
+                              context,
+                              origin: origin,
+                              date: item.date,
+                              autoSearch: false,
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isVeryNarrow ? 6 : 8,
+                              vertical: isVeryNarrow ? 2 : 4,
+                            ),
+                            margin: const EdgeInsets.only(right: 4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.red.withValues(alpha: 0.18)
+                                  : Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.red.withValues(alpha: 0.35)
+                                    : Colors.red.shade200,
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.flight_takeoff_rounded,
+                                  size: isVeryNarrow ? 11 : 13,
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.red.shade300
+                                      : Colors.red.shade700,
+                                ),
+                                if (!isVeryNarrow) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Getaway',
+                                    style: TextStyle(
+                                      fontSize: isNarrow ? 10 : 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context).brightness == Brightness.dark
+                                          ? Colors.red.shade300
+                                          : Colors.red.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      // Out-of-town Event Venue Flights Shortcut
+                      if (item.type == UpcomingItemType.event &&
+                          item.event?.venue != null &&
+                          AirportHelper.hasKnownAirport(item.event!.venue))
+                        InkWell(
+                          onTap: () {
+                            String origin = '';
+                            final userDoc = widget.allUsers.firstWhere(
+                              (u) => u['uid'] == widget.currentUserId,
+                              orElse: () => <String, dynamic>{},
+                            );
+                            final defaultLoc = userDoc['defaultLocation'] as String?;
+                            if (defaultLoc != null && defaultLoc.isNotEmpty) {
+                              origin = AirportHelper.findBestAirport(defaultLoc);
+                            }
+                            showFlightCheckerDialog(
+                              context,
+                              origin: origin,
+                              destination: item.event!.venue,
+                              date: item.date,
+                              autoSearch: true,
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isVeryNarrow ? 6 : 8,
+                              vertical: isVeryNarrow ? 2 : 4,
+                            ),
+                            margin: const EdgeInsets.only(right: 4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.blue.withValues(alpha: 0.18)
+                                  : Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.blue.withValues(alpha: 0.35)
+                                    : Colors.blue.shade200,
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.flight_takeoff_rounded,
+                                  size: isVeryNarrow ? 11 : 13,
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.blue.shade300
+                                      : Colors.blue.shade700,
+                                ),
+                                if (!isVeryNarrow) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Flights',
+                                    style: TextStyle(
+                                      fontSize: isNarrow ? 10 : 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context).brightness == Brightness.dark
+                                          ? Colors.blue.shade300
+                                          : Colors.blue.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
                       // Compact group badges
                       _buildGroupBadges(item.groupNames, isNarrow),
                     ],
@@ -548,10 +685,11 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
       onEdit: () {
         if (!_checkCanWrite()) return;
         Navigator.pop(context); // Close event detail
-        Navigator.pop(this.context); // Close upcoming summary
+        // ignore: use_build_context_synchronously
+        Navigator.pop(context); // Close upcoming summary
         // Show edit modal
         showModalBottomSheet(
-          context: this.context,
+          context: context,
           isScrollControlled: true,
           builder: (context) => AddEventModal(
             currentUserId: widget.currentUserId,

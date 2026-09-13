@@ -18,12 +18,16 @@ class FlightCheckerDialog extends StatefulWidget {
   final String? initialOrigin;
   final String? initialDestination;
   final DateTime? initialDate;
+  final DateTime? initialReturnDate;
+  final bool autoSearch;
 
   const FlightCheckerDialog({
     super.key,
     this.initialOrigin,
     this.initialDestination,
     this.initialDate,
+    this.initialReturnDate,
+    this.autoSearch = true,
   });
 
   @override
@@ -49,17 +53,26 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     final depDate = widget.initialDate ?? DateTime.now().add(const Duration(days: 14));
     final depStr = '${depDate.year}-${depDate.month.toString().padLeft(2, '0')}-${depDate.day.toString().padLeft(2, '0')}';
 
+    String? retStr;
+    String tripType = 'oneway';
+    if (widget.initialReturnDate != null) {
+      final retDate = widget.initialReturnDate!;
+      retStr = '${retDate.year}-${retDate.month.toString().padLeft(2, '0')}-${retDate.day.toString().padLeft(2, '0')}';
+      tripType = 'roundtrip';
+    }
+
     _currentParams = FlightSearchParams(
       origin: widget.initialOrigin ?? '',
       destination: widget.initialDestination ?? '',
       departureDate: depStr,
-      returnDate: null,
-      tripType: 'oneway',
+      returnDate: retStr,
+      tripType: tripType,
     );
 
     _isSearchExpanded = true;
 
-    if ((widget.initialOrigin ?? '').isNotEmpty &&
+    if (widget.autoSearch &&
+        (widget.initialOrigin ?? '').isNotEmpty &&
         (widget.initialDestination ?? '').isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _performSearch(_currentParams);
@@ -432,6 +445,8 @@ void showFlightCheckerDialog(
   String? origin,
   String? destination,
   DateTime? date,
+  DateTime? returnDate,
+  bool autoSearch = true,
 }) {
   showDialog(
     context: context,
@@ -439,6 +454,8 @@ void showFlightCheckerDialog(
       initialOrigin: origin,
       initialDestination: destination,
       initialDate: date,
+      initialReturnDate: returnDate,
+      autoSearch: autoSearch,
     ),
   );
 }

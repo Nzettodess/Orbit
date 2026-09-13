@@ -5,7 +5,6 @@ import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
@@ -15,18 +14,15 @@ import 'profile.dart';
 import 'group_management.dart';
 import 'firestore_service.dart';
 import 'models.dart';
-import 'models/placeholder_member.dart';
 import 'location_picker.dart';
 import 'google_calendar_service.dart';
 import 'add_event_modal.dart';
-import 'notification_center.dart';
 import 'settings.dart';
 import 'rsvp_management.dart';
 import 'widgets/home_calendar.dart';
 import 'widgets/home_drawer.dart';
 import 'upcoming_summary_dialog.dart';
 import 'detail_modal.dart';
-import 'widgets/credits_feedback_dialog.dart';
 import 'birthday_baby_dialog.dart';
 import 'services/connectivity_service.dart';
 import 'services/session_service.dart';
@@ -54,7 +50,6 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   String? _pendingJoinGroupId; // For deep link invitations
   double _previousKeyboardHeight = 0;
   final FirestoreService _firestoreService = FirestoreService();
-  final GoogleCalendarService _googleCalendarService = GoogleCalendarService();
 
   List<UserLocation> _locations = [];
   List<UserLocation> _realUserLocations = [];
@@ -1260,14 +1255,16 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     final additional = data['additionalHolidayCountry'];
     if (additional != null && additional is String && additional.isNotEmpty) {
       final calendarId = GoogleCalendarService.countryCalendars[additional];
-      if (calendarId != null && !calendarIds.contains(calendarId))
+      if (calendarId != null && !calendarIds.contains(calendarId)) {
         calendarIds.add(calendarId);
+      }
     }
 
     for (final religionKey in _religiousCalendars) {
       final calendarId = GoogleCalendarService.religiousCalendars[religionKey];
-      if (calendarId != null && !calendarIds.contains(calendarId))
+      if (calendarId != null && !calendarIds.contains(calendarId)) {
         calendarIds.add(calendarId);
+      }
     }
 
     _fetchHolidays(calendarIds);
@@ -1391,7 +1388,12 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     );
   }
 
-  void _openFlightChecker({String? destination, DateTime? date}) {
+  void _openFlightChecker({
+    String? destination,
+    DateTime? date,
+    DateTime? returnDate,
+    bool autoSearch = true,
+  }) {
     String origin = '';
     if (_user != null) {
       final userDoc = _allUsers.firstWhere(
@@ -1409,6 +1411,8 @@ class _HomeWithLoginState extends State<HomeWithLogin>
       origin: origin,
       destination: resolvedDest.isNotEmpty ? resolvedDest : destination,
       date: date,
+      returnDate: returnDate,
+      autoSearch: autoSearch,
     );
   }
 
@@ -1550,6 +1554,26 @@ class _HomeWithLoginState extends State<HomeWithLogin>
                     ? DateFormat('MMM dd, yyyy').format(startDate)
                     : "${DateFormat('MMM dd').format(startDate)} - ${DateFormat('MMM dd, yyyy').format(endDate)}";
 
+                // Check if destination has a recognized airport and is not user's current home location
+                final destStr = state != null && state.isNotEmpty ? '$country, $state' : country;
+                final hasAirport = AirportHelper.hasKnownAirport(destStr);
+
+                String userHome = '';
+                if (_user != null) {
+                  final userDoc = _allUsers.firstWhere(
+                    (u) => u['uid'] == _user!.uid,
+                    orElse: () => <String, dynamic>{},
+                  );
+                  userHome = (userDoc['defaultLocation'] as String?) ?? '';
+                }
+                final userHomeAirport = AirportHelper.findBestAirport(userHome);
+                final targetAirport = AirportHelper.findBestAirport(destStr);
+                final isSameAsHome = userHomeAirport.isNotEmpty &&
+                    targetAirport.isNotEmpty &&
+                    userHomeAirport == targetAirport;
+
+                final showFlightAction = hasAirport && !isSameAsHome;
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
@@ -1558,16 +1582,20 @@ class _HomeWithLoginState extends State<HomeWithLogin>
                     ),
                     backgroundColor: Colors.green,
                     duration: const Duration(seconds: 6),
-                    action: SnackBarAction(
-                      label: 'Check Flights ✈',
-                      textColor: Colors.white,
-                      onPressed: () {
-                        _openFlightChecker(
-                          destination: state != null && state.isNotEmpty ? '$country, $state' : country,
-                          date: startDate,
-                        );
-                      },
-                    ),
+                    action: showFlightAction
+                        ? SnackBarAction(
+                            label: 'Check Flights ✈',
+                            textColor: Colors.white,
+                            onPressed: () {
+                              _openFlightChecker(
+                                destination: destStr,
+                                date: startDate,
+                                returnDate: dayCount > 1 ? endDate : null,
+                                autoSearch: true,
+                              );
+                            },
+                          )
+                        : null,
                   ),
                 );
               }

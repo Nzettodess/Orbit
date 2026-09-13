@@ -6,6 +6,8 @@ import 'firestore_service.dart';
 import 'widgets/syncfusion_date_picker.dart';
 import 'services/notification_service.dart';
 import 'widgets/rich_description_editor.dart';
+import 'flight_checker/flight_checker_dialog.dart';
+import 'flight_checker/utils/airport_data.dart';
 
 class AddEventModal extends StatefulWidget {
   final String currentUserId;
@@ -247,6 +249,63 @@ class _AddEventModalState extends State<AddEventModal> {
                     ),
                   ),
                 ),
+              ),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _venueController,
+                builder: (context, value, _) {
+                  final text = value.text.trim();
+                  if (text.isEmpty || !AirportHelper.hasKnownAirport(text)) {
+                    return const SizedBox.shrink();
+                  }
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: InkWell(
+                        onTap: () {
+                          showFlightCheckerDialog(
+                            context,
+                            destination: text,
+                            date: _selectedDate,
+                            autoSearch: true,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.blue.withValues(alpha: 0.15) : Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isDark ? Colors.blue.withValues(alpha: 0.35) : Colors.blue.shade200,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.flight_takeoff_rounded,
+                                size: 14,
+                                color: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Check flights to venue ↗',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               Row(

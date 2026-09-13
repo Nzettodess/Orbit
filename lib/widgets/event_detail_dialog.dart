@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models.dart';
 import '../core/theme/app_colors.dart';
 import '../flight_checker/flight_checker_dialog.dart';
+import '../flight_checker/utils/airport_data.dart';
 import 'rich_description_viewer.dart';
 
 /// A custom dialog for displaying event details with full markdown support.
@@ -127,40 +128,53 @@ class EventDetailDialog extends StatelessWidget {
                         venue: event.venue!,
                         style: const TextStyle(fontSize: 14),
                       ),
-                      const SizedBox(height: 6),
-                      InkWell(
-                        onTap: () {
-                          Navigator.pop(context);
-                          showFlightCheckerDialog(
-                            context,
-                            destination: event.venue,
-                            date: event.date,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.flight_takeoff_rounded,
-                                size: 15,
-                                color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
+                      if (AirportHelper.hasKnownAirport(event.venue)) ...[
+                        const SizedBox(height: 6),
+                        InkWell(
+                          onTap: () {
+                            Navigator.pop(context);
+                            showFlightCheckerDialog(
+                              context,
+                              destination: event.venue,
+                              date: event.date,
+                              autoSearch: true,
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.iosBlue.withValues(alpha: 0.15)
+                                  : AppColors.iosBlue.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: AppColors.iosBlue.withValues(alpha: isDark ? 0.35 : 0.25),
+                                width: 1,
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Check Flights to Venue ↗',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.flight_takeoff_rounded,
+                                  size: 16,
                                   color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Check Flights to Venue ↗',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 14),
                     ],
                     

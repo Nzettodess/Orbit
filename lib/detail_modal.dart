@@ -15,6 +15,7 @@ import 'widgets/user_profile_dialog.dart';
 import 'widgets/rich_description_viewer.dart';
 import 'widgets/event_detail_dialog.dart';
 import 'flight_checker/flight_checker_dialog.dart';
+import 'flight_checker/utils/airport_data.dart';
 
 class DetailModal extends StatefulWidget {
   final DateTime date;
@@ -1106,29 +1107,75 @@ class _DetailModalState extends State<DetailModal> {
                                 onPressed: () => _togglePin(element.userId),
                               ),
                               // Check flights to this member's location on this date
-                              if (element.nation != "No location selected")
-                                IconButton(
-                                  icon: Icon(Icons.flight_takeoff_rounded, size: iconSize, color: Theme.of(context).colorScheme.primary),
-                                  padding: EdgeInsets.all(iconPadding),
-                                  constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
-                                  tooltip: 'Check flights to $name (${element.state != null && element.state!.isNotEmpty ? element.state : element.nation})',
-                                  onPressed: () {
-                                    final myLoc = widget.locations.where((l) => l.userId == widget.currentUserId).firstOrNull;
-                                    final originStr = myLoc != null && myLoc.nation != "No location selected"
-                                        ? "${myLoc.state != null && myLoc.state!.isNotEmpty ? '${myLoc.state}, ' : ''}${myLoc.nation}"
-                                        : '';
-                                    final destStr = "${element.state != null && element.state!.isNotEmpty ? '${element.state}, ' : ''}${element.nation}";
+                              Builder(
+                                builder: (context) {
+                                  if (element.nation == "No location selected") {
+                                    return const SizedBox.shrink();
+                                  }
 
-                                    showDialog(
-                                      context: context,
-                                      builder: (dialogCtx) => FlightCheckerDialog(
-                                        initialOrigin: originStr.isNotEmpty ? originStr : null,
-                                        initialDestination: destStr,
-                                        initialDate: widget.date,
-                                      ),
+                                  final destStr = "${element.state != null && element.state!.isNotEmpty ? '${element.state}, ' : ''}${element.nation}";
+                                  if (!AirportHelper.hasKnownAirport(destStr)) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  // Get current user's location on this date or fallback to profile default
+                                  final myLoc = widget.locations.where((l) => l.userId == widget.currentUserId).firstOrNull;
+                                  String myNation = '';
+                                  String myState = '';
+                                  String originStr = '';
+
+                                  if (myLoc != null && myLoc.nation != "No location selected") {
+                                    myNation = myLoc.nation;
+                                    myState = myLoc.state ?? '';
+                                    originStr = "${myState.isNotEmpty ? '$myState, ' : ''}$myNation";
+                                  } else {
+                                    final currentUserDoc = widget.allUsers.firstWhere(
+                                      (u) => u['uid'] == widget.currentUserId,
+                                      orElse: () => <String, dynamic>{},
                                     );
-                                  },
-                                ),
+                                    final defaultLoc = currentUserDoc['defaultLocation'] as String?;
+                                    if (defaultLoc != null && defaultLoc.isNotEmpty) {
+                                      originStr = defaultLoc;
+                                      final parts = defaultLoc.split(',').map((s) => s.trim()).toList();
+                                      if (parts.length > 1) {
+                                        myState = parts[0];
+                                        myNation = parts.sublist(1).join(', ');
+                                      } else {
+                                        myNation = defaultLoc;
+                                      }
+                                    }
+                                  }
+
+                                  // Don't show flight button if user is already at the same location
+                                  final isSameLocation = myNation.isNotEmpty &&
+                                      myNation.toLowerCase() == element.nation.toLowerCase() &&
+                                      (myState.toLowerCase() == (element.state ?? '').toLowerCase() ||
+                                          (myState.isEmpty && (element.state?.isEmpty ?? true)));
+
+                                  if (isSameLocation) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  final resolvedOrigin = AirportHelper.findBestAirport(originStr);
+                                  final resolvedDest = AirportHelper.findBestAirport(destStr);
+
+                                  return IconButton(
+                                    icon: Icon(Icons.flight_takeoff_rounded, size: iconSize, color: Theme.of(context).colorScheme.primary),
+                                    padding: EdgeInsets.all(iconPadding),
+                                    constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
+                                    tooltip: 'Check flights to $name (${element.state != null && element.state!.isNotEmpty ? element.state : element.nation})',
+                                    onPressed: () {
+                                      showFlightCheckerDialog(
+                                        context,
+                                        origin: resolvedOrigin.isNotEmpty ? resolvedOrigin : originStr,
+                                        destination: resolvedDest.isNotEmpty ? resolvedDest : destStr,
+                                        date: widget.date,
+                                        autoSearch: true,
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
 
                             ],
                           );
