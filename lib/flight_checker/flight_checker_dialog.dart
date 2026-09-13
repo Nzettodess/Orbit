@@ -47,32 +47,19 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     super.initState();
     final depDate = widget.initialDate ?? DateTime.now().add(const Duration(days: 14));
     final depStr = '${depDate.year}-${depDate.month.toString().padLeft(2, '0')}-${depDate.day.toString().padLeft(2, '0')}';
-    final retDate = depDate.add(const Duration(days: 7));
-    final retStr = '${retDate.year}-${retDate.month.toString().padLeft(2, '0')}-${retDate.day.toString().padLeft(2, '0')}';
 
     _currentParams = FlightSearchParams(
       origin: widget.initialOrigin ?? '',
       destination: widget.initialDestination ?? '',
       departureDate: depStr,
-      returnDate: retStr,
-      tripType: 'roundtrip',
+      returnDate: null,
+      tripType: 'oneway',
     );
 
     if ((widget.initialOrigin ?? '').isNotEmpty &&
         (widget.initialDestination ?? '').isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _performSearch(_currentParams);
-      });
-    } else {
-      _loadSavedTripType();
-    }
-  }
-
-  Future<void> _loadSavedTripType() async {
-    final saved = await FlightService.getLastTripType();
-    if (mounted && saved != _currentParams.tripType) {
-      setState(() {
-        _currentParams = _currentParams.copyWith(tripType: saved);
       });
     }
   }

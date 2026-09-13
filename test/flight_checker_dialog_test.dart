@@ -129,6 +129,9 @@ void main() {
       expect(oneWayTab, findsOneWidget);
       expect(multiTripTab, findsOneWidget);
 
+      // Verify One-Way is selected by default initially: Return field is absent
+      expect(find.text('Return'), findsNothing);
+
       // Tap Round-Trip and verify Return date field appears
       await tester.tap(roundTripTab);
       await tester.pumpAndSettle();

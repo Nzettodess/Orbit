@@ -322,13 +322,15 @@ class FlightLegCardsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: flights.map((flight) {
+      children: flights.asMap().entries.map((entry) {
+        final index = entry.key;
+        final flight = entry.value;
         final isLowest = lowestPrice != null && flight.priceNumeric == lowestPrice;
         final isBest = bestFlight != null &&
             flight.airline == bestFlight!.airline &&
             flight.priceNumeric == bestFlight!.priceNumeric &&
             flight.departure.time == bestFlight!.departure.time;
-        final keyId = 'flight_${legPrefix}_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
+        final keyId = 'flight_${legPrefix}_${index}_${flight.airline}_${flight.departure.time}_${flight.priceNumeric}';
         return FlightCard(
           key: ValueKey(keyId),
           flight: flight,

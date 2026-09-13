@@ -5,6 +5,7 @@ import 'package:whereabouts/flight_checker/utils/flight_filter_helper.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_card.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_multicity_results_view.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_results_header_bar.dart';
+import 'package:whereabouts/flight_checker/widgets/flight_leg_section_header.dart';
 
 void main() {
   final sampleFlight1 = FlightInfo(
@@ -276,6 +277,68 @@ void main() {
       expect(find.text('Best'), findsOneWidget);
       expect(find.text('Lowest Fare'), findsOneWidget);
       expect(find.text('Long wait time'), findsOneWidget);
+    });
+
+    testWidgets('FlightLegCardsList renders identical flights in multi-city Trip 6 without duplicate keys', (tester) async {
+      final flightA = FlightInfo(
+        airline: 'Air France',
+        stops: '1 stop',
+        duration: '14h 20m',
+        price: 'RM 2,943',
+        priceNumeric: 2943,
+        departure: const FlightEndpoint(
+          airport: 'Paris (CDG)',
+          time: '12:40 AM',
+          date: '2026-10-30',
+        ),
+        arrival: const FlightEndpoint(
+          airport: 'New York (JFK)',
+          time: '03:00 PM',
+          date: '2026-10-30',
+        ),
+        deepLink: 'https://google.com/travel/flights',
+      );
+
+      final flightB = FlightInfo(
+        airline: 'Air France',
+        stops: '1 stop',
+        duration: '15h 10m',
+        price: 'RM 2,943',
+        priceNumeric: 2943,
+        departure: const FlightEndpoint(
+          airport: 'Paris (CDG)',
+          time: '12:40 AM',
+          date: '2026-10-30',
+        ),
+        arrival: const FlightEndpoint(
+          airport: 'New York (JFK)',
+          time: '03:50 PM',
+          date: '2026-10-30',
+        ),
+        deepLink: 'https://google.com/travel/flights',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: FlightLegCardsList(
+                flights: [flightA, flightB],
+                lowestPrice: 2943,
+                bestFlight: null,
+                legPrefix: 'multicity_5',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(FlightCard), findsNWidgets(2));
+      expect(find.text('Air France'), findsNWidgets(2));
+      expect(find.text('12:40 AM'), findsNWidgets(2));
+      expect(find.text('RM 2,943'), findsNWidgets(2));
     });
   });
 }

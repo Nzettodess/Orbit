@@ -124,9 +124,9 @@ class FlightService {
   static Future<String> getLastTripType() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(_prefLastTripType) ?? 'roundtrip';
+      return prefs.getString(_prefLastTripType) ?? 'oneway';
     } catch (_) {
-      return 'roundtrip';
+      return 'oneway';
     }
   }
 
