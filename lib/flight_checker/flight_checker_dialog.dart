@@ -9,6 +9,7 @@ import 'widgets/flight_checker_status_views.dart';
 import 'widgets/flight_filter_bar.dart';
 import 'widgets/flight_leg_section_header.dart';
 import 'widgets/flight_leg_tab_bar.dart';
+import 'widgets/flight_multicity_results_view.dart';
 import 'widgets/flight_results_header_bar.dart';
 import 'widgets/flight_search_form.dart';
 
@@ -38,18 +39,16 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   FlightFilterCriteria _filterCriteria = const FlightFilterCriteria();
   bool _isDepartingExpanded = true;
   bool _isReturningExpanded = true;
+  final Map<int, bool> _multiCityExpanded = {};
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    final depDate =
-        widget.initialDate ?? DateTime.now().add(const Duration(days: 14));
-    final depStr =
-        '${depDate.year}-${depDate.month.toString().padLeft(2, '0')}-${depDate.day.toString().padLeft(2, '0')}';
+    final depDate = widget.initialDate ?? DateTime.now().add(const Duration(days: 14));
+    final depStr = '${depDate.year}-${depDate.month.toString().padLeft(2, '0')}-${depDate.day.toString().padLeft(2, '0')}';
     final retDate = depDate.add(const Duration(days: 7));
-    final retStr =
-        '${retDate.year}-${retDate.month.toString().padLeft(2, '0')}-${retDate.day.toString().padLeft(2, '0')}';
+    final retStr = '${retDate.year}-${retDate.month.toString().padLeft(2, '0')}-${retDate.day.toString().padLeft(2, '0')}';
 
     _currentParams = FlightSearchParams(
       origin: widget.initialOrigin ?? '',
@@ -59,7 +58,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       tripType: 'roundtrip',
     );
 
-    // Auto-trigger search if both origin and destination were passed
     if ((widget.initialOrigin ?? '').isNotEmpty &&
         (widget.initialDestination ?? '').isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -75,51 +73,51 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   }
 
   void _toggleAllLegs() {
-    final anyOpen = _isDepartingExpanded || _isReturningExpanded;
-    if (anyOpen) {
-      if (_scrollController.hasClients && _scrollController.offset > 0) {
-        _scrollController.animateTo(
-          0.0,
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeInOutCubic,
-        );
+    final isMultiTrip =
+        _response?.isMultiCity == true || _currentParams.tripType == 'multicity';
+    if (isMultiTrip) {
+      final anyOpen = _multiCityExpanded.values.any((v) => v);
+      if (anyOpen && _scrollController.hasClients && _scrollController.offset > 0) {
+        _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
       }
       setState(() {
-        _isDepartingExpanded = false;
-        _isReturningExpanded = false;
+        for (final key in _multiCityExpanded.keys.toList()) {
+          _multiCityExpanded[key] = !anyOpen;
+        }
       });
-    } else {
-      setState(() {
-        _isDepartingExpanded = true;
-        _isReturningExpanded = true;
-      });
+      return;
     }
+
+    final anyOpen = _isDepartingExpanded || _isReturningExpanded;
+    if (anyOpen && _scrollController.hasClients && _scrollController.offset > 0) {
+      _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
+    }
+    setState(() {
+      _isDepartingExpanded = !anyOpen;
+      _isReturningExpanded = !anyOpen;
+    });
   }
 
   void _toggleDeparting() {
-    if (_isDepartingExpanded &&
-        _scrollController.hasClients &&
-        _scrollController.offset > 0) {
-      _scrollController.animateTo(
-        0.0,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeInOutCubic,
-      );
+    if (_isDepartingExpanded && _scrollController.hasClients && _scrollController.offset > 0) {
+      _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
     }
     setState(() => _isDepartingExpanded = !_isDepartingExpanded);
   }
 
   void _toggleReturning() {
-    if (_isReturningExpanded &&
-        _scrollController.hasClients &&
-        _scrollController.offset > 0) {
-      _scrollController.animateTo(
-        0.0,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeInOutCubic,
-      );
+    if (_isReturningExpanded && _scrollController.hasClients && _scrollController.offset > 0) {
+      _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
     }
     setState(() => _isReturningExpanded = !_isReturningExpanded);
+  }
+
+  void _toggleMultiCityLeg(int index) {
+    final isCurrentlyExpanded = _multiCityExpanded[index] ?? true;
+    if (isCurrentlyExpanded && _scrollController.hasClients && _scrollController.offset > 0) {
+      _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
+    }
+    setState(() => _multiCityExpanded[index] = !isCurrentlyExpanded);
   }
 
   void _handleCurrencyChanged(String newCurrency) {
@@ -128,7 +126,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     _currentParams = updated;
     _filterCriteria = const FlightFilterCriteria();
 
-    // Instant 0ms repaint if this currency was already retrieved
     if (_currencyCache.containsKey(newCurrency)) {
       setState(() {
         _response = _currencyCache[newCurrency];
@@ -136,7 +133,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         _errorMessage = null;
       });
     } else if (_response != null && _response!.flights.isNotEmpty) {
-      // Query Google Flights live in the new currency for 100% genuine airline quotes
       _performSearch(updated);
     }
   }
@@ -146,11 +142,9 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     setState(() {
       String? returnDate = _currentParams.returnDate;
       if (newTripType == 'roundtrip' && (returnDate == null || returnDate.isEmpty)) {
-        final dep = DateTime.tryParse(_currentParams.departureDate) ??
-            DateTime.now().add(const Duration(days: 14));
+        final dep = DateTime.tryParse(_currentParams.departureDate) ?? DateTime.now().add(const Duration(days: 14));
         final ret = dep.add(const Duration(days: 7));
-        returnDate =
-            '${ret.year}-${ret.month.toString().padLeft(2, '0')}-${ret.day.toString().padLeft(2, '0')}';
+        returnDate = '${ret.year}-${ret.month.toString().padLeft(2, '0')}-${ret.day.toString().padLeft(2, '0')}';
       }
       _currentParams = _currentParams.copyWith(
         tripType: newTripType,
@@ -167,6 +161,12 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       _filterCriteria = const FlightFilterCriteria();
       _isDepartingExpanded = true;
       _isReturningExpanded = true;
+      _multiCityExpanded.clear();
+      if (params.multiCityLegs != null) {
+        for (int i = 0; i < params.multiCityLegs!.length; i++) {
+          _multiCityExpanded[i] = true;
+        }
+      }
     });
 
     final res = await FlightService.searchFlights(params);
@@ -175,12 +175,14 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       setState(() {
         _isLoading = false;
         _response = res;
+        for (final leg in res.multiCityLegs) {
+          _multiCityExpanded.putIfAbsent(leg.legIndex, () => true);
+        }
         if (res.success && res.flights.isNotEmpty) {
           _currencyCache[params.currency] = res;
         }
         if (!res.success) {
-          _errorMessage =
-              res.error ?? 'Could not retrieve flights at this time.';
+          _errorMessage = res.error ?? 'Could not retrieve flights at this time.';
         }
       });
     }
@@ -205,7 +207,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
         child: Column(
           children: [
-            // 1. Dialog Header with solid opaque background
             FlightCheckerDialogHeader(
               isDark: isDark,
               bgColor: dialogBg,
@@ -214,12 +215,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
             Divider(
               height: 1,
               thickness: 1,
-              color: isDark
-                  ? AppColors.darkElevatedHighest
-                  : AppColors.iosGray5,
+              color: isDark ? AppColors.darkElevatedHighest : AppColors.iosGray5,
             ),
-
-            // 2. Scrollable Body with strict clipping
             Expanded(
               child: ClipRect(
                 child: SingleChildScrollView(
@@ -249,26 +246,32 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   }
 
   Widget _buildResultsSection(bool isDark) {
-    if (_isLoading) {
-      return _buildLoadingState(isDark);
-    }
-
-    if (_errorMessage != null) {
-      return _buildErrorFallback(isDark);
-    }
-
-    if (_response == null) {
-      return const SizedBox.shrink();
-    }
-
-    if (_response!.flights.isEmpty) {
-      return _buildEmptyState(isDark);
-    }
-
+    if (_isLoading) return _buildLoadingState(isDark);
+    if (_errorMessage != null) return _buildErrorFallback(isDark);
+    if (_response == null) return const SizedBox.shrink();
+    if (_response!.flights.isEmpty) return _buildEmptyState(isDark);
     return _buildFlightResults(isDark);
   }
 
   Widget _buildFlightResults(bool isDark) {
+    final isMultiTrip =
+        _response?.isMultiCity == true || _currentParams.tripType == 'multicity';
+    if (isMultiTrip && (_response?.multiCityLegs.isNotEmpty ?? false)) {
+      return FlightMultiCityResultsView(
+        multiCityLegs: _response!.multiCityLegs,
+        expandedMap: _multiCityExpanded,
+        onToggleLeg: _toggleMultiCityLeg,
+        onToggleAllLegs: _toggleAllLegs,
+        filterCriteria: _filterCriteria,
+        onFilterChanged: (updated) => setState(() => _filterCriteria = updated),
+        currency: _currentParams.currency,
+        fallbackUrl: _response!.fallbackUrl.isNotEmpty
+            ? _response!.fallbackUrl
+            : FlightService.buildGoogleFlightsFallbackUrl(_currentParams),
+        isDark: isDark,
+      );
+    }
+
     final isRoundTrip = _response?.isRoundTrip == true || _currentParams.tripType == 'roundtrip';
 
     final outboundFlights = isRoundTrip

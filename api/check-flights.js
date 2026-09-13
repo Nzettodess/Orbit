@@ -27,23 +27,8 @@ export function formatCurrencyPrice(amount, currencyCode = 'MYR') {
   if (isNaN(num)) return String(amount);
   const formatted = num.toLocaleString('en-US');
   const code = (currencyCode || 'MYR').toUpperCase();
-  switch (code) {
-    case 'MYR': return `RM ${formatted}`;
-    case 'USD': return `$${formatted}`;
-    case 'SGD': return `S$${formatted}`;
-    case 'EUR': return `€${formatted}`;
-    case 'GBP': return `£${formatted}`;
-    case 'JPY': return `¥${formatted}`;
-    case 'AUD': return `A$${formatted}`;
-    case 'CAD': return `C$${formatted}`;
-    case 'CNY': return `¥${formatted}`;
-    case 'THB': return `฿${formatted}`;
-    case 'IDR': return `Rp ${formatted}`;
-    case 'TWD': return `NT$${formatted}`;
-    case 'KRW': return `₩${formatted}`;
-    case 'HKD': return `HK$${formatted}`;
-    default: return `${code} ${formatted}`;
-  }
+  const syms = { MYR: 'RM', USD: '$', SGD: 'S$', EUR: '€', GBP: '£', JPY: '¥', AUD: 'A$', CAD: 'C$', CNY: '¥', THB: '฿', IDR: 'Rp', TWD: 'NT$', KRW: '₩', HKD: 'HK$' };
+  return `${syms[code] || code} ${formatted}`;
 }
 
 export function formatLegroom(val) {
@@ -362,14 +347,80 @@ export default async function handler(req, res) {
     fallbackUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(fallbackQuery)}&curr=${currency}&hl=en`;
     searchUrl = fallbackUrl;
 
+    function buildLegQuery(from, to, date) {
+      let q = `Flights from ${from} to ${to} on ${date} one way`;
+      if (cabinClass === 'business') q += ' business class';
+      else if (cabinClass === 'first') q += ' first class';
+      else if (cabinClass === 'premiumeconomy') q += ' premium economy';
+      if (adults > 1) q += ` ${adults} adults`;
+      if (children > 0) q += ` ${children} children`;
+      return q;
+    }
+
     if (tripType === 'multicity') {
+      let rawLegs = params.multiCityLegs;
+      if (typeof rawLegs === 'string') {
+        try { rawLegs = JSON.parse(rawLegs); } catch (_) { rawLegs = []; }
+      }
+      if (!Array.isArray(rawLegs) || rawLegs.length === 0) {
+        rawLegs = [
+          { origin: rawOrigin, destination: rawDestination, date: departureDate },
+          { origin: rawDestination, destination: rawOrigin, date: returnDate || departureDate }
+        ];
+      }
+
+      const parsedLegs = rawLegs.map((leg, index) => {
+        const o = normalizeLocation(leg.origin || '') || (leg.origin || '');
+        const d = normalizeLocation(leg.destination || '') || (leg.destination || '');
+        const dt = (leg.date || '').trim();
+        return {
+          legIndex: index,
+          title: `Trip ${index + 1}`,
+          origin: o,
+          destination: d,
+          date: dt,
+        };
+      }).filter(l => l.origin && l.destination && l.date);
+
+      if (parsedLegs.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Multi-trip requires at least one valid leg with origin, destination, and date.',
+          fallbackUrl,
+        });
+      }
+
+      const multiFallbackParts = parsedLegs.map((l, i) =>
+        i === 0 ? `Flights from ${l.origin} to ${l.destination} on ${l.date}` : `then from ${l.origin} to ${l.destination} on ${l.date}`
+      );
+      fallbackUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(multiFallbackParts.join(' '))}&curr=${currency}&hl=en`;
+
+      const legResults = await Promise.all(
+        parsedLegs.map(l =>
+          scrapeGoogleFlights(buildLegQuery(l.origin, l.destination, l.date), currency, fallbackUrl, l.origin, l.destination, l.date, l.date)
+        )
+      );
+
+      const multiCityLegs = parsedLegs.map((l, i) => ({
+        legIndex: l.legIndex,
+        title: l.title,
+        origin: l.origin,
+        destination: l.destination,
+        date: l.date,
+        flights: legResults[i] || [],
+      }));
+
+      const totalCount = multiCityLegs.reduce((sum, l) => sum + l.flights.length, 0);
+
       return res.status(200).json({
         success: true,
+        tripType: 'multicity',
         isMultiCity: true,
-        message: 'Multi-city routes are best explored directly on Google Flights.',
-        flights: [],
-        outboundFlights: [],
-        returnFlights: [],
+        count: totalCount,
+        multiCityLegs,
+        outboundFlights: multiCityLegs[0]?.flights || [],
+        returnFlights: multiCityLegs[1]?.flights || [],
+        flights: multiCityLegs[0]?.flights || [],
         fallbackUrl,
       });
     }
@@ -380,16 +431,6 @@ export default async function handler(req, res) {
         error: 'Missing required parameters: origin, destination, and departureDate are required.',
         fallbackUrl,
       });
-    }
-
-    function buildLegQuery(from, to, date) {
-      let q = `Flights from ${from} to ${to} on ${date} one way`;
-      if (cabinClass === 'business') q += ' business class';
-      else if (cabinClass === 'first') q += ' first class';
-      else if (cabinClass === 'premiumeconomy') q += ' premium economy';
-      if (adults > 1) q += ` ${adults} adults`;
-      if (children > 0) q += ` ${children} children`;
-      return q;
     }
 
     if (tripType === 'roundtrip' && returnDate) {

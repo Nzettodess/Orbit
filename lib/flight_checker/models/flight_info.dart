@@ -217,6 +217,32 @@ class FlightInfo {
   };
 }
 
+/// Parameter for an individual leg in a multi-city route
+@immutable
+class FlightLegParam {
+  final String origin;
+  final String destination;
+  final String date;
+
+  const FlightLegParam({
+    required this.origin,
+    required this.destination,
+    required this.date,
+  });
+
+  factory FlightLegParam.fromJson(Map<String, dynamic> json) => FlightLegParam(
+        origin: json['origin'] as String? ?? '',
+        destination: json['destination'] as String? ?? '',
+        date: json['date'] as String? ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'origin': origin,
+        'destination': destination,
+        'date': date,
+      };
+}
+
 /// Search parameter query model
 @immutable
 class FlightSearchParams {
@@ -230,6 +256,7 @@ class FlightSearchParams {
   final int cabinClassIndex;
   final String cabinClass; // 'economy' | 'premiumeconomy' | 'business' | 'first'
   final String currency;
+  final List<FlightLegParam>? multiCityLegs;
 
   const FlightSearchParams({
     required this.origin,
@@ -241,6 +268,7 @@ class FlightSearchParams {
     this.children = 0,
     this.cabinClass = 'economy',
     this.currency = 'MYR',
+    this.multiCityLegs,
   }) : cabinClassIndex = 0;
 
   FlightSearchParams copyWith({
@@ -253,6 +281,7 @@ class FlightSearchParams {
     int? children,
     String? cabinClass,
     String? currency,
+    List<FlightLegParam>? multiCityLegs,
   }) {
     return FlightSearchParams(
       origin: origin ?? this.origin,
@@ -264,6 +293,7 @@ class FlightSearchParams {
       children: children ?? this.children,
       cabinClass: cabinClass ?? this.cabinClass,
       currency: currency ?? this.currency,
+      multiCityLegs: multiCityLegs ?? this.multiCityLegs,
     );
   }
 
@@ -277,6 +307,51 @@ class FlightSearchParams {
     'children': children,
     'cabinClass': cabinClass,
     'currency': currency,
+    if (multiCityLegs != null)
+      'multiCityLegs': multiCityLegs!.map((e) => e.toJson()).toList(),
+  };
+}
+
+/// Multi-city leg flight grouping model for response
+@immutable
+class FlightMultiCityLegGroup {
+  final int legIndex;
+  final String title;
+  final String origin;
+  final String destination;
+  final String date;
+  final List<FlightInfo> flights;
+
+  const FlightMultiCityLegGroup({
+    required this.legIndex,
+    required this.title,
+    required this.origin,
+    required this.destination,
+    required this.date,
+    this.flights = const [],
+  });
+
+  factory FlightMultiCityLegGroup.fromJson(Map<String, dynamic> json) {
+    final rawFlights = json['flights'] as List<dynamic>? ?? [];
+    return FlightMultiCityLegGroup(
+      legIndex: (json['legIndex'] as num?)?.toInt() ?? 0,
+      title: json['title'] as String? ?? 'Trip 1',
+      origin: json['origin'] as String? ?? '',
+      destination: json['destination'] as String? ?? '',
+      date: json['date'] as String? ?? '',
+      flights: rawFlights
+          .map((f) => FlightInfo.fromJson(f as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'legIndex': legIndex,
+    'title': title,
+    'origin': origin,
+    'destination': destination,
+    'date': date,
+    'flights': flights.map((f) => f.toJson()).toList(),
   };
 }
 
@@ -288,6 +363,7 @@ class FlightSearchResponse {
   final List<FlightInfo> flights;
   final List<FlightInfo> outboundFlights;
   final List<FlightInfo> returnFlights;
+  final List<FlightMultiCityLegGroup> multiCityLegs;
   final String fallbackUrl;
   final String? error;
   final String tripType;
@@ -299,6 +375,7 @@ class FlightSearchResponse {
     this.flights = const [],
     this.outboundFlights = const [],
     this.returnFlights = const [],
+    this.multiCityLegs = const [],
     required this.fallbackUrl,
     this.error,
     this.tripType = 'oneway',
@@ -311,6 +388,7 @@ class FlightSearchResponse {
     final rawFlights = json['flights'] as List<dynamic>? ?? [];
     final rawOutbound = json['outboundFlights'] as List<dynamic>?;
     final rawReturn = json['returnFlights'] as List<dynamic>?;
+    final rawMultiCity = json['multiCityLegs'] as List<dynamic>? ?? [];
 
     final parsedFlights = rawFlights
         .map((f) => FlightInfo.fromJson(f as Map<String, dynamic>))
@@ -321,6 +399,12 @@ class FlightSearchResponse {
     final parsedReturn = rawReturn != null
         ? rawReturn.map((f) => FlightInfo.fromJson(f as Map<String, dynamic>)).toList()
         : const <FlightInfo>[];
+    final parsedMultiCity = rawMultiCity
+        .map((l) => FlightMultiCityLegGroup.fromJson(l as Map<String, dynamic>))
+        .toList();
+
+    final isMulti = json['isMultiCity'] as bool? ??
+        (json['tripType'] == 'multicity' || parsedMultiCity.isNotEmpty);
 
     return FlightSearchResponse(
       success: json['success'] as bool? ?? false,
@@ -328,10 +412,12 @@ class FlightSearchResponse {
       flights: parsedFlights,
       outboundFlights: parsedOutbound,
       returnFlights: parsedReturn,
+      multiCityLegs: parsedMultiCity,
       fallbackUrl: json['fallbackUrl'] as String? ?? '',
       error: json['error'] as String?,
-      tripType: json['tripType'] as String? ?? (parsedReturn.isNotEmpty ? 'roundtrip' : 'oneway'),
-      isMultiCity: json['isMultiCity'] as bool? ?? false,
+      tripType: json['tripType'] as String? ??
+          (isMulti ? 'multicity' : (parsedReturn.isNotEmpty ? 'roundtrip' : 'oneway')),
+      isMultiCity: isMulti,
     );
   }
 }

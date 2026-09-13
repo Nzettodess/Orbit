@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../models/flight_info.dart';
-import '../services/flight_service.dart';
 import '../utils/airport_data.dart';
-import '../utils/currency_helper.dart';
 import 'airport_autocomplete_field.dart';
+import 'flight_multicity_input_list.dart';
+import 'flight_trip_type_selector.dart';
 import 'passenger_selector.dart';
 import 'popup_selector_field.dart';
 
@@ -41,6 +41,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
   late String _cabinClass;
   late String _currency;
   bool _showPassengerPicker = false;
+  late List<EditableTripLeg> _multiCityLegs;
 
   @override
   void initState() {
@@ -62,13 +63,95 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
     _children = widget.initialParams.children.clamp(0, 8);
     _cabinClass = widget.initialParams.cabinClass;
     _currency = widget.initialParams.currency.isNotEmpty ? widget.initialParams.currency : 'MYR';
+
+    _multiCityLegs = (widget.initialParams.multiCityLegs?.isNotEmpty ?? false)
+        ? widget.initialParams.multiCityLegs!
+            .map((l) => EditableTripLeg(
+                  origin: l.origin,
+                  destination: l.destination,
+                  date: DateTime.tryParse(l.date) ?? DateTime.now().add(const Duration(days: 14)),
+                ))
+            .toList()
+        : [
+            EditableTripLeg(
+              origin: initialOrigin.isNotEmpty ? initialOrigin : widget.initialParams.origin,
+              destination: initialDest.isNotEmpty ? initialDest : widget.initialParams.destination,
+              date: _departureDate,
+            ),
+            EditableTripLeg(
+              origin: initialDest.isNotEmpty ? initialDest : widget.initialParams.destination,
+              destination: initialOrigin.isNotEmpty ? initialOrigin : widget.initialParams.origin,
+              date: _returnDate ?? _departureDate.add(const Duration(days: 7)),
+            ),
+          ];
   }
 
   @override
   void dispose() {
     _originController.dispose();
     _destinationController.dispose();
+    for (final l in _multiCityLegs) {
+      l.dispose();
+    }
     super.dispose();
+  }
+
+  void _handleAddMultiCityLeg() {
+    if (_multiCityLegs.length >= 6) return;
+    setState(() {
+      final lastLeg = _multiCityLegs.isNotEmpty ? _multiCityLegs.last : null;
+      final nextOrigin = lastLeg?.destController.text.trim() ?? '';
+      final nextDate = lastLeg != null
+          ? lastLeg.date.add(const Duration(days: 3))
+          : _departureDate.add(const Duration(days: 10));
+      _multiCityLegs.add(EditableTripLeg(origin: nextOrigin, destination: '', date: nextDate));
+    });
+  }
+
+  void _handleRemoveMultiCityLeg(int index) {
+    if (_multiCityLegs.length <= 2) return;
+    setState(() => _multiCityLegs.removeAt(index).dispose());
+  }
+
+  Future<void> _handlePickMultiCityDate(int index) async {
+    final leg = _multiCityLegs[index];
+    final now = DateTime.now();
+    final first = index > 0 ? _multiCityLegs[index - 1].date : now;
+    final initial = leg.date.isBefore(first) ? first : leg.date;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: first,
+      lastDate: now.add(const Duration(days: 365)),
+    );
+
+    if (picked != null) {
+      setState(() => leg.date = picked);
+    }
+  }
+
+  void _handleSwapMultiCityLocations(int index) {
+    final leg = _multiCityLegs[index];
+    setState(() {
+      final temp = leg.originController.text;
+      leg.originController.text = leg.destController.text;
+      leg.destController.text = temp;
+    });
+  }
+
+  void _handleTripTypeChanged(String key) {
+    if (key == _tripType) return;
+    setState(() {
+      _tripType = key;
+      if (key == 'roundtrip') {
+        _returnDate ??= _departureDate.add(const Duration(days: 7));
+        if (_returnDate!.isBefore(_departureDate)) {
+          _returnDate = _departureDate.add(const Duration(days: 7));
+        }
+      }
+    });
+    widget.onTripTypeChanged?.call(key);
   }
 
   void _swapLocations() {
@@ -112,7 +195,33 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
     final effectiveReturn = _returnDate ?? _departureDate.add(const Duration(days: 7));
     final retStr = DateFormat('yyyy-MM-dd').format(effectiveReturn);
 
-    final params = FlightSearchParams(
+    if (_tripType == 'multicity') {
+      final legs = _multiCityLegs
+          .map((l) => FlightLegParam(
+                origin: l.originController.text.trim(),
+                destination: l.destController.text.trim(),
+                date: DateFormat('yyyy-MM-dd').format(l.date),
+              ))
+          .toList();
+      final firstLeg = legs.isNotEmpty ? legs.first : null;
+      final lastLeg = legs.length > 1 ? legs.last : firstLeg;
+
+      widget.onSearch(FlightSearchParams(
+        origin: firstLeg?.origin ?? _originController.text.trim(),
+        destination: lastLeg?.destination ?? _destinationController.text.trim(),
+        departureDate: firstLeg?.date ?? depStr,
+        returnDate: null,
+        tripType: 'multicity',
+        adults: _adults,
+        children: _children,
+        cabinClass: _cabinClass,
+        currency: _currency,
+        multiCityLegs: legs,
+      ));
+      return;
+    }
+
+    widget.onSearch(FlightSearchParams(
       origin: _originController.text.trim(),
       destination: _destinationController.text.trim(),
       departureDate: depStr,
@@ -122,9 +231,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
       children: _children,
       cabinClass: _cabinClass,
       currency: _currency,
-    );
-
-    widget.onSearch(params);
+    ));
   }
 
   @override
@@ -136,10 +243,25 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 1. Trip Type Segmented Control
-        _buildTripTypeSelector(isDark),
+        FlightTripTypeSelector(
+          selectedTripType: _tripType,
+          onChanged: _handleTripTypeChanged,
+          isDark: isDark,
+        ),
         const SizedBox(height: 14),
 
-        // Origin & Destination with Autocomplete and Swap button (Responsive)
+        if (_tripType == 'multicity') ...[
+          FlightMultiCityInputList(
+            legs: _multiCityLegs,
+            onAddLeg: _handleAddMultiCityLeg,
+            onRemoveLeg: _handleRemoveMultiCityLeg,
+            onPickDate: _handlePickMultiCityDate,
+            onSwapLocations: _handleSwapMultiCityLocations,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 12),
+        ] else ...[
+          // Origin & Destination with Autocomplete and Swap button (Responsive)
           LayoutBuilder(
             builder: (context, constraints) {
               final textScale = MediaQuery.textScalerOf(context).scale(1.0);
@@ -217,7 +339,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
           Row(
             children: [
               Expanded(
-                child: _buildDateTile(
+                child: FlightDateTile(
                   label: 'Departure',
                   date: _departureDate,
                   onTap: () => _pickDate(isReturn: false),
@@ -228,7 +350,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
               if (_tripType == 'roundtrip') ...[
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _buildDateTile(
+                  child: FlightDateTile(
                     label: 'Return',
                     date: _returnDate ?? _departureDate.add(const Duration(days: 7)),
                     onTap: () => _pickDate(isReturn: true),
@@ -240,212 +362,104 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
             ],
           ),
           const SizedBox(height: 12),
+        ],
 
-          // Passengers, Class & Currency Row (Responsive for mobile viewports)
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final textScale = MediaQuery.textScalerOf(context).scale(1.0);
-              final isVeryNarrow = constraints.maxWidth < 340 || textScale > 1.2;
-              final isNarrow = constraints.maxWidth < 450;
-              final passTile = PassengerTile(
-                adults: _adults,
-                children: _children,
-                isExpanded: _showPassengerPicker,
-                onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker),
-                bg: fieldBg,
-                isDark: isDark,
-              );
-
-              if (isNarrow) {
-                return Column(
-                  children: [
-                    passTile,
-                    const SizedBox(height: 10),
-                    if (isVeryNarrow) ...[
-                       _buildClassDropdown(fieldBg, isDark),
-                      const SizedBox(height: 10),
-                      _buildCurrencyDropdown(fieldBg, isDark),
-                    ] else ...[
-                      Row(
-                        children: [
-                          Expanded(child: _buildClassDropdown(fieldBg, isDark)),
-                          const SizedBox(width: 8),
-                          Expanded(child: _buildCurrencyDropdown(fieldBg, isDark)),
-                        ],
-                      ),
-                    ],
-                  ],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(flex: 3, child: passTile),
-                  const SizedBox(width: 8),
-                  Expanded(flex: 2, child: _buildClassDropdown(fieldBg, isDark)),
-                  const SizedBox(width: 8),
-                  Expanded(flex: 2, child: _buildCurrencyDropdown(fieldBg, isDark)),
-                ],
-              );
-            },
-          ),
-          if (_showPassengerPicker) ...[
-            const SizedBox(height: 10),
-            PassengerControlPanel(
+        // Passengers, Class & Currency Row (Responsive for mobile viewports)
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+            final isVeryNarrow = constraints.maxWidth < 340 || textScale > 1.2;
+            final isNarrow = constraints.maxWidth < 450;
+            final passTile = PassengerTile(
               adults: _adults,
               children: _children,
-              onChanged: (a, c) => setState(() {
-                _adults = a;
-                _children = c;
-              }),
-              onDone: () => setState(() => _showPassengerPicker = false),
+              isExpanded: _showPassengerPicker,
+              onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker),
+              bg: fieldBg,
               isDark: isDark,
-            ),
-          ],
-          const SizedBox(height: 16),
+            );
+            final classDrop = FlightClassDropdown(
+              cabinClass: _cabinClass,
+              onSelected: (val) => setState(() => _cabinClass = val),
+              bg: fieldBg,
+              isDark: isDark,
+            );
+            final currDrop = FlightCurrencyDropdown(
+              currency: _currency,
+              onSelected: (val) {
+                setState(() => _currency = val);
+                widget.onCurrencyChanged?.call(val);
+              },
+              bg: fieldBg,
+              isDark: isDark,
+            );
 
-          // Search Button
-          ElevatedButton.icon(
-            onPressed: widget.isLoading ? null : _submit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.iosBlue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
-            ),
-            icon: widget.isLoading
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.search_rounded, size: 18),
-            label: Text(
-              widget.isLoading ? 'Searching flights…' : 'Find Flights',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildTripTypeSelector(bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkElevated : AppColors.lightSecondaryBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      padding: const EdgeInsets.all(3),
-      child: Row(
-        children: [
-          _buildSegment('oneway', 'One-Way'),
-          _buildSegment('roundtrip', 'Round-Trip'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSegment(String key, String title) {
-    final isSelected = _tripType == key;
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _tripType = key;
-            if (key == 'roundtrip') {
-              _returnDate ??= _departureDate.add(const Duration(days: 7));
-              if (_returnDate!.isBefore(_departureDate)) {
-                _returnDate = _departureDate.add(const Duration(days: 7));
-              }
+            if (isNarrow) {
+              return Column(
+                children: [
+                  passTile,
+                  const SizedBox(height: 10),
+                  if (isVeryNarrow) ...[
+                    classDrop,
+                    const SizedBox(height: 10),
+                    currDrop,
+                  ] else ...[
+                    Row(
+                      children: [
+                        Expanded(child: classDrop),
+                        const SizedBox(width: 8),
+                        Expanded(child: currDrop),
+                      ],
+                    ),
+                  ],
+                ],
+              );
             }
-          });
-          widget.onTripTypeChanged?.call(key);
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.iosBlue : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? AppColors.darkSecondary : AppColors.lightSecondary),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-
-  Widget _buildDateTile({
-    required String label,
-    required DateTime date,
-    required VoidCallback onTap,
-    required Color fieldBg,
-    required bool isDark,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary)),
-        const SizedBox(height: 4),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(color: fieldBg, borderRadius: BorderRadius.circular(10)),
-            child: Row(
+            return Row(
               children: [
-                Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.iosBlue),
+                Expanded(flex: 3, child: passTile),
                 const SizedBox(width: 8),
-                Text(DateFormat('MMM d, yyyy').format(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                Expanded(flex: 2, child: classDrop),
+                const SizedBox(width: 8),
+                Expanded(flex: 2, child: currDrop),
               ],
-            ),
+            );
+          },
+        ),
+        if (_showPassengerPicker) ...[
+          const SizedBox(height: 10),
+          PassengerControlPanel(
+            adults: _adults,
+            children: _children,
+            onChanged: (a, c) => setState(() {
+              _adults = a;
+              _children = c;
+            }),
+            onDone: () => setState(() => _showPassengerPicker = false),
+            isDark: isDark,
+          ),
+        ],
+        const SizedBox(height: 16),
+
+        // Search Button
+        ElevatedButton.icon(
+          onPressed: widget.isLoading ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.iosBlue,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            elevation: 0,
+          ),
+          icon: widget.isLoading
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.search_rounded, size: 18),
+          label: Text(
+            widget.isLoading ? 'Searching flights…' : 'Find Flights',
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
           ),
         ),
       ],
-    );
-  }
-
-
-  Widget _buildClassDropdown(Color bg, bool isDark) {
-    const items = [
-      {'value': 'economy', 'label': 'Economy'},
-      {'value': 'premiumeconomy', 'label': 'Premium'},
-      {'value': 'business', 'label': 'Business'},
-      {'value': 'first', 'label': 'First'},
-    ];
-    final display = items.firstWhere((i) => i['value'] == _cabinClass, orElse: () => items.first)['label']!;
-    return PopupSelectorField(
-      label: 'Class',
-      value: _cabinClass,
-      displayLabel: display,
-      items: items,
-      onSelected: (val) => setState(() => _cabinClass = val),
-      bg: bg,
-      isDark: isDark,
-    );
-  }
-
-  Widget _buildCurrencyDropdown(Color bg, bool isDark) {
-    final items = CurrencyHelper.supportedCurrencies.map((c) => {'value': c['code']!, 'label': c['label']!}).toList();
-    return PopupSelectorField(
-      label: 'Currency',
-      value: _currency,
-      displayLabel: CurrencyHelper.getLabel(_currency),
-      items: items,
-      onSelected: (val) {
-        setState(() => _currency = val);
-        widget.onCurrencyChanged?.call(val);
-      },
-      bg: bg,
-      isDark: isDark,
     );
   }
 }

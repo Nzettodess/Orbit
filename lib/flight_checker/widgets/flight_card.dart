@@ -109,54 +109,116 @@ class _FlightCardState extends State<FlightCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. Header: Airline Logo + Name + Stops Badge
-                    Row(
-                      children: [
-                        _buildAirlineLogo(flight.logoUrl),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            flight.airline,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: isDark
-                                  ? AppColors.darkPrimary
-                                  : AppColors.lightPrimary,
+                    // 1. Header: Airline Logo + Name + Badges (Responsive 2-row on small mobile)
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final hasAuxBadges = widget.isBest || widget.isLowestFare || hasLongLayover;
+                        final isNarrow = constraints.maxWidth < 460;
+
+                        if (isNarrow && hasAuxBadges) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  _buildAirlineLogo(flight.logoUrl),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      flight.airline,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                        color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildStopsBadge(
+                                    isNonstop: isNonstop,
+                                    text: stopsText,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  if (widget.isBest)
+                                    _buildTopBadge(
+                                      text: 'Best',
+                                      icon: Icons.thumb_up_alt_rounded,
+                                      color: AppColors.iosBlue,
+                                    ),
+                                  if (widget.isLowestFare)
+                                    _buildTopBadge(
+                                      text: 'Lowest Fare',
+                                      icon: Icons.bolt_rounded,
+                                      color: AppColors.iosGreen,
+                                    ),
+                                  if (hasLongLayover)
+                                    _buildTopBadge(
+                                      text: 'Long wait time',
+                                      icon: Icons.warning_amber_rounded,
+                                      color: AppColors.iosRed,
+                                    ),
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            _buildAirlineLogo(flight.logoUrl),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                flight.airline,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (widget.isBest) ...[
-                          _buildTopBadge(
-                            text: 'Best',
-                            icon: Icons.thumb_up_alt_rounded,
-                            color: AppColors.iosBlue,
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        if (widget.isLowestFare) ...[
-                          _buildTopBadge(
-                            text: 'Lowest Fare',
-                            icon: Icons.bolt_rounded,
-                            color: AppColors.iosGreen,
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        if (hasLongLayover) ...[
-                          _buildTopBadge(
-                            text: 'Long wait time',
-                            icon: Icons.warning_amber_rounded,
-                            color: AppColors.iosRed,
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        _buildStopsBadge(
-                          isNonstop: isNonstop,
-                          text: stopsText,
-                        ),
-                      ],
+                            if (widget.isBest) ...[
+                              _buildTopBadge(
+                                text: 'Best',
+                                icon: Icons.thumb_up_alt_rounded,
+                                color: AppColors.iosBlue,
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            if (widget.isLowestFare) ...[
+                              _buildTopBadge(
+                                text: 'Lowest Fare',
+                                icon: Icons.bolt_rounded,
+                                color: AppColors.iosGreen,
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            if (hasLongLayover) ...[
+                              _buildTopBadge(
+                                text: 'Long wait time',
+                                icon: Icons.warning_amber_rounded,
+                                color: AppColors.iosRed,
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            _buildStopsBadge(
+                              isNonstop: isNonstop,
+                              text: stopsText,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 14),
 
@@ -171,22 +233,24 @@ class _FlightCardState extends State<FlightCard> {
                     ),
                     const SizedBox(height: 14),
 
-                    // 3. Price & Interactive Expand Action
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(activePrice, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.iosBlue, fontFeatures: const [FontFeature.tabularFigures()])),
-                              Text('Total estimated fare', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary)),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Row(
+                    // 3. Price & Interactive Expand Action (Responsive)
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isNarrow = constraints.maxWidth < 360;
+                        final priceBlock = Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(activePrice, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.iosBlue, fontFeatures: const [FontFeature.tabularFigures()])),
+                            Text('Total estimated fare', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary)),
+                          ],
+                        );
+
+                        final actionsBlock = Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          alignment: WrapAlignment.end,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             TextButton.icon(
                               onPressed: () => setState(() => _isExpanded = !_isExpanded),
@@ -199,15 +263,33 @@ class _FlightCardState extends State<FlightCard> {
                               ),
                               label: Text(_isExpanded ? 'Hide' : 'Details', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                             ),
-                            const SizedBox(width: 6),
                             ElevatedButton(
                               onPressed: () => widget.onSelect != null ? widget.onSelect!() : FlightService.launchFlightUrl(flight.deepLink),
                               style: ElevatedButton.styleFrom(backgroundColor: AppColors.iosBlue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: const Size(0, 34), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), elevation: 0),
                               child: const Text('View Deal ↗', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                             ),
                           ],
-                        ),
-                      ],
+                        );
+
+                        if (isNarrow) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              priceBlock,
+                              const SizedBox(height: 8),
+                              Align(alignment: Alignment.centerRight, child: actionsBlock),
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            Expanded(child: priceBlock),
+                            const SizedBox(width: 8),
+                            actionsBlock,
+                          ],
+                        );
+                      },
                     ),
 
                     // 4. Expanded Segment Breakdown & Itinerary Timeline
@@ -296,14 +378,15 @@ class _FlightCardState extends State<FlightCard> {
           ),
           if (longLayover != null) ...[
             const SizedBox(height: 3),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.warning_amber_rounded, size: 11, color: AppColors.iosRed),
-                const SizedBox(width: 2),
-                Flexible(
-                  child: Text(
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.warning_amber_rounded, size: 11, color: AppColors.iosRed),
+                  const SizedBox(width: 2),
+                  Text(
                     '${longLayover.duration} ${longLayover.airportCode}',
                     style: const TextStyle(
                       fontSize: 10,
@@ -311,21 +394,22 @@ class _FlightCardState extends State<FlightCard> {
                       color: AppColors.iosRed,
                     ),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ] else if (!isNonstop && flight.layovers.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(
-              '${flight.layovers.first.duration} ${flight.layovers.first.airportCode}',
-              style: TextStyle(
-                fontSize: 10,
-                color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '${flight.layovers.first.duration} ${flight.layovers.first.airportCode}',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? AppColors.darkTertiary : AppColors.lightTertiary,
+                ),
+                maxLines: 1,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ],
@@ -350,41 +434,19 @@ class _FlightCardState extends State<FlightCard> {
     return _buildFallbackLogo();
   }
 
-  Widget _buildFallbackLogo() {
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        color: AppColors.iosBlue.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: const Icon(
-        Icons.flight_rounded,
-        size: 14,
-        color: AppColors.iosBlue,
-      ),
-    );
-  }
+  Widget _buildFallbackLogo() => Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(color: AppColors.iosBlue.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+        child: const Icon(Icons.flight_rounded, size: 14, color: AppColors.iosBlue),
+      );
 
-  Widget _buildStopsBadge({
-    required bool isNonstop,
-    required String text,
-  }) {
+  Widget _buildStopsBadge({required bool isNonstop, required String text}) {
     final color = isNonstop ? AppColors.iosGreen : AppColors.iosOrange;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+      child: Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
     );
   }
 

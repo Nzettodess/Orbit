@@ -106,7 +106,7 @@ void main() {
       expect(find.text('RM 250'), findsOneWidget);
     });
 
-    testWidgets('Trip type selector only provides Round-Trip and One-Way, with Multi-City completely removed', (tester) async {
+    testWidgets('Trip type selector provides Round-Trip, One-Way, and Multi-Trip dynamically', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -119,15 +119,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Multi-City tab should NOT exist anywhere in the dialog
-      expect(find.text('Multi-City'), findsNothing);
-      expect(find.text('Multi-City Route Planning'), findsNothing);
-
-      // Round-Trip and One-Way tabs are present
       final roundTripTab = find.text('Round-Trip');
       final oneWayTab = find.text('One-Way');
+      final multiTripTab = find.text('Multi-Trip');
+
       expect(roundTripTab, findsOneWidget);
       expect(oneWayTab, findsOneWidget);
+      expect(multiTripTab, findsOneWidget);
 
       // Tap Round-Trip and verify Return date field appears
       await tester.tap(roundTripTab);
@@ -138,10 +136,62 @@ void main() {
       await tester.tap(oneWayTab);
       await tester.pumpAndSettle();
       expect(find.text('Return'), findsNothing);
+
+      // Tap Multi-Trip and verify Trip 1, Trip 2, and add flight button appear
+      await tester.tap(multiTripTab);
+      await tester.pumpAndSettle();
+      expect(find.text('Trip 1'), findsOneWidget);
+      expect(find.text('Trip 2'), findsOneWidget);
+
+      final addBtn3 = find.text('Add Flight (Trip 3)');
+      expect(addBtn3, findsOneWidget);
+
+      // Scroll and tap Add Flight and verify Trip 3 is added
+      await tester.ensureVisible(addBtn3);
+      await tester.pumpAndSettle();
+      await tester.tap(addBtn3);
+      await tester.pumpAndSettle();
+      expect(find.text('Trip 3'), findsOneWidget);
+      expect(find.text('Add Flight (Trip 4)'), findsOneWidget);
     });
   });
 
   group('FlightLegTabBar & Round-Trip Multi-Leg Tests', () {
+    test('FlightSearchResponse correctly parses multiCityLegs and isMultiCity', () {
+      final json = {
+        'success': true,
+        'tripType': 'multicity',
+        'isMultiCity': true,
+        'count': 2,
+        'multiCityLegs': [
+          {
+            'legIndex': 0,
+            'title': 'Trip 1',
+            'origin': 'KUL',
+            'destination': 'SIN',
+            'date': '2026-10-15',
+            'flights': [mockFlight1.toJson()],
+          },
+          {
+            'legIndex': 1,
+            'title': 'Trip 2',
+            'origin': 'SIN',
+            'destination': 'NRT',
+            'date': '2026-10-20',
+            'flights': [mockFlight2.toJson()],
+          },
+        ],
+        'flights': [mockFlight1.toJson(), mockFlight2.toJson()],
+        'fallbackUrl': 'https://google.com',
+      };
+
+      final response = FlightSearchResponse.fromJson(json);
+      expect(response.success, isTrue);
+      expect(response.isMultiCity, isTrue);
+      expect(response.multiCityLegs.length, equals(2));
+      expect(response.multiCityLegs[0].title, equals('Trip 1'));
+      expect(response.multiCityLegs[1].title, equals('Trip 2'));
+    });
     test('FlightSearchResponse correctly parses outboundFlights, returnFlights, and tripType', () {
       final json = {
         'success': true,
