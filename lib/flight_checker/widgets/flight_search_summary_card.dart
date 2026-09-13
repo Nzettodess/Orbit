@@ -106,7 +106,7 @@ class FlightSearchSummaryCard extends StatelessWidget {
       onTap: onToggleExpand,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -122,10 +122,11 @@ class FlightSearchSummaryCard extends StatelessWidget {
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 color: AppColors.iosBlue.withValues(alpha: isDark ? 0.18 : 0.10),
                 borderRadius: BorderRadius.circular(8),
@@ -136,11 +137,11 @@ class FlightSearchSummaryCard extends StatelessWidget {
                     : (currentParams.tripType == 'roundtrip'
                         ? Icons.sync_alt_rounded
                         : Icons.flight_takeoff_rounded),
-                size: 18,
+                size: 16,
                 color: AppColors.iosBlue,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,7 +150,7 @@ class FlightSearchSummaryCard extends StatelessWidget {
                   Text(
                     routeText,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w700,
                       color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
                       letterSpacing: -0.2,
@@ -158,21 +159,53 @@ class FlightSearchSummaryCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    '$datesText · $metaText',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 280) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              datesText,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              metaText,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        );
+                      }
+                      return Text(
+                        '$datesText · $metaText',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      );
+                    },
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               decoration: BoxDecoration(
                 color: isDark ? AppColors.darkElevated : AppColors.iosGray6,
                 borderRadius: BorderRadius.circular(8),
@@ -184,7 +217,7 @@ class FlightSearchSummaryCard extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.tune_rounded, size: 13, color: AppColors.iosBlue),
+                  Icon(Icons.tune_rounded, size: 12, color: AppColors.iosBlue),
                   const SizedBox(width: 4),
                   Text(
                     'Edit',
@@ -194,8 +227,6 @@ class FlightSearchSummaryCard extends StatelessWidget {
                       color: AppColors.iosBlue,
                     ),
                   ),
-                  const SizedBox(width: 2),
-                  Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.iosBlue),
                 ],
               ),
             ),

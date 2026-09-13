@@ -146,5 +146,40 @@ void main() {
 
       expect(toggled, isTrue);
     });
+
+    testWidgets('Collapsed mode renders stacked dates and meta on narrow screen without overflowing', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 320,
+              child: FlightSearchSummaryCard(
+                currentParams: sampleParamsMultiCity,
+                isExpanded: false,
+                onToggleExpand: () {},
+                onSearch: (_) {},
+                isLoading: false,
+                hasResults: true,
+                isDark: false,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Verify route, dates, and meta are all rendered cleanly as separate readable widgets
+      expect(find.text('2 Trips: KUL→SIN · SIN→NRT'), findsOneWidget);
+      expect(find.text('15 Oct 2026'), findsOneWidget);
+      expect(find.text('1 Passenger · Economy · MYR'), findsOneWidget);
+      expect(find.text('Edit'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }
