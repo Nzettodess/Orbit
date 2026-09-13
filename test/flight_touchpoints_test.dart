@@ -201,5 +201,105 @@ void main() {
 
       expect(find.text('Check Flights to Venue ↗'), findsNothing);
     });
+
+    testWidgets('Hides Check Flights to Venue tile when venue is the same as user home airport', (tester) async {
+      final futureDate = DateTime.now().add(const Duration(days: 30));
+      final event = GroupEvent(
+        id: 'event_same_home',
+        groupId: 'g1',
+        creatorId: 'u1',
+        title: 'Tokyo Meetup',
+        description: 'Local gathering',
+        venue: 'Tokyo Big Sight, Tokyo',
+        date: futureDate,
+        rsvps: {},
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EventDetailDialog(
+              event: event,
+              userHomeAirport: 'Tokyo (HND)',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Check Flights to Venue ↗'), findsNothing);
+    });
+
+    testWidgets('Pre-fills user home airport and passes it when flight tile is tapped', (tester) async {
+      final futureDate = DateTime.now().add(const Duration(days: 30));
+      final event = GroupEvent(
+        id: 'event_diff_home',
+        groupId: 'g1',
+        creatorId: 'u1',
+        title: 'Tokyo Summit',
+        description: 'Overseas summit',
+        venue: 'Tokyo Big Sight, Tokyo',
+        date: futureDate,
+        rsvps: {},
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EventDetailDialog(
+              event: event,
+              userHomeAirport: 'Kuala Lumpur (KUL)',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Check Flights to Venue ↗'), findsOneWidget);
+      await tester.tap(find.text('Check Flights to Venue ↗'));
+      await tester.pumpAndSettle();
+
+      // FlightCheckerDialog opened with KUL pre-filled
+      expect(find.text('Kuala Lumpur (KUL)'), findsWidgets);
+    });
+  });
+
+  group('AirportHelper.isSameLocation Tests', () {
+    test('Correctly identifies matching locations across variations and codes', () {
+      expect(AirportHelper.isSameLocation('Penang (PEN)', 'Penang'), isTrue);
+      expect(AirportHelper.isSameLocation('KUL', 'Kuala Lumpur (KUL)'), isTrue);
+      expect(AirportHelper.isSameLocation('Penang', 'penang'), isTrue);
+      expect(AirportHelper.isSameLocation('Tokyo', 'Tokyo (HND)'), isTrue);
+      expect(AirportHelper.isSameLocation('SIN', 'Singapore (SIN)'), isTrue);
+      expect(AirportHelper.isSameLocation('JFK', 'New York'), isTrue);
+      expect(AirportHelper.isSameLocation('Malaysia, Penang', 'Penang (PEN)'), isTrue);
+    });
+
+    test('Correctly identifies non-matching locations', () {
+      expect(AirportHelper.isSameLocation('Kuala Lumpur (KUL)', 'Tokyo (HND)'), isFalse);
+      expect(AirportHelper.isSameLocation('Penang (PEN)', 'Singapore (SIN)'), isFalse);
+      expect(AirportHelper.isSameLocation(null, 'KUL'), isFalse);
+      expect(AirportHelper.isSameLocation('', 'KUL'), isFalse);
+      expect(AirportHelper.isSameLocation('KUL', ''), isFalse);
+    });
+  });
+
+  group('Flight Same-Location Search Validation Tests', () {
+    testWidgets('Prevents search and displays error message when origin and destination are the same', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: FlightCheckerDialog(
+              initialOrigin: 'Penang (PEN)',
+              initialDestination: 'Penang',
+              autoSearch: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Origin and destination cannot be the same airport.'), findsOneWidget);
+    });
   });
 }

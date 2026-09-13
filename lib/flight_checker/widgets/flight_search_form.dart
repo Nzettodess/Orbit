@@ -46,39 +46,45 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
   @override
   void initState() {
     super.initState();
-    final initialOrigin = AirportHelper.findBestAirport(widget.initialParams.origin);
-    final initialDest = AirportHelper.findBestAirport(widget.initialParams.destination);
+    final p = widget.initialParams;
+    final from = AirportHelper.findBestAirport(p.origin);
+    final to = AirportHelper.findBestAirport(p.destination);
 
-    _originController = TextEditingController(text: initialOrigin.isNotEmpty ? initialOrigin : widget.initialParams.origin);
-    _destinationController = TextEditingController(text: initialDest.isNotEmpty ? initialDest : widget.initialParams.destination);
-
-    _tripType = widget.initialParams.tripType;
-    _departureDate = DateTime.tryParse(widget.initialParams.departureDate) ??
-        DateTime.now().add(const Duration(days: 14));
-    if (widget.initialParams.returnDate != null && widget.initialParams.returnDate!.isNotEmpty) {
-      _returnDate = DateTime.tryParse(widget.initialParams.returnDate!);
+    _originController = TextEditingController(text: from.isNotEmpty ? from : p.origin);
+    _destinationController = TextEditingController(text: to.isNotEmpty ? to : p.destination);
+    _tripType = p.tripType;
+    _departureDate = DateTime.tryParse(p.departureDate) ?? DateTime.now().add(const Duration(days: 14));
+    if (p.returnDate != null && p.returnDate!.isNotEmpty) {
+      _returnDate = DateTime.tryParse(p.returnDate!);
     }
     _returnDate ??= _departureDate.add(const Duration(days: 7));
-    _adults = widget.initialParams.adults.clamp(1, 9);
-    _children = widget.initialParams.children.clamp(0, 8);
-    _cabinClass = widget.initialParams.cabinClass;
-    _currency = widget.initialParams.currency.isNotEmpty ? widget.initialParams.currency : 'MYR';
+    _adults = p.adults.clamp(1, 9);
+    _children = p.children.clamp(0, 8);
+    _cabinClass = p.cabinClass;
+    _currency = p.currency.isNotEmpty ? p.currency : 'MYR';
 
-    _multiCityLegs = (widget.initialParams.multiCityLegs?.isNotEmpty ?? false)
-        ? widget.initialParams.multiCityLegs!
-            .map((l) => EditableTripLeg(
-                  origin: l.origin,
-                  destination: l.destination,
-                  date: DateTime.tryParse(l.date) ?? DateTime.now().add(const Duration(days: 14)),
-                ))
-            .toList()
-        : [
-            EditableTripLeg(
-              origin: initialOrigin.isNotEmpty ? initialOrigin : widget.initialParams.origin,
-              destination: initialDest.isNotEmpty ? initialDest : widget.initialParams.destination,
-              date: _departureDate,
-            ),
-          ];
+    _multiCityLegs = (p.multiCityLegs?.isNotEmpty ?? false)
+        ? p.multiCityLegs!.map((l) => EditableTripLeg(
+              origin: l.origin,
+              destination: l.destination,
+              date: DateTime.tryParse(l.date) ?? DateTime.now().add(const Duration(days: 14)),
+            )).toList()
+        : [EditableTripLeg(origin: from.isNotEmpty ? from : p.origin, destination: to.isNotEmpty ? to : p.destination, date: _departureDate)];
+  }
+
+  @override
+  void didUpdateWidget(covariant FlightSearchForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialParams.origin != oldWidget.initialParams.origin &&
+        _originController.text.trim() != widget.initialParams.origin) {
+      final newOrigin = AirportHelper.findBestAirport(widget.initialParams.origin);
+      _originController.text = newOrigin.isNotEmpty ? newOrigin : widget.initialParams.origin;
+    }
+    if (widget.initialParams.destination != oldWidget.initialParams.destination &&
+        _destinationController.text.trim() != widget.initialParams.destination) {
+      final newDest = AirportHelper.findBestAirport(widget.initialParams.destination);
+      _destinationController.text = newDest.isNotEmpty ? newDest : widget.initialParams.destination;
+    }
   }
 
   @override
@@ -192,6 +198,18 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
     }
   }
 
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
   void _submit() {
     final depStr = DateFormat('yyyy-MM-dd').format(_departureDate);
     final effectiveReturn = _returnDate ?? _departureDate.add(const Duration(days: 7));
@@ -205,6 +223,16 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
                 date: DateFormat('yyyy-MM-dd').format(l.date),
               ))
           .toList();
+
+      for (int i = 0; i < legs.length; i++) {
+        final leg = legs[i];
+        if (AirportHelper.isSameLocation(leg.origin, leg.destination)) {
+          final display = AirportHelper.findBestAirport(leg.origin);
+          _showError('Trip ${i + 1}: Origin and destination cannot be the same airport (${display.isNotEmpty ? display : leg.origin}).');
+          return;
+        }
+      }
+
       final firstLeg = legs.isNotEmpty ? legs.first : null;
       final lastLeg = legs.length > 1 ? legs.last : firstLeg;
 
@@ -223,9 +251,17 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
       return;
     }
 
+    final fromText = _originController.text.trim();
+    final toText = _destinationController.text.trim();
+    if (AirportHelper.isSameLocation(fromText, toText)) {
+      final display = AirportHelper.findBestAirport(fromText);
+      _showError('Origin and destination cannot be the same airport (${display.isNotEmpty ? display : fromText}).');
+      return;
+    }
+
     widget.onSearch(FlightSearchParams(
-      origin: _originController.text.trim(),
-      destination: _destinationController.text.trim(),
+      origin: fromText,
+      destination: toText,
       departureDate: depStr,
       returnDate: _tripType == 'roundtrip' ? retStr : null,
       tripType: _tripType,
@@ -396,36 +432,20 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
               isDark: isDark,
             );
 
-            if (isNarrow) {
-              return Column(
-                children: [
-                  passTile,
-                  const SizedBox(height: 10),
-                  if (isVeryNarrow) ...[
-                    classDrop,
+            return isNarrow
+                ? Column(children: [
+                    passTile,
                     const SizedBox(height: 10),
-                    currDrop,
-                  ] else ...[
-                    Row(
-                      children: [
-                        Expanded(child: classDrop),
-                        const SizedBox(width: 8),
-                        Expanded(child: currDrop),
-                      ],
-                    ),
-                  ],
-                ],
-              );
-            }
-            return Row(
-              children: [
-                Expanded(flex: 3, child: passTile),
-                const SizedBox(width: 8),
-                Expanded(flex: 2, child: classDrop),
-                const SizedBox(width: 8),
-                Expanded(flex: 2, child: currDrop),
-              ],
-            );
+                    if (isVeryNarrow) ...[classDrop, const SizedBox(height: 10), currDrop]
+                    else Row(children: [Expanded(child: classDrop), const SizedBox(width: 8), Expanded(child: currDrop)]),
+                  ])
+                : Row(children: [
+                    Expanded(flex: 3, child: passTile),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 2, child: classDrop),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 2, child: currDrop),
+                  ]);
           },
         ),
         if (_showPassengerPicker) ...[

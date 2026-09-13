@@ -221,4 +221,37 @@ class AirportHelper {
     final best = findBestAirport(locationString);
     return RegExp(r'\([A-Z0-9]{3}\)').hasMatch(best);
   }
+
+  /// Extracts a 3-letter IATA code if available in parentheses (e.g. "(KUL)") or standalone "KUL"
+  static String extractIataCode(String? input) {
+    if (input == null || input.trim().isEmpty) return '';
+    final trimmed = input.trim();
+    final match = RegExp(r'\(([A-Z0-9]{3})\)', caseSensitive: false).firstMatch(trimmed);
+    if (match != null) return match.group(1)!.toUpperCase();
+    if (RegExp(r'^[A-Za-z0-9]{3}$').hasMatch(trimmed)) return trimmed.toUpperCase();
+    return '';
+  }
+
+  /// Checks if two location strings resolve to the same airport or city
+  static bool isSameLocation(String? loc1, String? loc2) {
+    if (loc1 == null || loc2 == null) return false;
+    final clean1 = loc1.trim();
+    final clean2 = loc2.trim();
+    if (clean1.isEmpty || clean2.isEmpty) return false;
+    if (clean1.toLowerCase() == clean2.toLowerCase()) return true;
+
+    final code1 = extractIataCode(clean1);
+    final code2 = extractIataCode(clean2);
+    if (code1.isNotEmpty && code2.isNotEmpty && code1 == code2) return true;
+
+    final airport1 = findBestAirport(clean1);
+    final airport2 = findBestAirport(clean2);
+    if (airport1.isNotEmpty && airport2.isNotEmpty) {
+      if (airport1.toLowerCase() == airport2.toLowerCase()) return true;
+      final bestCode1 = extractIataCode(airport1);
+      final bestCode2 = extractIataCode(airport2);
+      if (bestCode1.isNotEmpty && bestCode2.isNotEmpty && bestCode1 == bestCode2) return true;
+    }
+    return false;
+  }
 }

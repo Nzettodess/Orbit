@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models.dart';
 import '../core/theme/app_colors.dart';
 import '../flight_checker/flight_checker_dialog.dart';
@@ -16,6 +17,7 @@ class EventDetailDialog extends StatelessWidget {
   final String? groupName;
   final VoidCallback? onEdit; // Optional edit callback
   final bool showDate; // Whether to show date (for upcoming summary)
+  final String? userHomeAirport;
   
   const EventDetailDialog({
     super.key,
@@ -23,6 +25,7 @@ class EventDetailDialog extends StatelessWidget {
     this.groupName,
     this.onEdit,
     this.showDate = false,
+    this.userHomeAirport,
   });
 
   @override
@@ -128,21 +131,43 @@ class EventDetailDialog extends StatelessWidget {
                         venue: event.venue!,
                         style: const TextStyle(fontSize: 14),
                       ),
-                      Builder(
-                        builder: (context) {
+                      FutureBuilder<String>(
+                        future: () async {
+                          if (userHomeAirport != null && userHomeAirport!.isNotEmpty) {
+                            return userHomeAirport!;
+                          }
+                          try {
+                            final user = FirebaseAuth.instance.currentUser;
+                            if (user != null) {
+                              final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+                              final defaultLoc = doc.data()?['defaultLocation'] as String?;
+                              if (defaultLoc != null && defaultLoc.isNotEmpty) {
+                                return AirportHelper.findBestAirport(defaultLoc);
+                              }
+                            }
+                          } catch (_) {}
+                          return '';
+                        }(),
+                        builder: (context, snapshot) {
                           final now = DateTime.now();
                           final today = DateTime(now.year, now.month, now.day);
                           final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
                           if (eventDay.isBefore(today) || !AirportHelper.hasKnownAirport(event.venue)) {
                             return const SizedBox.shrink();
                           }
+                          final resolvedHome = snapshot.data ?? userHomeAirport ?? '';
+                          if (resolvedHome.isNotEmpty && AirportHelper.isSameLocation(resolvedHome, event.venue)) {
+                            return const SizedBox.shrink();
+                          }
                           return Padding(
                             padding: const EdgeInsets.only(top: 6),
                             child: InkWell(
                               onTap: () {
+                                final origin = resolvedHome;
                                 Navigator.pop(context);
                                 showFlightCheckerDialog(
                                   context,
+                                  origin: origin,
                                   destination: event.venue,
                                   date: event.date,
                                   autoSearch: true,
@@ -305,6 +330,7 @@ void showEventDetailDialog(
   String? groupName,
   VoidCallback? onEdit,
   bool showDate = false,
+  String? userHomeAirport,
 }) {
   showDialog(
     context: context,
@@ -313,6 +339,7 @@ void showEventDetailDialog(
       groupName: groupName,
       onEdit: onEdit,
       showDate: showDate,
+      userHomeAirport: userHomeAirport,
     ),
   );
 }

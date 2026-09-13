@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme/app_colors.dart';
 import 'models/flight_info.dart';
 import 'services/flight_service.dart';
+import 'utils/airport_data.dart';
 import 'utils/currency_helper.dart';
 import 'utils/flight_filter_helper.dart';
 import 'widgets/flight_checker_dialog_header.dart';
@@ -74,10 +77,36 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     if (widget.autoSearch &&
         (widget.initialOrigin ?? '').isNotEmpty &&
         (widget.initialDestination ?? '').isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _performSearch(_currentParams);
-      });
+      if (AirportHelper.isSameLocation(widget.initialOrigin, widget.initialDestination)) {
+        _errorMessage = 'Origin and destination cannot be the same airport.';
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _performSearch(_currentParams));
+      }
+    } else if ((widget.initialOrigin ?? '').isEmpty) {
+      _resolveDefaultHomeOrigin();
     }
+  }
+
+  Future<void> _resolveDefaultHomeOrigin() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final defaultLoc = doc.data()?['defaultLocation'] as String?;
+      if (defaultLoc != null && defaultLoc.isNotEmpty && mounted) {
+        final homeAirport = AirportHelper.findBestAirport(defaultLoc);
+        if (homeAirport.isNotEmpty) {
+          final isSame = AirportHelper.isSameLocation(homeAirport, _currentParams.destination);
+          setState(() {
+            _currentParams = _currentParams.copyWith(origin: homeAirport);
+            if (isSame) _errorMessage = 'Origin and destination cannot be the same airport.';
+          });
+          if (widget.autoSearch && _currentParams.destination.isNotEmpty && !isSame) {
+            _performSearch(_currentParams);
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -106,18 +135,10 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     });
   }
 
-  void _toggleDeparting() {
-    setState(() => _isDepartingExpanded = !_isDepartingExpanded);
-  }
-
-  void _toggleReturning() {
-    setState(() => _isReturningExpanded = !_isReturningExpanded);
-  }
-
-  void _toggleMultiCityLeg(int index) {
-    final isCurrentlyExpanded = _multiCityExpanded[index] ?? true;
-    setState(() => _multiCityExpanded[index] = !isCurrentlyExpanded);
-  }
+  void _toggleDeparting() => setState(() => _isDepartingExpanded = !_isDepartingExpanded);
+  void _toggleReturning() => setState(() => _isReturningExpanded = !_isReturningExpanded);
+  void _toggleMultiCityLeg(int index) =>
+      setState(() => _multiCityExpanded[index] = !(_multiCityExpanded[index] ?? true));
 
   void _handleCurrencyChanged(String newCurrency) {
     if (newCurrency == _currentParams.currency) return;
@@ -154,6 +175,25 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   }
 
   Future<void> _performSearch(FlightSearchParams params) async {
+    if (params.tripType == 'multicity' && params.multiCityLegs != null) {
+      for (int i = 0; i < params.multiCityLegs!.length; i++) {
+        final leg = params.multiCityLegs![i];
+        if (AirportHelper.isSameLocation(leg.origin, leg.destination)) {
+          setState(() {
+            _currentParams = params;
+            _errorMessage = 'Trip ${i + 1}: Origin and destination cannot be the same.';
+          });
+          return;
+        }
+      }
+    } else if (AirportHelper.isSameLocation(params.origin, params.destination)) {
+      setState(() {
+        _currentParams = params;
+        _errorMessage = 'Origin and destination cannot be the same airport.';
+      });
+      return;
+    }
+
     FlightService.saveLastTripType(params.tripType);
     setState(() {
       _currentParams = params;
@@ -200,25 +240,14 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     return Dialog(
       backgroundColor: dialogBg,
       clipBehavior: Clip.antiAlias,
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 12 : 24,
-        vertical: isMobile ? 16 : 32,
-      ),
+      insetPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24, vertical: isMobile ? 16 : 32),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
         child: Column(
           children: [
-            FlightCheckerDialogHeader(
-              isDark: isDark,
-              bgColor: dialogBg,
-              onClose: () => Navigator.pop(context),
-            ),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: isDark ? AppColors.darkElevatedHighest : AppColors.iosGray5,
-            ),
+            FlightCheckerDialogHeader(isDark: isDark, bgColor: dialogBg, onClose: () => Navigator.pop(context)),
+            Divider(height: 1, thickness: 1, color: isDark ? AppColors.darkElevatedHighest : AppColors.iosGray5),
             Expanded(
               child: ClipRect(
                 child: SingleChildScrollView(
@@ -230,8 +259,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                       FlightSearchSummaryCard(
                         currentParams: _currentParams,
                         isExpanded: _isSearchExpanded,
-                        onToggleExpand: () =>
-                            setState(() => _isSearchExpanded = !_isSearchExpanded),
+                        onToggleExpand: () => setState(() => _isSearchExpanded = !_isSearchExpanded),
                         onSearch: _performSearch,
                         onCurrencyChanged: _handleCurrencyChanged,
                         onTripTypeChanged: _handleTripTypeChanged,
@@ -254,7 +282,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
 
   Widget _buildResultsSection(bool isDark) {
     if (_isLoading) return _buildLoadingState(isDark);
-    if (_errorMessage != null) return _buildErrorFallback(isDark);
+    if (_errorMessage != null) return _buildErrorFallback(isDark, message: _errorMessage);
     if (_response == null) return const SizedBox.shrink();
     if (_response!.flights.isEmpty) return _buildEmptyState(isDark);
     return _buildFlightResults(isDark);
@@ -280,38 +308,23 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     }
 
     final isRoundTrip = _response?.isRoundTrip == true || _currentParams.tripType == 'roundtrip';
-
     final outboundFlights = isRoundTrip
         ? (_response!.outboundFlights.isNotEmpty ? _response!.outboundFlights : _response!.flights)
         : _response!.flights;
     final returnFlights = isRoundTrip ? _response!.returnFlights : const <FlightInfo>[];
     final allFlights = isRoundTrip ? [...outboundFlights, ...returnFlights] : outboundFlights;
-
-    final priceRange = CurrencyHelper.calculatePriceRange(
-      allFlights,
-      _currentParams.currency,
-    );
-
+    final priceRange = CurrencyHelper.calculatePriceRange(allFlights, _currentParams.currency);
     final availableAirlines = FlightFilterHelper.getAvailableAirlines(allFlights);
     final airlineCounts = FlightFilterHelper.getAirlineCounts(allFlights);
-
-    final filteredOutbound = FlightFilterHelper.applyFiltersAndSort(
-      outboundFlights,
-      _filterCriteria,
-    );
+    final filteredOutbound = FlightFilterHelper.applyFiltersAndSort(outboundFlights, _filterCriteria);
     final filteredReturn = isRoundTrip
         ? FlightFilterHelper.applyFiltersAndSort(returnFlights, _filterCriteria)
         : const <FlightInfo>[];
-
     final lowestOutbound = FlightLegSectionHeader.findLowestPrice(outboundFlights);
     final lowestReturn = isRoundTrip ? FlightLegSectionHeader.findLowestPrice(returnFlights) : null;
-    final combinedTotal = (lowestOutbound != null && lowestReturn != null)
-        ? lowestOutbound + lowestReturn
-        : null;
-
+    final combinedTotal = (lowestOutbound != null && lowestReturn != null) ? lowestOutbound + lowestReturn : null;
     final bestOutbound = FlightFilterHelper.findBestFlight(outboundFlights);
     final bestReturn = isRoundTrip ? FlightFilterHelper.findBestFlight(returnFlights) : null;
-
     final totalFoundCount = outboundFlights.length + returnFlights.length;
     final totalVisibleCount = filteredOutbound.length + filteredReturn.length;
 
