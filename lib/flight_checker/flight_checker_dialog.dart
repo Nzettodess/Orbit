@@ -63,6 +63,17 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _performSearch(_currentParams);
       });
+    } else {
+      _loadSavedTripType();
+    }
+  }
+
+  Future<void> _loadSavedTripType() async {
+    final saved = await FlightService.getLastTripType();
+    if (mounted && saved != _currentParams.tripType) {
+      setState(() {
+        _currentParams = _currentParams.copyWith(tripType: saved);
+      });
     }
   }
 
@@ -77,9 +88,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         _response?.isMultiCity == true || _currentParams.tripType == 'multicity';
     if (isMultiTrip) {
       final anyOpen = _multiCityExpanded.values.any((v) => v);
-      if (anyOpen && _scrollController.hasClients && _scrollController.offset > 0) {
-        _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
-      }
       setState(() {
         for (final key in _multiCityExpanded.keys.toList()) {
           _multiCityExpanded[key] = !anyOpen;
@@ -89,9 +97,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     }
 
     final anyOpen = _isDepartingExpanded || _isReturningExpanded;
-    if (anyOpen && _scrollController.hasClients && _scrollController.offset > 0) {
-      _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
-    }
     setState(() {
       _isDepartingExpanded = !anyOpen;
       _isReturningExpanded = !anyOpen;
@@ -99,24 +104,15 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   }
 
   void _toggleDeparting() {
-    if (_isDepartingExpanded && _scrollController.hasClients && _scrollController.offset > 0) {
-      _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
-    }
     setState(() => _isDepartingExpanded = !_isDepartingExpanded);
   }
 
   void _toggleReturning() {
-    if (_isReturningExpanded && _scrollController.hasClients && _scrollController.offset > 0) {
-      _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
-    }
     setState(() => _isReturningExpanded = !_isReturningExpanded);
   }
 
   void _toggleMultiCityLeg(int index) {
     final isCurrentlyExpanded = _multiCityExpanded[index] ?? true;
-    if (isCurrentlyExpanded && _scrollController.hasClients && _scrollController.offset > 0) {
-      _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 260), curve: Curves.easeInOutCubic);
-    }
     setState(() => _multiCityExpanded[index] = !isCurrentlyExpanded);
   }
 
@@ -139,6 +135,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
 
   void _handleTripTypeChanged(String newTripType) {
     if (newTripType == _currentParams.tripType) return;
+    FlightService.saveLastTripType(newTripType);
     setState(() {
       String? returnDate = _currentParams.returnDate;
       if (newTripType == 'roundtrip' && (returnDate == null || returnDate.isEmpty)) {
@@ -154,6 +151,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   }
 
   Future<void> _performSearch(FlightSearchParams params) async {
+    FlightService.saveLastTripType(params.tripType);
     setState(() {
       _currentParams = params;
       _isLoading = true;

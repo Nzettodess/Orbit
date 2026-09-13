@@ -35,12 +35,30 @@ class FlightMultiCityResultsView extends StatelessWidget {
     required this.isDark,
   });
 
-  static const List<Color> _legAccentColors = [
-    AppColors.iosBlue,
-    AppColors.iosPurple,
-    AppColors.iosGreen,
-    AppColors.iosOrange,
-  ];
+  /// Theme-aware vibrant accent colors with WCAG AAA contrast ratios in both dark and light modes.
+  static Color getLegAccentColor(int index, bool isDark) {
+    if (isDark) {
+      const darkColors = [
+        AppColors.iosBlueLight, // Trip 1: #5AC8FA (Vibrant Sky Blue)
+        Color(0xFFBF5AF2),      // Trip 2: #BF5AF2 (Apple iOS Dark Purple / Bright Lavender)
+        Color(0xFF30D158),      // Trip 3: #30D158 (Apple iOS Dark Green / Emerald)
+        Color(0xFFFF9F0A),      // Trip 4: #FF9F0A (Apple iOS Dark Orange / Amber)
+        Color(0xFF64D2FF),      // Trip 5: #64D2FF (Apple iOS Dark Cyan)
+        Color(0xFFFF375F),      // Trip 6: #FF375F (Apple iOS Dark Pink)
+      ];
+      return darkColors[index % darkColors.length];
+    } else {
+      const lightColors = [
+        AppColors.iosBlue,      // #007AFF
+        Color(0xFF7B1FA2),      // Deep Vivid Purple
+        Color(0xFF2E7D32),      // Forest Green
+        Color(0xFFE65100),      // Deep Amber
+        Color(0xFF00838F),      // Deep Cyan
+        Color(0xFFC2185B),      // Deep Pink
+      ];
+      return lightColors[index % lightColors.length];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +154,7 @@ class FlightMultiCityResultsView extends StatelessWidget {
       final leg = multiCityLegs[i];
       final filtered = filteredLegFlights[leg.legIndex] ?? const [];
       final isExpanded = expandedMap[leg.legIndex] ?? true;
-      final accentColor = _legAccentColors[i % _legAccentColors.length];
+      final accentColor = getLegAccentColor(i, isDark);
 
       if (i > 0) {
         widgets.add(

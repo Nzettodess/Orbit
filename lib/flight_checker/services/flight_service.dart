@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/flight_info.dart';
 import '../utils/airport_data.dart';
@@ -115,5 +116,25 @@ class FlightService {
     if (uri != null && await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  static const String _prefLastTripType = 'flight_last_trip_type';
+
+  /// Get the user's last selected trip type ('roundtrip', 'oneway', 'multicity')
+  static Future<String> getLastTripType() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_prefLastTripType) ?? 'roundtrip';
+    } catch (_) {
+      return 'roundtrip';
+    }
+  }
+
+  /// Save the user's last selected trip type
+  static Future<void> saveLastTripType(String tripType) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefLastTripType, tripType);
+    } catch (_) {}
   }
 }
