@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../services/notification_service.dart';
 import '../services/pwa_service.dart';
 import '../models.dart';
@@ -98,7 +97,15 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
           children: [
             // Hide logo only when effective width is very small OR screen is tiny
             if (showLogo)
-              SvgPicture.asset("assets/orbit_logo.svg", height: 40),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  "assets/orbit_logo.png",
+                  height: 38,
+                  width: 38,
+                  fit: BoxFit.cover,
+                ),
+              ),
             // Hide "Orbit" text when effective width is small OR screen is narrow
             if (showOrbitText) ...[
               const SizedBox(width: 8),

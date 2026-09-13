@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart'; // Needed for CalendarController
 import 'login.dart';
@@ -1778,7 +1777,15 @@ class _HomeWithLoginState extends State<HomeWithLogin>
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SvgPicture.asset("assets/orbit_logo.svg", height: 40),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  "assets/orbit_logo.png",
+                  height: 38,
+                  width: 38,
+                  fit: BoxFit.cover,
+                ),
+              ),
               const SizedBox(width: 8),
               Text(
                 "Orbit",

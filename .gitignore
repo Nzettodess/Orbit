@@ -55,3 +55,4 @@ app.*.map.json
 # Node modules
 node_modules/
 scratch/
+.agents/skills/ip-as-logo/

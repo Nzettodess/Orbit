@@ -193,12 +193,13 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                   );
                 }
               },
-              child: SizedBox(
-                width: 70,
-                height: 70,
-                child: SvgPicture.asset(
-                  'assets/orbit_logo.svg',
-                  fit: BoxFit.contain,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.asset(
+                  'assets/orbit_logo.png',
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
