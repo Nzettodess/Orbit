@@ -18,6 +18,7 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final List<PlaceholderMember> placeholderMembers;
   final List<Group> groups;
   final List<String> religiousCalendars;
+  final bool isSyncing;
   
   final VoidCallback onUpcomingTap;
   final VoidCallback onBirthdayTap;
@@ -39,6 +40,7 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.placeholderMembers = const [],
     this.groups = const [],
     this.religiousCalendars = const [],
+    this.isSyncing = false,
     required this.onUpcomingTap,
     required this.onBirthdayTap,
     required this.onProfileTap,
@@ -128,7 +130,27 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
       ),
       actions: [
-        if (kIsWeb)
+        if (isSyncing)
+          Tooltip(
+            message: 'Syncing with cloud...',
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          )
+        else if (kIsWeb)
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.blueAccent),
             tooltip: 'Refresh',

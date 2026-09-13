@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:whereabouts/models.dart';
 import 'package:whereabouts/religious_calendar_helper.dart';
+import 'package:whereabouts/services/group_cache_service.dart';
 
 void main() {
   group('UserLocation Model Tests', () {
@@ -206,6 +208,78 @@ void main() {
         member2,            // Priority 2: Aaron (alphabetical)
         member1,            // Priority 2: Charlie
       ]);
+    });
+  });
+
+  group('Group Model & GroupCacheService Tests', () {
+    test('Group toCacheMap and fromMap serialization', () {
+      final group = Group(
+        id: 'grp_001',
+        name: 'Family Trip',
+        ownerId: 'usr_owner',
+        admins: ['usr_owner', 'usr_admin'],
+        members: ['usr_owner', 'usr_admin', 'usr_member'],
+        lastBirthdayCheck: '2026-09-13',
+        lastMonthlyBirthdayCheck: '2026-09',
+      );
+
+      final cacheMap = group.toCacheMap();
+      expect(cacheMap['id'], 'grp_001');
+      expect(cacheMap['name'], 'Family Trip');
+      expect(cacheMap['ownerId'], 'usr_owner');
+      expect(cacheMap['admins'], ['usr_owner', 'usr_admin']);
+      expect(cacheMap['members'], ['usr_owner', 'usr_admin', 'usr_member']);
+
+      final restored = Group.fromMap(cacheMap);
+      expect(restored.id, 'grp_001');
+      expect(restored.name, 'Family Trip');
+      expect(restored.ownerId, 'usr_owner');
+      expect(restored.admins, ['usr_owner', 'usr_admin']);
+      expect(restored.members, ['usr_owner', 'usr_admin', 'usr_member']);
+      expect(restored.lastBirthdayCheck, '2026-09-13');
+    });
+
+    test('GroupCacheService saves, loads and clears cache', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+
+      final cacheService = GroupCacheService();
+      const testUserId = 'test_user_cache_123';
+
+      // 1. Initial load should be null
+      final initial = await cacheService.loadUserGroups(testUserId);
+      expect(initial, isNull);
+
+      // 2. Save groups
+      final groups = [
+        Group(
+          id: 'g1',
+          name: 'Work',
+          ownerId: testUserId,
+          admins: [testUserId],
+          members: [testUserId, 'user2'],
+        ),
+        Group(
+          id: 'g2',
+          name: 'Friends',
+          ownerId: 'user3',
+          admins: ['user3'],
+          members: [testUserId, 'user3'],
+        ),
+      ];
+      await cacheService.saveUserGroups(testUserId, groups);
+
+      // 3. Load groups
+      final loaded = await cacheService.loadUserGroups(testUserId);
+      expect(loaded, isNotNull);
+      expect(loaded!.length, 2);
+      expect(loaded[0].name, 'Work');
+      expect(loaded[1].name, 'Friends');
+
+      // 4. Clear cache
+      await cacheService.clearCache(testUserId);
+      final afterClear = await cacheService.loadUserGroups(testUserId);
+      expect(afterClear, isNull);
     });
   });
 }

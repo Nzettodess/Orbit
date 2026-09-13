@@ -27,6 +27,7 @@ import 'services/connectivity_service.dart';
 import 'services/session_service.dart';
 import 'services/holiday_cache_service.dart';
 import 'services/notification_service.dart';
+import 'services/group_cache_service.dart';
 import 'widgets/skeleton_loading.dart';
 import 'widgets/delayed_empty_state.dart';
 import 'widgets/home_speed_dial.dart';
@@ -82,6 +83,8 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   bool _isCheckingGroups = false;
   int _lastPendingCount = 0;
   bool _isProfileInitialLoadDone = false;
+  bool _isSyncing = false;
+  bool _isInitialGroupsLoading = true;
 
   // Session service for multi-device detection
   SessionService? _sessionService;
@@ -150,6 +153,9 @@ class _HomeWithLoginState extends State<HomeWithLogin>
             _events = [];
             _holidays = [];
             _allUsers = [];
+            _myGroups = [];
+            _isSyncing = false;
+            _isInitialGroupsLoading = true;
           });
         }
       }
@@ -948,20 +954,33 @@ class _HomeWithLoginState extends State<HomeWithLogin>
     });
   }
 
-  void _loadData() {
+  void _loadData() async {
     if (_user == null) return;
+
+    final userId = _user!.uid;
+
+    if (mounted) {
+      setState(() {
+        _isSyncing = true;
+      });
+    }
 
     // Cancel existing data subscriptions and group subscription
     _groupsSubscription?.cancel();
     _cancelDataSubscriptions();
 
-    final userId = _user!.uid;
-
     // --- 1. Cache First: Immediate UI Update ---
-    final cachedGroups = _firestoreService.getLastSeenGroups(userId);
-    if (cachedGroups != null) {
-      print('[Home] Applying cached groups');
-      _myGroups = cachedGroups;
+    var cachedGroups = _firestoreService.getLastSeenGroups(userId);
+    if (cachedGroups == null || cachedGroups.isEmpty) {
+      cachedGroups = await GroupCacheService().loadUserGroups(userId);
+    }
+
+    if (cachedGroups != null && cachedGroups.isNotEmpty && mounted) {
+      debugPrint('[Home] Applying persistent cached groups (${cachedGroups.length})');
+      setState(() {
+        _myGroups = cachedGroups!;
+        _isInitialGroupsLoading = false;
+      });
       final groupIds = cachedGroups.map((g) => g.id).toList();
       _loadDataFromCache(userId, groupIds);
     }
@@ -971,6 +990,9 @@ class _HomeWithLoginState extends State<HomeWithLogin>
       userGroups,
     ) {
       if (!mounted) return;
+
+      // Save to persistent storage cache
+      GroupCacheService().saveUserGroups(userId, userGroups);
 
       // Calculate member signatures to detect content changes (not just list changes)
       // This ensures that if someone joins/leaves a group, our data filters update.
@@ -983,6 +1005,8 @@ class _HomeWithLoginState extends State<HomeWithLogin>
 
       setState(() {
         _myGroups = userGroups;
+        _isInitialGroupsLoading = false;
+        _isSyncing = false;
       });
 
       if (userGroups.isNotEmpty) {
@@ -993,11 +1017,17 @@ class _HomeWithLoginState extends State<HomeWithLogin>
 
       // Restart listeners if group list OR member composition changed
       if (oldSignature != newSignature || _eventsSubscription == null) {
-        print('[Home] Groups or members changed, resetting data listeners');
+        debugPrint('[Home] Groups or members changed, resetting data listeners');
         _setupDataListeners(userId, userGroups.map((g) => g.id).toList());
       }
     }, onError: (e) {
       debugPrint('[Home] Error listening to user groups: $e');
+      if (mounted) {
+        setState(() {
+          _isInitialGroupsLoading = false;
+          _isSyncing = false;
+        });
+      }
     });
   }
 
@@ -1854,6 +1884,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
         placeholderMembers: _placeholderMembers,
         groups: _myGroups,
         religiousCalendars: _religiousCalendars,
+        isSyncing: _isSyncing,
         onUpcomingTap: _openUpcomingSummary,
         onBirthdayTap: _openBirthdayBabyDialog,
         onProfileTap: () {
@@ -2012,7 +2043,7 @@ class _HomeWithLoginState extends State<HomeWithLogin>
               child: Column(
                 children: [
                   DelayedEmptyStateWidget(
-                    groups: _myGroups,
+                    groups: _isInitialGroupsLoading ? null : _myGroups,
                     delayMs: 800, // Wait 800ms before showing empty state
                     skeletonBuilder: () => Card(
                       child: Padding(

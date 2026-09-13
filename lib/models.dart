@@ -35,8 +35,32 @@ class Group {
     );
   }
 
+  factory Group.fromMap(Map<String, dynamic> map, {String? id}) {
+    return Group(
+      id: id ?? (map['id'] as String? ?? ''),
+      name: map['name'] ?? '',
+      ownerId: map['ownerId'] ?? '',
+      admins: List<String>.from(map['admins'] ?? []),
+      members: List<String>.from(map['members'] ?? []),
+      lastBirthdayCheck: map['lastBirthdayCheck'],
+      lastMonthlyBirthdayCheck: map['lastMonthlyBirthdayCheck'],
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
+      'name': name,
+      'ownerId': ownerId,
+      'admins': admins,
+      'members': members,
+      'lastBirthdayCheck': lastBirthdayCheck,
+      'lastMonthlyBirthdayCheck': lastMonthlyBirthdayCheck,
+    };
+  }
+
+  Map<String, dynamic> toCacheMap() {
+    return {
+      'id': id,
       'name': name,
       'ownerId': ownerId,
       'admins': admins,
