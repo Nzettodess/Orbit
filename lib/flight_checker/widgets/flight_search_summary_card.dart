@@ -155,8 +155,6 @@ class FlightSearchSummaryCard extends StatelessWidget {
                       color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
                       letterSpacing: -0.2,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   LayoutBuilder(
@@ -173,8 +171,6 @@ class FlightSearchSummaryCard extends StatelessWidget {
                                 fontWeight: FontWeight.w500,
                                 color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 1),
                             Text(
@@ -183,8 +179,6 @@ class FlightSearchSummaryCard extends StatelessWidget {
                                 fontSize: 11.5,
                                 color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         );
@@ -195,8 +189,6 @@ class FlightSearchSummaryCard extends StatelessWidget {
                           fontSize: 12,
                           color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
                         ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
                       );
                     },
                   ),

@@ -313,8 +313,6 @@ class FlightRoundTripSummaryBanner extends StatelessWidget {
                         ? AppColors.darkTertiary
                         : AppColors.lightTertiary,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
