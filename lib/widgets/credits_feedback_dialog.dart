@@ -282,7 +282,7 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                         onSendTestAnnouncement: () => NotificationService().broadcastVersionAnnouncement(
                           version: WhatsNewDialog.version,
                           title: 'Orbit v1.1.0 is here! 🦦✈️',
-                          message: 'Enjoy our new Cosmic Otter mascot, Multi-Trip Flight Checker, Member Nicknames, and Instant Group Caching.',
+                          message: 'Meet Cosmic Otter, explore smarter flight search, set custom member nicknames, and enjoy instant loading.',
                         ),
                       ),
                     );
