@@ -30,18 +30,24 @@ class FlightSearchSummaryCard extends StatelessWidget {
     required this.isDark,
   });
 
+  static String _shortAirport(String loc) {
+    final match = RegExp(r'\(([A-Z0-9]{3})\)').firstMatch(loc);
+    if (match != null) return match.group(1)!;
+    return loc;
+  }
+
   static String formatRoute(FlightSearchParams params) {
     if (params.tripType == 'multicity') {
       final legs = params.multiCityLegs;
       if (legs != null && legs.isNotEmpty) {
         if (legs.length == 1) {
           final l = legs.first;
-          final from = l.origin.isNotEmpty ? l.origin : 'Origin';
-          final to = l.destination.isNotEmpty ? l.destination : 'Destination';
+          final from = l.origin.isNotEmpty ? _shortAirport(l.origin) : 'Origin';
+          final to = l.destination.isNotEmpty ? _shortAirport(l.destination) : 'Destination';
           return 'Trip 1: $from → $to';
         }
         final summary = legs
-            .map((l) => '${l.origin.isNotEmpty ? l.origin : "?"}→${l.destination.isNotEmpty ? l.destination : "?"}')
+            .map((l) => '${l.origin.isNotEmpty ? _shortAirport(l.origin) : "?"}→${l.destination.isNotEmpty ? _shortAirport(l.destination) : "?"}')
             .join(' · ');
         return '${legs.length} Trips: $summary';
       }
@@ -148,7 +154,7 @@ class FlightSearchSummaryCard extends StatelessWidget {
                       color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
                       letterSpacing: -0.2,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
@@ -158,7 +164,7 @@ class FlightSearchSummaryCard extends StatelessWidget {
                       fontSize: 12,
                       color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],

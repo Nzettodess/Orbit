@@ -166,7 +166,7 @@ class FlightMultiTripSummaryBanner extends StatelessWidget {
                           ? AppColors.darkTertiary
                           : AppColors.lightTertiary,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
