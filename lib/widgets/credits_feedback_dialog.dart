@@ -193,11 +193,22 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                   );
                 }
               },
-              child: Image.asset(
-                'assets/orbit_logo_nobg.png',
+              child: SizedBox(
                 width: 70,
                 height: 70,
-                fit: BoxFit.contain,
+                child: Image.asset(
+                  'assets/orbit_logo_nobg.png',
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Image.asset(
+                    'assets/orbit_logo.png',
+                    width: 70,
+                    height: 70,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const SizedBox(width: 70, height: 70),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 8),

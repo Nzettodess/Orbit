@@ -97,11 +97,22 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
           children: [
             // Hide logo only when effective width is very small OR screen is tiny
             if (showLogo)
-              Image.asset(
-                "assets/orbit_logo_nobg.png",
-                height: 38,
+              SizedBox(
                 width: 38,
-                fit: BoxFit.contain,
+                height: 38,
+                child: Image.asset(
+                  "assets/orbit_logo_nobg.png",
+                  height: 38,
+                  width: 38,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Image.asset(
+                    "assets/orbit_logo.png",
+                    height: 38,
+                    width: 38,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const SizedBox(width: 38, height: 38),
+                  ),
+                ),
               ),
             // Hide "Orbit" text when effective width is small OR screen is narrow
             if (showOrbitText) ...[
