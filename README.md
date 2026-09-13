@@ -1,8 +1,42 @@
-# Orbit 🌍
+<p align="center">
+  <img src="assets/orbit_logo_nobg.png" alt="Orbit Cosmic Otter Logo" width="160" />
+</p>
 
-**Keep your world in sync.**
+<h1 align="center">Orbit</h1>
 
-Orbit is a collaborative location and calendar coordination app for groups, built with Flutter and Firebase. It helps families, friends, and teams stay connected by sharing whereabouts and coordinating events seamlessly.
+<p align="center">
+  <strong>Keep your world in sync.</strong>
+</p>
+
+<p align="center">
+  A modern, collaborative location and calendar coordination app for groups, families, and teams.<br/>
+  Built with Flutter and Firebase, featuring live travel intelligence, persistent local caching, and the Cosmic Otter mascot.
+</p>
+
+<p align="center">
+  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.9.2+-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" /></a>
+  <a href="https://firebase.google.com"><img src="https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth%20%7C%20Storage-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase" /></a>
+  <a href="https://orbit-wheat-sigma.vercel.app"><img src="https://img.shields.io/badge/Web%20App-PWA%20Ready-0070F3?style=for-the-badge&logo=pwa&logoColor=white" alt="Web / PWA" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-34D399?style=for-the-badge" alt="MIT License" /></a>
+  <a href="#-update-log"><img src="https://img.shields.io/badge/Version-v1.1.0-6C5CE7?style=for-the-badge" alt="Version 1.1.0" /></a>
+</p>
+
+<p align="center">
+  <a href="#-preview">Preview</a> •
+  <a href="#-features">Features</a> •
+  <a href="#-update-log">Update Log</a> •
+  <a href="#-getting-started">Getting Started</a> •
+  <a href="#-deployment">Deployment</a> •
+  <a href="#-license">License</a>
+</p>
+
+---
+
+## 📸 Preview
+
+<p align="center">
+  <img src="web/icons/screenshot-wide.png" alt="Orbit Desktop View" width="800" />
+</p>
 
 ## ✨ Features
 
@@ -12,15 +46,15 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 - **⚡ Persistent Group Caching & Instant Boot**: Group data is cached locally via `SharedPreferences`, rendering instantly on app boot with zero network delay and a subtle background sync indicator.
 - **🎂 Automated Birthday Push Cron**: Scheduled daily serverless birthday check via GitHub Actions at 00:00 MYT (`16:00 UTC`), evaluating Solar and Lunar birthdays with OneSignal Web Push and in-app alerts.
 - **🗺️ Smart Location Autocomplete**: High-accuracy city-to-country mapping (e.g. "Bali" → "Indonesia, Bali") with 100% free-text flexibility and ~240 preset regions.
-- **Group Management**: Create and join groups to coordinate with family, friends, or colleagues.
-- **Location Sharing**: Share your current location with group members for specific dates.
-- **Event Scheduling**: Create and manage group events with RSVP functionality.
-- **Holiday Calendars**: Automatically displays public holidays based on your location.
-- **Religious Calendars**: Support for Chinese Lunar and Islamic Hijri calendars.
-- **Real-time Sync**: Instant updates across all devices using Firebase.
-- **Dark Mode**: Full dark/light theme support.
-- **PWA Support**: Install as a Progressive Web App on any device.
-- **Admin Controls**: Role-based access and member management.
+- **👥 Group Management**: Create and join groups to coordinate with family, friends, or colleagues.
+- **📍 Location Sharing**: Share your current location with group members for specific dates.
+- **📅 Event Scheduling**: Create and manage group events with RSVP functionality.
+- **🎉 Holiday Calendars**: Automatically displays public holidays based on your location.
+- **🌙 Religious Calendars**: Support for Chinese Lunar and Islamic Hijri calendars.
+- **🔄 Real-time Sync**: Instant updates across all devices using Firebase.
+- **🌓 Dark Mode**: Full dark/light theme support.
+- **📲 PWA Support**: Install as a Progressive Web App on any device.
+- **🛡️ Admin Controls**: Role-based access and member management.
 
 ## 📝 Update Log
 
@@ -80,9 +114,9 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 ### [1.0.1] - 2026-01-03
 
 - **🎨 UI & Accessibility**: Standardized 90% mobile dialogs with pixel-perfect icon alignment, added variable text scaling (80-150%), and refined Settings labels with vibrant, high-contrast button colors.
-- **� Responsive Polish**: Optimized App Bar, Date Picker, and "Load more" button layouts to prevent overflows on narrow screens (320px-450px) while maintaining legibility.
+- **📱 Responsive Polish**: Optimized App Bar, Date Picker, and "Load more" button layouts to prevent overflows on narrow screens (320px-450px) while maintaining legibility.
 - **⚡ UX & PWA**: Restored original AlertDialog feedback for copy actions, added a manual refresh button, and optimized installation logic for iOS PWA users.
-- **� Security & Integrity**: Hardened Firestore rules for user privacy, secured the group join flow, and enforced strict ownership transfer policies to prevent orphaned groups.
+- **🛡️ Security & Integrity**: Hardened Firestore rules for user privacy, secured the group join flow, and enforced strict ownership transfer policies to prevent orphaned groups.
 
 ### [1.0.0] - 2026-01-01
 
