@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
     appId: '1:991486277733:web:fd67b5372c01962b086e8c',
     messagingSenderId: '991486277733',
     projectId: 'whereabouts-510db',
-    authDomain: 'whereabouts-510db.firebaseapp.com',
+    authDomain: 'orbit-wheat-sigma.vercel.app',
     storageBucket: 'whereabouts-510db.firebasestorage.app',
   );
 
