@@ -41,6 +41,9 @@ export default async function handler(req, res) {
             },
             headings: { en: title || 'Orbit' },
             contents: { en: message },
+            chrome_web_icon: 'https://orbit-wheat-sigma.vercel.app/icons/Icon-512.png',
+            chrome_web_badge: 'https://orbit-wheat-sigma.vercel.app/icons/Icon-192.png',
+            firefox_icon: 'https://orbit-wheat-sigma.vercel.app/icons/Icon-512.png',
             data: data || {},
             ...(external_id ? { external_id: String(external_id) } : {}),
         };

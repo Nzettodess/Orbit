@@ -45,6 +45,8 @@ const oneSignalAppId = process.env.ONESIGNAL_APP_ID || '74c32f25-a8d0-4d63-889b-
 const isSend = process.argv.includes('--send') || process.argv.includes('--execute');
 const statusIndex = process.argv.indexOf('--status');
 const statusId = statusIndex !== -1 && process.argv[statusIndex + 1] ? process.argv[statusIndex + 1] : null;
+const userIndex = process.argv.indexOf('--user');
+const targetUser = userIndex !== -1 && process.argv[userIndex + 1] ? process.argv[userIndex + 1] : null;
 
 console.log('====================================================');
 console.log(`📣 Orbit v${VERSION} Manual Announcement Broadcaster`);
@@ -57,14 +59,7 @@ if (statusId) {
       headers: { 'Authorization': `Basic ${oneSignalApiKey}` }
     });
     const data = await res.json();
-    console.log('Status Report:', {
-      id: data.id,
-      successful: data.successful,
-      failed: data.failed,
-      remaining: data.remaining,
-      converted: data.converted,
-      platform_delivery_stats: data.platform_delivery_stats
-    });
+    console.log('Status Report:', JSON.stringify(data, null, 2));
   } catch (err) {
     console.error('Error fetching notification status:', err);
   }
@@ -73,7 +68,7 @@ if (statusId) {
 
 console.log(`Title   : ${NOTIFICATION_TITLE}`);
 console.log(`Message : ${NOTIFICATION_BODY}`);
-console.log(`Target  : All Subscribed Devices (Segment: "Total Subscriptions")`);
+console.log(`Target  : ${targetUser ? `Single User (${targetUser})` : 'All Subscribed Devices (Segment: "Total Subscriptions")'}`);
 console.log(`URL     : ${TARGET_URL}`);
 console.log(`Mode    : ${isSend ? '🚀 EXECUTE BROADCAST' : '🛡️ DRY-RUN (Pass --send to deliver)'}`);
 console.log('----------------------------------------------------');
@@ -86,7 +81,7 @@ if (!oneSignalApiKey) {
 async function sendBroadcast() {
   if (!isSend) {
     console.log('Dry-run complete. No notification was pushed.');
-    console.log('To send for real, run: node scripts/broadcast-announcement.mjs --send');
+    console.log(`To send for real, run: node scripts/broadcast-announcement.mjs --send${targetUser ? ` --user ${targetUser}` : ''}`);
     return;
   }
 
@@ -94,16 +89,26 @@ async function sendBroadcast() {
   
   const payload = {
     app_id: oneSignalAppId,
-    included_segments: ['Total Subscriptions'],
     headings: { en: NOTIFICATION_TITLE },
     contents: { en: NOTIFICATION_BODY },
+    chrome_web_icon: 'https://orbit-wheat-sigma.vercel.app/icons/Icon-512.png',
+    chrome_web_badge: 'https://orbit-wheat-sigma.vercel.app/icons/Icon-192.png',
+    firefox_icon: 'https://orbit-wheat-sigma.vercel.app/icons/Icon-512.png',
     data: {
       type: 'announcement',
       version: VERSION,
       click_action: 'open_announcement'
     },
     url: TARGET_URL,
-    collapse_id: `announcement_${VERSION}`
+    collapse_id: `announcement_${VERSION}`,
+    ...(targetUser ? {
+      target_channel: 'push',
+      include_aliases: {
+        external_id: [targetUser]
+      }
+    } : {
+      included_segments: ['Total Subscriptions']
+    })
   };
 
   try {
