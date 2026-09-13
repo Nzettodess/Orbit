@@ -34,6 +34,7 @@ import 'widgets/home_speed_dial.dart';
 import 'widgets/home_app_bar.dart';
 import 'flight_checker/flight_checker_dialog.dart';
 import 'flight_checker/utils/airport_data.dart';
+import 'widgets/whats_new_dialog.dart';
 
 class HomeWithLogin extends StatefulWidget {
   const HomeWithLogin({super.key});
@@ -135,6 +136,8 @@ class _HomeWithLoginState extends State<HomeWithLogin>
         NotificationService().initialize(user.uid);
         // Check for birthday notifications (day-of and monthly summary)
         _checkBirthdayNotifications(user.uid);
+        // Check for v1.1.0 announcement dialog
+        _checkWhatsNewAnnouncement();
         // Process any pending join request from deep link
         _processPendingJoin(user.uid);
         // Watch pending join requests to auto-refresh when approved
@@ -930,6 +933,39 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   /// Called once on app load, with deduplication to prevent spam
   Future<void> _checkBirthdayNotifications(String userId) async {
     await NotificationService().checkAllBirthdays(userId);
+  }
+
+  bool _isWhatsNewCheckInProgress = false;
+
+  /// Check if the v1.1.0 announcement dialog should be presented to the user
+  Future<void> _checkWhatsNewAnnouncement() async {
+    if (_isWhatsNewCheckInProgress) return;
+    // Strictly require active authentication before presenting the update dialog
+    if (FirebaseAuth.instance.currentUser == null) {
+      debugPrint('[Home] _checkWhatsNewAnnouncement skipped: user not logged in');
+      return;
+    }
+
+    _isWhatsNewCheckInProgress = true;
+    try {
+      await Future.delayed(const Duration(milliseconds: 1000));
+      if (!mounted || FirebaseAuth.instance.currentUser == null) return;
+      final shouldShow = await WhatsNewDialog.shouldShow();
+      debugPrint('[Home] _checkWhatsNewAnnouncement -> shouldShow: $shouldShow');
+      if (shouldShow && mounted) {
+        debugPrint('[Home] Launching WhatsNewDialog for v${WhatsNewDialog.version}');
+        await showDialog(
+          context: context,
+          barrierDismissible: true,
+          useRootNavigator: true,
+          builder: (_) => const WhatsNewDialog(),
+        );
+      }
+    } catch (e) {
+      debugPrint('[Home] Error showing WhatsNewDialog: $e');
+    } finally {
+      _isWhatsNewCheckInProgress = false;
+    }
   }
 
   void _updateCombinedLocations() {

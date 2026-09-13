@@ -525,6 +525,85 @@ class NotificationService {
     }
   }
 
+  /// Broadcast a version announcement to a user or current user with strict single-delivery deduplication
+  Future<bool> broadcastVersionAnnouncement({
+    required String version,
+    required String title,
+    required String message,
+    String? targetUserId,
+  }) async {
+    final uid = targetUserId ?? _currentUserId;
+    if (uid == null) {
+      debugPrint('Cannot broadcast announcement: No target user ID');
+      return false;
+    }
+
+    final dedupeKey = 'announcement_$version';
+    final docId = '${uid}_$dedupeKey';
+    final docRef = _db.collection('notifications').doc(docId);
+
+    try {
+      final existing = await docRef.get();
+      if (existing.exists) {
+        debugPrint('Announcement for $version already received by $uid, skipping duplicate broadcast.');
+        return false; // Already sent, strictly prevent duplicate
+      }
+
+      await docRef.set({
+        'userId': uid,
+        'title': title,
+        'message': message,
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'type': NotificationType.general.name,
+        'dedupeKey': dedupeKey,
+        'relatedId': version,
+        'isAnnouncement': true,
+      });
+
+      // Send push notification via OneSignal
+      await _sendPushNotification(
+        playerIds: [uid],
+        message: message,
+        title: title,
+        data: {'type': 'announcement', 'version': version},
+        pushDedupeKey: 'announcement_${version}_$uid',
+      );
+
+      debugPrint('Broadcast announcement for $version successfully delivered to $uid');
+      return true;
+    } catch (e) {
+      debugPrint('Error broadcasting announcement to $uid: $e');
+      return false;
+    }
+  }
+
+  /// Broadcast version announcement across all registered users in Firestore
+  Future<int> broadcastVersionAnnouncementToAllUsers({
+    required String version,
+    required String title,
+    required String message,
+  }) async {
+    int sentCount = 0;
+    try {
+      final usersSnapshot = await _db.collection('users').get();
+      for (final doc in usersSnapshot.docs) {
+        final uid = doc.id;
+        final sent = await broadcastVersionAnnouncement(
+          version: version,
+          title: title,
+          message: message,
+          targetUserId: uid,
+        );
+        if (sent) sentCount++;
+      }
+      debugPrint('Broadcast announcement for $version completed: $sentCount new notifications sent.');
+    } catch (e) {
+      debugPrint('Error broadcasting to all users: $e');
+    }
+    return sentCount;
+  }
+
   // ============= Specific Notification Types =============
 
   /// Send join request notification to group owner

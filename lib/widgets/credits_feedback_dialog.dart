@@ -4,6 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'notification_debug_dialog.dart';
+import 'whats_new_dialog.dart';
+import '../services/notification_service.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:js' as js;
 
@@ -51,7 +53,7 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
     final sb = StringBuffer();
 
     sb.writeln('--- Orbit Device Info ---');
-    sb.writeln('App Version: v1.0.2');
+    sb.writeln('App Version: v1.1.0');
     sb.writeln('Timestamp: ${DateTime.now()}');
     sb.writeln('User ID: ${user?.uid ?? "Not Logged In"}');
     sb.writeln('Email: ${user?.email ?? "N/A"}');
@@ -263,9 +265,53 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              'v1.0.2',
-              style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor.withOpacity(0.8)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'v1.1.0',
+                  style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor.withOpacity(0.8)),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => WhatsNewDialog(
+                        isPreview: true,
+                        onSendTestAnnouncement: () => NotificationService().broadcastVersionAnnouncement(
+                          version: WhatsNewDialog.version,
+                          title: 'Orbit v1.1.0 is here! 🦦✈️',
+                          message: 'Enjoy our new Cosmic Otter mascot, Multi-Trip Flight Checker, Member Nicknames, and Instant Group Caching.',
+                        ),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF5E5CE6).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_awesome_rounded, size: 10, color: Color(0xFF5E5CE6)),
+                        SizedBox(width: 3),
+                        Text(
+                          "What's New",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF5E5CE6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             

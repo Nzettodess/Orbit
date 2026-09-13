@@ -94,3 +94,22 @@ This document serves as the master checklist to ensure that refactoring and modu
   - *Expected:* Expands to show legroom with explicit inch units (e.g. `29 in`), carbon emissions, aircraft type, and Google Flights booking link.
 - [ ] **9.6 Smart Location Autocomplete:** In Location Picker, type a city or island (e.g. `Bali`, `Penang`, or `Tokyo`).
   - *Expected:* Direct state/city match appears as top suggestion (e.g. `🇮🇩 Bali, Indonesia`); tapping it simultaneously populates Country to `Indonesia` and State to `Bali` with country flag.
+
+## 10. Version 1.1.0 Major Features & Release Rollout
+
+- [ ] **10.1 Cosmic Otter Brand Mascot & Asset Rendering:** Open App Bar, Drawer, and Android Install Preview.
+  - *Expected:* Mascot logo renders crisply with transparent background, zero RenderFlex overflows, and fallback safety.
+- [ ] **10.2 Personal Member Nicknames (Private Aliases):** Tap member profile from calendar event or member management; assign a custom nickname.
+  - *Expected:* Nickname saves to current user's private aliases; calendar indicators, attendee rows, and profile dialog display the nickname immediately without affecting other members' views.
+- [ ] **10.3 Multi-Trip Flight Search & Collapsible Leg Animations:** Select Multi-Trip tab in Flight Checker; fill Trip 1 and Trip 2; search and toggle expand/collapse.
+  - *Expected:* Leg cards expand/collapse with smooth `SizeTransition` easeInOutCubic animation; combined price appears accurately in bottom bar.
+- [ ] **10.4 Airport Conflict Validation & Home Prefill:** Enter identical origin and destination (e.g. `KUL` to `KUL`), or open flight checker from an event.
+  - *Expected:* Highlights field with red border, displays error banner, and disables "Find Flights" button. When opened from event, pre-fills home origin airport automatically.
+- [ ] **10.5 Persistent Group Caching & Instant Boot:** Close and reopen the app.
+  - *Expected:* Groups load instantly from local cache without spinner delay; subtle pulsating sync indicator appears briefly during background Firestore sync.
+- [ ] **10.6 "What's New in v1.1.0" Dialog & 1-Time Auto-Popup:** Open updated app with unread version.
+  - *Expected:* Automatically presents `WhatsNewDialog`; tapping "Explore Orbit v1.1.0" closes the dialog and writes `last_seen_version = '1.1.0'` so it never auto-pops again.
+- [ ] **10.7 Drawer "NEW" Badge & Re-readability:** Open Drawer within 7 days of release date.
+  - *Expected:* "What's New in v1.1.0" menu item displays purple `NEW` badge; tapping it opens the dialog on demand.
+- [ ] **10.8 Single-Broadcast Announcement Notification:** Send test broadcast announcement.
+  - *Expected:* Notification appears in Notification Center with purple badge; tapping it marks as read and opens What's New dialog; sending a second time skips duplicate write.

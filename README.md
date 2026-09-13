@@ -6,7 +6,12 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 
 ## ✨ Features
 
-- **Flight Checker & Fare Tracking**: Live Google Flights search for one-way, round-trip, and multi-city routes with multi-currency conversion, lowest fare highlighting, and multi-airline filtering.
+- **🦦 Cosmic Otter Mascot & Modern Branding**: Custom high-resolution mascot logo with transparent background and anime-grade waifu2x 2x upscaled assets across app icons, splash screens, and PWA manifest.
+- **✈️ Advanced Flight Checker & Fare Intelligence**: Live Google Flights search for one-way, round-trip, and multi-city routes with multi-currency conversion (10 global currencies), lowest fare highlighting, collapsible animated leg cards, layover alerts (>5h), and smart airport validation.
+- **👤 Personal Member Nicknames**: Assign private aliases to group members that only you see, seamlessly displayed across calendar tiles, attendee lists, and member dialogs.
+- **⚡ Persistent Group Caching & Instant Boot**: Group data is cached locally via `SharedPreferences`, rendering instantly on app boot with zero network delay and a subtle background sync indicator.
+- **🎂 Automated Birthday Push Cron**: Scheduled daily serverless birthday check via GitHub Actions at 00:00 MYT (`16:00 UTC`), evaluating Solar and Lunar birthdays with OneSignal Web Push and in-app alerts.
+- **🗺️ Smart Location Autocomplete**: High-accuracy city-to-country mapping (e.g. "Bali" → "Indonesia, Bali") with 100% free-text flexibility and ~240 preset regions.
 - **Group Management**: Create and join groups to coordinate with family, friends, or colleagues.
 - **Location Sharing**: Share your current location with group members for specific dates.
 - **Event Scheduling**: Create and manage group events with RSVP functionality.
@@ -19,7 +24,33 @@ Orbit is a collaborative location and calendar coordination app for groups, buil
 
 ## 📝 Update Log
 
-### [1.0.3] - 2026-09-12
+### [1.1.0] - 2026-09-13
+
+- **🦦 Cosmic Otter Brand Identity & Visual Rebrand**:
+  - Replaced legacy world icon with custom, high-resolution **Cosmic Otter** mascot logo across all touchpoints (`assets/logo.png`, favicon, Android & iOS launcher icons, and PWA web app manifest).
+  - Enhanced artwork with waifu2x 2x upscaling and transparent background for clean rendering against dynamic light/dark theme surfaces.
+  - Sized and guarded all mascot image containers with errorBuilder fallbacks to eliminate RenderFlex overflows.
+- **✈️ Comprehensive Flight Checker & Intelligence Suite**:
+  - **Multi-Trip & Multi-City Search**: Added multi-leg trip search supporting Trip 1, Trip 2, Trip 3 with unified combined pricing and responsive layout.
+  - **Fluid Animations & Responsive Collapsing**: Engineered smooth zero-lag collapsible trip cards and leg sections with `SizeTransition` and `easeInOutCubic` curves, eliminating scroll bleed and jumps.
+  - **Live Pricing & Multi-Currency Converter**: Scraping integration with Google Flights (`api/check-flights.js`) with instant client-side conversion across 10 currencies (MYR, SGD, USD, EUR, GBP, JPY, AUD, CAD, CNY, THB).
+  - **Lowest Fare Glow & Layover Warnings**: Distinct 2.0px green accent border (`AppColors.iosGreen`) and `⚡ Lowest Fare` badge on cheapest flights; dedicated "Long wait time" badge for layovers > 5 hours.
+  - **Smart Validation & Calendar Touchpoints**: Auto-search prefill from event locations and home airports; red border warning on conflicting origin/destination; disambiguation between multi-airport cities (e.g., NYC: JFK, EWR, LGA) vs identical airport selections.
+- **👤 Personal Member Nicknames & Responsive Profile**:
+  - Personal aliases: Users can assign custom nicknames to any group member that only they can see, resolving ambiguous names across calendar views and member lists.
+  - Redesigned `UserProfileDialog`: Fully responsive profile modal with multiline bio text, solar/lunar birthday indicators, and instant inline nickname editor.
+- **⚡ Persistent Group Caching & Refresh-Free Sync**:
+  - Persistent local group caching via `SharedPreferences` (`_persistMyGroupsToCache` and `_loadCachedMyGroups`), rendering groups and calendar instantly on boot with zero network delay.
+  - Subtle pulsating sync indicator (`_isSyncing`) next to the group selector during background Firestore reconciliation.
+- **📢 In-App Update Announcement & What's New Dialog**:
+  - Interactive "What's New in Orbit v1.1.0" modal dialog showcasing mascot, features, and quick tour.
+  - Strict 1-time delivery and 1-broadcast limit per version via deterministic document IDs (`announcement_v1.1.0_{userId}`) and deduplication keys.
+  - 7-day prominent "NEW" badge in Drawer menu allowing users to revisit release notes at their convenience.
+- **📱 Mobile Ergonomics & Web Stability Harness**:
+  - Wrapped price action bars and expanded multiline routes to eliminate overflow on compact viewports (iPhone SE, 320px–450px).
+  - Gated offline persistence (`!kIsWeb`) to eradicate Chrome IndexedDB transaction hangs (`ca9: {"ve":-1}`).
+  - Expanded automated test suite from 27 to **120 passing tests** across unit, widget, and integration suites.
+
 
 - **✈️ Live Flight Checker & Fare Intelligence**:
   - Integrated Google Flights scraping backend (`api/check-flights.js`) deployable as a serverless function on Vercel or locally via `node api/local-dev-server.js`.

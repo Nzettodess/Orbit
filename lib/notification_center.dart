@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'firestore_service.dart';
 import 'models.dart';
 import 'widgets/skeleton_loading.dart';
+import 'widgets/whats_new_dialog.dart';
+import 'core/theme/app_colors.dart';
 import 'group_management.dart';
 import 'services/notification_service.dart';
 
@@ -139,6 +141,17 @@ class _NotificationCenterState extends State<NotificationCenter> {
     // Close the notification dialog first
     Navigator.pop(context);
     
+    // Check if this is a system update / announcement notification
+    final isAnnouncement = (notification.dedupeKey?.startsWith('announcement_') ?? false) ||
+        notification.relatedId == '1.1.0';
+    if (isAnnouncement) {
+      showDialog(
+        context: context,
+        builder: (_) => const WhatsNewDialog(),
+      );
+      return;
+    }
+
     // Navigate based on notification type
     switch (notification.type) {
       case NotificationType.joinRequest:
@@ -394,7 +407,14 @@ class _NotificationCenterState extends State<NotificationCenter> {
                     ),
                     itemBuilder: (context, index) {
                       final notification = notifications[index];
-                      final iconColor = _getColorForType(notification.type, notification.read);
+                      final isAnnouncement = (notification.dedupeKey?.startsWith('announcement_') ?? false) ||
+                          notification.relatedId == '1.1.0';
+                      final iconColor = isAnnouncement && !notification.read
+                          ? AppColors.iosPurple
+                          : _getColorForType(notification.type, notification.read);
+                      final iconData = isAnnouncement
+                          ? Icons.auto_awesome_rounded
+                          : _getIconForType(notification.type);
                       
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(
@@ -408,7 +428,7 @@ class _NotificationCenterState extends State<NotificationCenter> {
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            _getIconForType(notification.type),
+                            iconData,
                             color: iconColor,
                             size: 24,
                           ),

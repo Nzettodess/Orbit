@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'credits_feedback_dialog.dart';
+import 'whats_new_dialog.dart';
 import '../services/services.dart';
 import '../core/theme/app_colors.dart';
 
@@ -151,6 +152,38 @@ class HomeDrawer extends StatelessWidget {
                       context,
                       surfaceColor,
                       [
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.auto_awesome_rounded,
+                          iconColor: AppColors.iosPurple,
+                          title: "What's New in v1.1.0",
+                          trailing: DateTime.now().isBefore(DateTime(2026, 9, 21))
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.iosPurple,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Text(
+                                    'NEW',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                )
+                              : null,
+                          onTap: () {
+                            Navigator.pop(context);
+                            showDialog(
+                              context: context,
+                              builder: (context) => const WhatsNewDialog(),
+                            );
+                          },
+                        ),
+                        _buildDivider(context),
                         _buildMenuItem(
                           context: context,
                           icon: Icons.info_outline_rounded,
@@ -323,6 +356,7 @@ class HomeDrawer extends StatelessWidget {
     required Color iconColor,
     required String title,
     required VoidCallback onTap,
+    Widget? trailing,
   }) {
     return Material(
       color: Colors.transparent,
@@ -352,6 +386,10 @@ class HomeDrawer extends StatelessWidget {
                   ),
                 ),
               ),
+              if (trailing != null) ...[
+                trailing,
+                const SizedBox(width: 6),
+              ],
               Icon(
                 Icons.chevron_right_rounded,
                 size: 20,
