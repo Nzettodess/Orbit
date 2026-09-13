@@ -1109,6 +1109,14 @@ class _DetailModalState extends State<DetailModal> {
                               // Check flights to this member's location on this date
                               Builder(
                                 builder: (context) {
+                                  // 1. Flight search cannot search dates in the past
+                                  final now = DateTime.now();
+                                  final today = DateTime(now.year, now.month, now.day);
+                                  final targetDate = DateTime(widget.date.year, widget.date.month, widget.date.day);
+                                  if (targetDate.isBefore(today)) {
+                                    return const SizedBox.shrink();
+                                  }
+
                                   if (element.nation == "No location selected") {
                                     return const SizedBox.shrink();
                                   }

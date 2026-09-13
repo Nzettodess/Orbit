@@ -121,6 +121,22 @@ class AirportHelper {
     }).take(10).toList();
   }
 
+  /// Common aliases and shorthand mapping to airport codes
+  static const Map<String, String> cityAliases = {
+    'nyc': 'JFK',
+    'newyork': 'JFK',
+    'newyorkcity': 'JFK',
+    'kl': 'KUL',
+    'jb': 'JHB',
+    'sf': 'SFO',
+    'la': 'LAX',
+    'sg': 'SIN',
+    'bkk': 'BKK',
+    'hkg': 'HKG',
+    'tyo': 'HND',
+    'sel': 'ICN',
+  };
+
   /// Automatically resolve a freeform location string (e.g. "Malaysia, Penang" or "Tokyo, Japan")
   /// to the best matching airport label (e.g. "Penang (PEN)" or "Tokyo (HND)").
   static String findBestAirport(String? locationString) {
@@ -130,13 +146,36 @@ class AirportHelper {
     final cleaned = locationString.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]', unicode: true), '').trim();
     final parts = cleaned.split(RegExp(r'[,•/-]')).map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
 
+    // 0. Check exact alias on full string
+    final fullCleanedNorm = cleaned.toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
+    if (cityAliases.containsKey(fullCleanedNorm)) {
+      final code = cityAliases[fullCleanedNorm]!;
+      final match = airports.firstWhere((a) => a.code == code, orElse: () => const AirportOption(code: '', city: '', country: '', name: ''));
+      if (match.code.isNotEmpty) return match.shortLabel;
+    }
+
     // 1. Try matching each part from specific (state/city) to broad (country)
     for (int i = parts.length - 1; i >= 0; i--) {
       final part = parts[i].toLowerCase();
+      final partNorm = part.replaceAll(RegExp(r'[\s\-_]'), '');
+
+      if (cityAliases.containsKey(partNorm)) {
+        final code = cityAliases[partNorm]!;
+        final match = airports.firstWhere((a) => a.code == code, orElse: () => const AirportOption(code: '', city: '', country: '', name: ''));
+        if (match.code.isNotEmpty) return match.shortLabel;
+      }
+
       final match = airports.firstWhere(
-        (a) => a.city.toLowerCase() == part ||
-            a.name.toLowerCase().contains(part) ||
-            a.code.toLowerCase() == part,
+        (a) {
+          final cityLower = a.city.toLowerCase();
+          final cityNorm = cityLower.replaceAll(RegExp(r'[\s\-_]'), '');
+          return cityLower == part ||
+              cityNorm == partNorm ||
+              (partNorm.contains(cityNorm) && cityNorm.length >= 3) ||
+              (cityNorm.contains(partNorm) && partNorm.length >= 3) ||
+              a.name.toLowerCase().contains(part) ||
+              a.code.toLowerCase() == partNorm;
+        },
         orElse: () => const AirportOption(code: '', city: '', country: '', name: ''),
       );
       if (match.code.isNotEmpty) {
@@ -147,8 +186,13 @@ class AirportHelper {
     // 2. Try matching country level
     for (final part in parts) {
       final partLower = part.toLowerCase();
+      final partNorm = partLower.replaceAll(RegExp(r'[\s\-_]'), '');
       final match = airports.firstWhere(
-        (a) => a.country.toLowerCase() == partLower,
+        (a) {
+          final countryLower = a.country.toLowerCase();
+          final countryNorm = countryLower.replaceAll(RegExp(r'[\s\-_]'), '');
+          return countryLower == partLower || countryNorm == partNorm;
+        },
         orElse: () => const AirportOption(code: '', city: '', country: '', name: ''),
       );
       if (match.code.isNotEmpty) {

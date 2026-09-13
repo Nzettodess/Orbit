@@ -1482,10 +1482,13 @@ class _HomeWithLoginState extends State<HomeWithLogin>
 
     if (!mounted) return;
 
-    showModalBottomSheet(
+    Map<String, dynamic>? savedSuccessData;
+    String? saveErrorMsg;
+
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (sheetContext) {
         // Filter group members who allow location editing (privacy check)
         // Exclude current user, exclude placeholders, only real members
         final editableMembers = _allUsers.where((user) {
@@ -1543,76 +1546,92 @@ class _HomeWithLoginState extends State<HomeWithLogin>
                     country,
                     state,
                   );
-                  // Notification is handled internally by FirestoreService now
                 }
-              } // end for loop
-
-              if (mounted) {
-                final dayCount = endDate.difference(startDate).inDays + 1;
-                final memberCount = selectedMemberIds.length;
-                final dateRange = dayCount == 1
-                    ? DateFormat('MMM dd, yyyy').format(startDate)
-                    : "${DateFormat('MMM dd').format(startDate)} - ${DateFormat('MMM dd, yyyy').format(endDate)}";
-
-                // Check if destination has a recognized airport and is not user's current home location
-                final destStr = state != null && state.isNotEmpty ? '$country, $state' : country;
-                final hasAirport = AirportHelper.hasKnownAirport(destStr);
-
-                String userHome = '';
-                if (_user != null) {
-                  final userDoc = _allUsers.firstWhere(
-                    (u) => u['uid'] == _user!.uid,
-                    orElse: () => <String, dynamic>{},
-                  );
-                  userHome = (userDoc['defaultLocation'] as String?) ?? '';
-                }
-                final userHomeAirport = AirportHelper.findBestAirport(userHome);
-                final targetAirport = AirportHelper.findBestAirport(destStr);
-                final isSameAsHome = userHomeAirport.isNotEmpty &&
-                    targetAirport.isNotEmpty &&
-                    userHomeAirport == targetAirport;
-
-                final showFlightAction = hasAirport && !isSameAsHome;
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      "Location set for $memberCount member${memberCount > 1 ? 's' : ''} "
-                      "to ${state != null ? '$state, ' : ''}$country for $dateRange",
-                    ),
-                    backgroundColor: Colors.green,
-                    duration: const Duration(seconds: 6),
-                    action: showFlightAction
-                        ? SnackBarAction(
-                            label: 'Check Flights ✈',
-                            textColor: Colors.white,
-                            onPressed: () {
-                              _openFlightChecker(
-                                destination: destStr,
-                                date: startDate,
-                                returnDate: dayCount > 1 ? endDate : null,
-                                autoSearch: true,
-                              );
-                            },
-                          )
-                        : null,
-                  ),
-                );
               }
+
+              savedSuccessData = {
+                'country': country,
+                'state': state,
+                'startDate': startDate,
+                'endDate': endDate,
+                'memberCount': selectedMemberIds.length,
+              };
             } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("Error saving location: $e"),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
+              saveErrorMsg = e.toString();
+              rethrow;
             }
           },
         );
       },
     );
+
+    if (!mounted) return;
+
+    if (savedSuccessData != null) {
+      final country = savedSuccessData!['country'] as String;
+      final state = savedSuccessData!['state'] as String?;
+      final startDate = savedSuccessData!['startDate'] as DateTime;
+      final endDate = savedSuccessData!['endDate'] as DateTime;
+      final memberCount = savedSuccessData!['memberCount'] as int;
+
+      final dayCount = endDate.difference(startDate).inDays + 1;
+      final dateRange = dayCount == 1
+          ? DateFormat('MMM dd, yyyy').format(startDate)
+          : "${DateFormat('MMM dd').format(startDate)} - ${DateFormat('MMM dd, yyyy').format(endDate)}";
+
+      // Check if destination has a recognized airport and is not user's current home location
+      final destStr = state != null && state.isNotEmpty ? '$country, $state' : country;
+      final hasAirport = AirportHelper.hasKnownAirport(destStr);
+
+      String userHome = '';
+      if (_user != null) {
+        final userDoc = _allUsers.firstWhere(
+          (u) => u['uid'] == _user!.uid,
+          orElse: () => <String, dynamic>{},
+        );
+        userHome = (userDoc['defaultLocation'] as String?) ?? '';
+      }
+      final userHomeAirport = AirportHelper.findBestAirport(userHome);
+      final targetAirport = AirportHelper.findBestAirport(destStr);
+      final isSameAsHome = userHomeAirport.isNotEmpty &&
+          targetAirport.isNotEmpty &&
+          userHomeAirport == targetAirport;
+
+      final showFlightAction = hasAirport && !isSameAsHome;
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Location set for $memberCount member${memberCount > 1 ? 's' : ''} "
+            "to ${state != null ? '$state, ' : ''}$country for $dateRange",
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 6),
+          action: showFlightAction
+              ? SnackBarAction(
+                  label: 'Check Flights ✈',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    _openFlightChecker(
+                      destination: destStr,
+                      date: startDate,
+                      returnDate: dayCount > 1 ? endDate : null,
+                      autoSearch: true,
+                    );
+                  },
+                )
+              : null,
+        ),
+      );
+    } else if (saveErrorMsg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error saving location: $saveErrorMsg"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // Helper to get locations for a specific date (for DetailModal from Upcoming)

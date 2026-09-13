@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whereabouts/flight_checker/flight_checker_dialog.dart';
 import 'package:whereabouts/flight_checker/utils/airport_data.dart';
+import 'package:whereabouts/models.dart';
+import 'package:whereabouts/widgets/event_detail_dialog.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +26,18 @@ void main() {
       expect(AirportHelper.hasKnownAirport('Seoul'), isTrue);
       expect(AirportHelper.hasKnownAirport('Melbourne'), isTrue);
       expect(AirportHelper.hasKnownAirport('Paris'), isTrue);
+    });
+
+    test('Resolves newyork, nyc, and city abbreviations to known airports', () {
+      expect(AirportHelper.hasKnownAirport('newyork'), isTrue);
+      expect(AirportHelper.hasKnownAirport('New York'), isTrue);
+      expect(AirportHelper.hasKnownAirport('New York City'), isTrue);
+      expect(AirportHelper.hasKnownAirport('United States, New York'), isTrue);
+      expect(AirportHelper.hasKnownAirport('nyc'), isTrue);
+      expect(AirportHelper.hasKnownAirport('NYC'), isTrue);
+      expect(AirportHelper.hasKnownAirport('kl'), isTrue);
+      expect(AirportHelper.hasKnownAirport('sf'), isTrue);
+      expect(AirportHelper.hasKnownAirport('la'), isTrue);
     });
 
     test('Returns false for null, empty strings, and generic non-airport locations', () {
@@ -103,6 +117,89 @@ void main() {
 
       // Form is displayed and Find Flights button is present
       expect(find.text('Find Flights'), findsOneWidget);
+    });
+  });
+
+  group('EventDetailDialog Flight Touchpoint Tests', () {
+    testWidgets('Renders Check Flights to Venue tile when venue has an airport and date is in future', (tester) async {
+      final futureDate = DateTime.now().add(const Duration(days: 30));
+      final event = GroupEvent(
+        id: 'event_future',
+        groupId: 'g1',
+        creatorId: 'u1',
+        title: 'Tech Conference',
+        description: 'Annual summit',
+        venue: 'Tokyo Big Sight, Tokyo',
+        date: futureDate,
+        rsvps: {},
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EventDetailDialog(
+              event: event,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Check Flights to Venue ↗'), findsOneWidget);
+    });
+
+    testWidgets('Hides Check Flights to Venue tile when event date is in the past', (tester) async {
+      final pastDate = DateTime.now().subtract(const Duration(days: 5));
+      final event = GroupEvent(
+        id: 'event_past',
+        groupId: 'g1',
+        creatorId: 'u1',
+        title: 'Past Expo',
+        description: 'Closed summit',
+        venue: 'Tokyo Big Sight, Tokyo',
+        date: pastDate,
+        rsvps: {},
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EventDetailDialog(
+              event: event,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Check Flights to Venue ↗'), findsNothing);
+    });
+
+    testWidgets('Hides Check Flights to Venue tile when venue has no recognized airport', (tester) async {
+      final futureDate = DateTime.now().add(const Duration(days: 30));
+      final event = GroupEvent(
+        id: 'event_local',
+        groupId: 'g1',
+        creatorId: 'u1',
+        title: 'Internal Sync',
+        description: 'Weekly team meeting',
+        venue: 'Meeting Room B, 2nd Floor',
+        date: futureDate,
+        rsvps: {},
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EventDetailDialog(
+              event: event,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Check Flights to Venue ↗'), findsNothing);
     });
   });
 }

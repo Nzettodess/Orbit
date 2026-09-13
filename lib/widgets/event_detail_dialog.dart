@@ -128,53 +128,63 @@ class EventDetailDialog extends StatelessWidget {
                         venue: event.venue!,
                         style: const TextStyle(fontSize: 14),
                       ),
-                      if (AirportHelper.hasKnownAirport(event.venue)) ...[
-                        const SizedBox(height: 6),
-                        InkWell(
-                          onTap: () {
-                            Navigator.pop(context);
-                            showFlightCheckerDialog(
-                              context,
-                              destination: event.venue,
-                              date: event.date,
-                              autoSearch: true,
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.iosBlue.withValues(alpha: 0.15)
-                                  : AppColors.iosBlue.withValues(alpha: 0.08),
+                      Builder(
+                        builder: (context) {
+                          final now = DateTime.now();
+                          final today = DateTime(now.year, now.month, now.day);
+                          final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
+                          if (eventDay.isBefore(today) || !AirportHelper.hasKnownAirport(event.venue)) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.pop(context);
+                                showFlightCheckerDialog(
+                                  context,
+                                  destination: event.venue,
+                                  date: event.date,
+                                  autoSearch: true,
+                                );
+                              },
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: AppColors.iosBlue.withValues(alpha: isDark ? 0.35 : 0.25),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.flight_takeoff_rounded,
-                                  size: 16,
-                                  color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Check Flights to Venue ↗',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? AppColors.iosBlue.withValues(alpha: 0.15)
+                                      : AppColors.iosBlue.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: AppColors.iosBlue.withValues(alpha: isDark ? 0.35 : 0.25),
+                                    width: 1,
                                   ),
                                 ),
-                              ],
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.flight_takeoff_rounded,
+                                      size: 16,
+                                      color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Check Flights to Venue ↗',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                       const SizedBox(height: 14),
                     ],
                     
@@ -208,11 +218,17 @@ class EventDetailDialog extends StatelessWidget {
                         ),
                       ),
                     const SizedBox(height: 4),
-                    FutureBuilder<DocumentSnapshot>(
-                      future: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(event.creatorId)
-                          .get(),
+                    FutureBuilder<DocumentSnapshot?>(
+                      future: () async {
+                        try {
+                          return await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(event.creatorId)
+                              .get();
+                        } catch (_) {
+                          return null;
+                        }
+                      }(),
                       builder: (context, snapshot) {
                         if (snapshot.hasData) {
                           final data = snapshot.data!.data() as Map<String, dynamic>?;
