@@ -11,7 +11,7 @@ import 'widgets/flight_leg_section_header.dart';
 import 'widgets/flight_leg_tab_bar.dart';
 import 'widgets/flight_multicity_results_view.dart';
 import 'widgets/flight_results_header_bar.dart';
-import 'widgets/flight_search_form.dart';
+import 'widgets/flight_search_summary_card.dart';
 
 /// Modal dialog for querying flight prices with Google Flights fallback
 class FlightCheckerDialog extends StatefulWidget {
@@ -39,6 +39,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
   FlightFilterCriteria _filterCriteria = const FlightFilterCriteria();
   bool _isDepartingExpanded = true;
   bool _isReturningExpanded = true;
+  bool _isSearchExpanded = true;
   final Map<int, bool> _multiCityExpanded = {};
   final ScrollController _scrollController = ScrollController();
 
@@ -55,6 +56,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       returnDate: null,
       tripType: 'oneway',
     );
+
+    _isSearchExpanded = true;
 
     if ((widget.initialOrigin ?? '').isNotEmpty &&
         (widget.initialDestination ?? '').isNotEmpty) {
@@ -165,6 +168,7 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
         }
         if (res.success && res.flights.isNotEmpty) {
           _currencyCache[params.currency] = res;
+          _isSearchExpanded = false;
         }
         if (!res.success) {
           _errorMessage = res.error ?? 'Could not retrieve flights at this time.';
@@ -210,14 +214,19 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      FlightSearchForm(
-                        initialParams: _currentParams,
-                        isLoading: _isLoading,
+                      FlightSearchSummaryCard(
+                        currentParams: _currentParams,
+                        isExpanded: _isSearchExpanded,
+                        onToggleExpand: () =>
+                            setState(() => _isSearchExpanded = !_isSearchExpanded),
                         onSearch: _performSearch,
                         onCurrencyChanged: _handleCurrencyChanged,
                         onTripTypeChanged: _handleTripTypeChanged,
+                        isLoading: _isLoading,
+                        hasResults: _response != null,
+                        isDark: isDark,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 14),
                       _buildResultsSection(isDark),
                     ],
                   ),
