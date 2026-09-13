@@ -193,14 +193,11 @@ class _CreditsAndFeedbackDialogState extends State<CreditsAndFeedbackDialog> {
                   );
                 }
               },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.asset(
-                  'assets/orbit_logo.png',
-                  width: 70,
-                  height: 70,
-                  fit: BoxFit.cover,
-                ),
+              child: Image.asset(
+                'assets/orbit_logo_nobg.png',
+                width: 70,
+                height: 70,
+                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(height: 8),

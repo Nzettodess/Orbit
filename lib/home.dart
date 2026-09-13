@@ -1777,14 +1777,11 @@ class _HomeWithLoginState extends State<HomeWithLogin>
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.asset(
-                  "assets/orbit_logo.png",
-                  height: 38,
-                  width: 38,
-                  fit: BoxFit.cover,
-                ),
+              Image.asset(
+                "assets/orbit_logo_nobg.png",
+                height: 38,
+                width: 38,
+                fit: BoxFit.contain,
               ),
               const SizedBox(width: 8),
               Text(
