@@ -90,6 +90,7 @@ flutter:
   assets:
     - assets/orbit_logo.png
     - assets/orbit_logo_nobg.png
+    - assets/orbit_logo_nobg_waifu2x_2x_png.png
     - assets/orbit_logo.svg
     - assets/google_logo.png
     - assets/github.svg
