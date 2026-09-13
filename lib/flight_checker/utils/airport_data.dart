@@ -61,6 +61,7 @@ class AirportHelper {
     AirportOption(code: 'HND', city: 'Tokyo', country: 'Japan', name: 'Tokyo Haneda Airport'),
     AirportOption(code: 'NRT', city: 'Tokyo', country: 'Japan', name: 'Narita International Airport'),
     AirportOption(code: 'KIX', city: 'Osaka', country: 'Japan', name: 'Kansai International Airport'),
+    AirportOption(code: 'ITM', city: 'Osaka', country: 'Japan', name: 'Itami Airport'),
     AirportOption(code: 'FUK', city: 'Fukuoka', country: 'Japan', name: 'Fukuoka Airport'),
     AirportOption(code: 'CTS', city: 'Sapporo', country: 'Japan', name: 'New Chitose Airport'),
     AirportOption(code: 'ICN', city: 'Seoul', country: 'South Korea', name: 'Incheon International Airport'),
@@ -71,7 +72,9 @@ class AirportHelper {
     AirportOption(code: 'HKG', city: 'Hong Kong', country: 'Hong Kong', name: 'Hong Kong International Airport'),
     AirportOption(code: 'MFM', city: 'Macau', country: 'Macau', name: 'Macau International Airport'),
     AirportOption(code: 'PVG', city: 'Shanghai', country: 'China', name: 'Shanghai Pudong International Airport'),
+    AirportOption(code: 'SHA', city: 'Shanghai', country: 'China', name: 'Shanghai Hongqiao International Airport'),
     AirportOption(code: 'PEK', city: 'Beijing', country: 'China', name: 'Beijing Capital International Airport'),
+    AirportOption(code: 'PKX', city: 'Beijing', country: 'China', name: 'Beijing Daxing International Airport'),
     AirportOption(code: 'CAN', city: 'Guangzhou', country: 'China', name: 'Guangzhou Baiyun International Airport'),
 
     // Australia & New Zealand
@@ -84,7 +87,9 @@ class AirportHelper {
     // Europe
     AirportOption(code: 'LHR', city: 'London', country: 'United Kingdom', name: 'Heathrow Airport'),
     AirportOption(code: 'LGW', city: 'London', country: 'United Kingdom', name: 'Gatwick Airport'),
+    AirportOption(code: 'STN', city: 'London', country: 'United Kingdom', name: 'London Stansted Airport'),
     AirportOption(code: 'CDG', city: 'Paris', country: 'France', name: 'Charles de Gaulle Airport'),
+    AirportOption(code: 'ORY', city: 'Paris', country: 'France', name: 'Paris Orly Airport'),
     AirportOption(code: 'AMS', city: 'Amsterdam', country: 'Netherlands', name: 'Amsterdam Airport Schiphol'),
     AirportOption(code: 'FRA', city: 'Frankfurt', country: 'Germany', name: 'Frankfurt Airport'),
     AirportOption(code: 'MUC', city: 'Munich', country: 'Germany', name: 'Munich Airport'),
@@ -101,6 +106,7 @@ class AirportHelper {
     // North America
     AirportOption(code: 'JFK', city: 'New York', country: 'United States', name: 'John F. Kennedy International Airport'),
     AirportOption(code: 'EWR', city: 'New York', country: 'United States', name: 'Newark Liberty International Airport'),
+    AirportOption(code: 'LGA', city: 'New York', country: 'United States', name: 'LaGuardia Airport'),
     AirportOption(code: 'LAX', city: 'Los Angeles', country: 'United States', name: 'Los Angeles International Airport'),
     AirportOption(code: 'SFO', city: 'San Francisco', country: 'United States', name: 'San Francisco International Airport'),
     AirportOption(code: 'ORD', city: 'Chicago', country: 'United States', name: "O'Hare International Airport"),
@@ -144,9 +150,20 @@ class AirportHelper {
     
     // Clean emojis and extra punctuation
     final cleaned = locationString.replaceAll(RegExp(r'[\u{1F1E6}-\u{1F1FF}]', unicode: true), '').trim();
+
+    // 0a. Check explicit IATA airport code first (e.g. "Bangkok (DMK)" or standalone "DMK")
+    final explicitCode = extractIataCode(cleaned);
+    if (explicitCode.isNotEmpty) {
+      final match = airports.firstWhere(
+        (a) => a.code == explicitCode,
+        orElse: () => const AirportOption(code: '', city: '', country: '', name: ''),
+      );
+      if (match.code.isNotEmpty) return match.shortLabel;
+    }
+
     final parts = cleaned.split(RegExp(r'[,•/-]')).map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
 
-    // 0. Check exact alias on full string
+    // 0b. Check exact alias on full string
     final fullCleanedNorm = cleaned.toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
     if (cityAliases.containsKey(fullCleanedNorm)) {
       final code = cityAliases[fullCleanedNorm]!;
@@ -226,13 +243,18 @@ class AirportHelper {
   static String extractIataCode(String? input) {
     if (input == null || input.trim().isEmpty) return '';
     final trimmed = input.trim();
-    final match = RegExp(r'\(([A-Z0-9]{3})\)', caseSensitive: false).firstMatch(trimmed);
+    final match = RegExp(r'\(([A-Za-z0-9]{3})\)').firstMatch(trimmed);
     if (match != null) return match.group(1)!.toUpperCase();
-    if (RegExp(r'^[A-Za-z0-9]{3}$').hasMatch(trimmed)) return trimmed.toUpperCase();
+    if (RegExp(r'^[A-Za-z0-9]{3}$').hasMatch(trimmed)) {
+      final code = trimmed.toUpperCase();
+      if (airports.any((a) => a.code == code) || !cityAliases.containsKey(trimmed.toLowerCase())) {
+        return code;
+      }
+    }
     return '';
   }
 
-  /// Checks if two location strings resolve to the same airport or city
+  /// Checks if two location strings resolve to the same airport
   static bool isSameLocation(String? loc1, String? loc2) {
     if (loc1 == null || loc2 == null) return false;
     final clean1 = loc1.trim();
@@ -242,15 +264,21 @@ class AirportHelper {
 
     final code1 = extractIataCode(clean1);
     final code2 = extractIataCode(clean2);
-    if (code1.isNotEmpty && code2.isNotEmpty && code1 == code2) return true;
+    // When both inputs have explicit airport codes, compare them directly.
+    // Distinct airports in the same city (e.g. Bangkok BKK vs DMK, Tokyo HND vs NRT, NYC JFK vs EWR) are different.
+    if (code1.isNotEmpty && code2.isNotEmpty) {
+      return code1 == code2;
+    }
 
     final airport1 = findBestAirport(clean1);
     final airport2 = findBestAirport(clean2);
     if (airport1.isNotEmpty && airport2.isNotEmpty) {
-      if (airport1.toLowerCase() == airport2.toLowerCase()) return true;
       final bestCode1 = extractIataCode(airport1);
       final bestCode2 = extractIataCode(airport2);
-      if (bestCode1.isNotEmpty && bestCode2.isNotEmpty && bestCode1 == bestCode2) return true;
+      if (bestCode1.isNotEmpty && bestCode2.isNotEmpty) {
+        return bestCode1 == bestCode2;
+      }
+      return airport1.toLowerCase() == airport2.toLowerCase();
     }
     return false;
   }

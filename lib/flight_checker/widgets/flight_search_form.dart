@@ -73,10 +73,26 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
 
     _originController.addListener(_onLocationChanged);
     _destinationController.addListener(_onLocationChanged);
+    for (final l in _multiCityLegs) {
+      l.originController.addListener(_onLocationChanged);
+      l.destController.addListener(_onLocationChanged);
+    }
   }
 
   void _onLocationChanged() {
     if (mounted) setState(() {});
+  }
+
+  bool get _hasSameAirportError {
+    if (_tripType == 'multicity') {
+      return _multiCityLegs.any((l) =>
+          l.originController.text.trim().isNotEmpty &&
+          l.destController.text.trim().isNotEmpty &&
+          AirportHelper.isSameLocation(l.originController.text.trim(), l.destController.text.trim()));
+    }
+    return _originController.text.trim().isNotEmpty &&
+        _destinationController.text.trim().isNotEmpty &&
+        AirportHelper.isSameLocation(_originController.text.trim(), _destinationController.text.trim());
   }
 
   @override
@@ -101,6 +117,8 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
     _originController.dispose();
     _destinationController.dispose();
     for (final l in _multiCityLegs) {
+      l.originController.removeListener(_onLocationChanged);
+      l.destController.removeListener(_onLocationChanged);
       l.dispose();
     }
     super.dispose();
@@ -114,13 +132,20 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
       final nextDate = lastLeg != null
           ? lastLeg.date.add(const Duration(days: 3))
           : _departureDate.add(const Duration(days: 10));
-      _multiCityLegs.add(EditableTripLeg(origin: nextOrigin, destination: '', date: nextDate));
+      final leg = EditableTripLeg(origin: nextOrigin, destination: '', date: nextDate);
+      leg.originController.addListener(_onLocationChanged);
+      leg.destController.addListener(_onLocationChanged);
+      _multiCityLegs.add(leg);
     });
   }
 
   void _handleRemoveMultiCityLeg(int index) {
     if (_multiCityLegs.length <= 1) return;
-    setState(() => _multiCityLegs.removeAt(index).dispose());
+    final removed = _multiCityLegs.removeAt(index);
+    removed.originController.removeListener(_onLocationChanged);
+    removed.destController.removeListener(_onLocationChanged);
+    removed.dispose();
+    setState(() {});
   }
 
   Future<void> _handlePickMultiCityDate(int index) async {
@@ -253,15 +278,10 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
     }
 
     widget.onSearch(FlightSearchParams(
-      origin: fromText,
-      destination: toText,
-      departureDate: depStr,
+      origin: fromText, destination: toText, departureDate: depStr,
       returnDate: _tripType == 'roundtrip' ? retStr : null,
-      tripType: _tripType,
-      adults: _adults,
-      children: _children,
-      cabinClass: _cabinClass,
-      currency: _currency,
+      tripType: _tripType, adults: _adults, children: _children,
+      cabinClass: _cabinClass, currency: _currency,
     ));
   }
 
@@ -297,9 +317,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
             builder: (context, constraints) {
               final textScale = MediaQuery.textScalerOf(context).scale(1.0);
               final isCompact = constraints.maxWidth < 380 || (constraints.maxWidth < 460 && textScale > 1.15);
-              final hasSameError = _originController.text.trim().isNotEmpty &&
-                  _destinationController.text.trim().isNotEmpty &&
-                  AirportHelper.isSameLocation(_originController.text.trim(), _destinationController.text.trim());
+              final hasSameError = _hasSameAirportError;
 
               final fromField = AirportAutocompleteField(
                 controller: _originController,
@@ -322,10 +340,10 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
               );
 
               final errorBanner = hasSameError
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 5, left: 2),
+                  ? const Padding(
+                      padding: EdgeInsets.only(top: 5, left: 2),
                       child: Row(
-                        children: const [
+                        children: [
                           Icon(Icons.error_outline_rounded, size: 13, color: AppColors.iosRed),
                           SizedBox(width: 4),
                           Expanded(
@@ -422,29 +440,9 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
             final textScale = MediaQuery.textScalerOf(context).scale(1.0);
             final isVeryNarrow = constraints.maxWidth < 340 || textScale > 1.2;
             final isNarrow = constraints.maxWidth < 450;
-            final passTile = PassengerTile(
-              adults: _adults,
-              children: _children,
-              isExpanded: _showPassengerPicker,
-              onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker),
-              bg: fieldBg,
-              isDark: isDark,
-            );
-            final classDrop = FlightClassDropdown(
-              cabinClass: _cabinClass,
-              onSelected: (val) => setState(() => _cabinClass = val),
-              bg: fieldBg,
-              isDark: isDark,
-            );
-            final currDrop = FlightCurrencyDropdown(
-              currency: _currency,
-              onSelected: (val) {
-                setState(() => _currency = val);
-                widget.onCurrencyChanged?.call(val);
-              },
-              bg: fieldBg,
-              isDark: isDark,
-            );
+            final passTile = PassengerTile(adults: _adults, children: _children, isExpanded: _showPassengerPicker, onTap: () => setState(() => _showPassengerPicker = !_showPassengerPicker), bg: fieldBg, isDark: isDark);
+            final classDrop = FlightClassDropdown(cabinClass: _cabinClass, onSelected: (val) => setState(() => _cabinClass = val), bg: fieldBg, isDark: isDark);
+            final currDrop = FlightCurrencyDropdown(currency: _currency, onSelected: (val) { setState(() => _currency = val); widget.onCurrencyChanged?.call(val); }, bg: fieldBg, isDark: isDark);
 
             return isNarrow
                 ? Column(children: [
@@ -464,23 +462,22 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
         ),
         if (_showPassengerPicker) ...[
           const SizedBox(height: 10),
-          PassengerControlPanel(
-            adults: _adults,
-            children: _children,
-            onChanged: (a, c) => setState(() {
-              _adults = a;
-              _children = c;
-            }),
-            onDone: () => setState(() => _showPassengerPicker = false),
-            isDark: isDark,
-          ),
+          PassengerControlPanel(adults: _adults, children: _children, onChanged: (a, c) => setState(() { _adults = a; _children = c; }), onDone: () => setState(() => _showPassengerPicker = false), isDark: isDark),
         ],
         const SizedBox(height: 16),
 
-        // Search Button
+        // Search Button (disabled if loading or if same origin and destination airport)
         ElevatedButton.icon(
-          onPressed: widget.isLoading ? null : _submit,
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.iosBlue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), elevation: 0),
+          onPressed: (widget.isLoading || _hasSameAirportError) ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.iosBlue,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: isDark ? AppColors.darkElevatedHighest.withValues(alpha: 0.5) : AppColors.iosGray4,
+            disabledForegroundColor: isDark ? AppColors.darkSecondary.withValues(alpha: 0.6) : AppColors.lightSecondary.withValues(alpha: 0.6),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            elevation: 0,
+          ),
           icon: widget.isLoading
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.search_rounded, size: 18),

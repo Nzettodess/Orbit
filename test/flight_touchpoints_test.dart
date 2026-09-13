@@ -278,6 +278,16 @@ void main() {
     test('Correctly identifies non-matching locations', () {
       expect(AirportHelper.isSameLocation('Kuala Lumpur (KUL)', 'Tokyo (HND)'), isFalse);
       expect(AirportHelper.isSameLocation('Penang (PEN)', 'Singapore (SIN)'), isFalse);
+      // Multi-airport cities (different airports in the same city are NOT the same airport)
+      expect(AirportHelper.isSameLocation('Bangkok (BKK)', 'Bangkok (DMK)'), isFalse);
+      expect(AirportHelper.isSameLocation('BKK', 'DMK'), isFalse);
+      expect(AirportHelper.isSameLocation('Tokyo (HND)', 'Tokyo (NRT)'), isFalse);
+      expect(AirportHelper.isSameLocation('New York (JFK)', 'New York (EWR)'), isFalse);
+      expect(AirportHelper.isSameLocation('New York (JFK)', 'New York (LGA)'), isFalse);
+      expect(AirportHelper.isSameLocation('London (LHR)', 'London (LGW)'), isFalse);
+      expect(AirportHelper.isSameLocation('Seoul (ICN)', 'Seoul (GMP)'), isFalse);
+      expect(AirportHelper.findBestAirport('Bangkok (DMK)'), equals('Bangkok (DMK)'));
+      expect(AirportHelper.findBestAirport('Bangkok (BKK)'), equals('Bangkok (BKK)'));
       expect(AirportHelper.isSameLocation(null, 'KUL'), isFalse);
       expect(AirportHelper.isSameLocation('', 'KUL'), isFalse);
       expect(AirportHelper.isSameLocation('KUL', ''), isFalse);
@@ -285,7 +295,12 @@ void main() {
   });
 
   group('Flight Same-Location Search Validation Tests', () {
-    testWidgets('Prevents search and displays error banner when origin and destination are the same', (tester) async {
+    testWidgets('Prevents search, displays error banner, and disables Find Flights button when same airport', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -301,10 +316,49 @@ void main() {
 
       // Error banner is displayed under the From and To fields
       expect(find.text('Origin and destination cannot be the same airport'), findsOneWidget);
-      // "Find Flights" button is visible and search was prevented
-      expect(find.text('Find Flights'), findsOneWidget);
       // Error icon is shown
       expect(find.byIcon(Icons.error_outline_rounded), findsWidgets);
+
+      // Find Flights button is rendered but disabled (onPressed is null)
+      final buttonFinder = find.ancestor(
+        of: find.text('Find Flights'),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      );
+      expect(buttonFinder, findsOneWidget);
+      final ButtonStyleButton btn = tester.widget(buttonFinder);
+      expect(btn.onPressed, isNull);
+    });
+
+    testWidgets('Enables Find Flights button for different airports in the same city (e.g. Bangkok BKK to DMK)', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: FlightCheckerDialog(
+              initialOrigin: 'Bangkok (BKK)',
+              initialDestination: 'Bangkok (DMK)',
+              autoSearch: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // No error banner
+      expect(find.text('Origin and destination cannot be the same airport'), findsNothing);
+
+      // Find Flights button is enabled (onPressed is not null)
+      final buttonFinder = find.ancestor(
+        of: find.text('Find Flights'),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      );
+      expect(buttonFinder, findsOneWidget);
+      final ButtonStyleButton btn = tester.widget(buttonFinder);
+      expect(btn.onPressed, isNotNull);
     });
   });
 }
