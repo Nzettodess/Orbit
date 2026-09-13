@@ -1110,6 +1110,29 @@ class FirestoreService {
     // Cache will be updated by the stream listener
   }
 
+  /// Set or remove a personal alias (nickname) for a member
+  Future<void> setMemberAlias(String currentUserId, String targetMemberId, String? alias) async {
+    final cleanAlias = alias?.trim();
+    final docRef = _db.collection('users').doc(currentUserId);
+    if (cleanAlias == null || cleanAlias.isEmpty) {
+      try {
+        await docRef.update({
+          'memberAliases.$targetMemberId': FieldValue.delete(),
+        });
+      } catch (e) {
+        _log.warning('Note while removing alias: $e');
+      }
+    } else {
+      // Use set with SetOptions(merge: true) so it creates the field if it doesn't exist,
+      // and merges without overwriting other member aliases.
+      await docRef.set({
+        'memberAliases': {
+          targetMemberId: cleanAlias,
+        }
+      }, SetOptions(merge: true));
+    }
+  }
+
   /// Get users by their IDs (for group members only)
   /// This replaces the broken getAllUsersStream which violated security rules
   /// by trying to read ALL users instead of just group members

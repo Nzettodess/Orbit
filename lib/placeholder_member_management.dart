@@ -577,9 +577,11 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
             ElevatedButton(
               onPressed: () async {
                 if (nameController.text.isEmpty) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(content: Text("Please enter a name")),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Please enter a name")),
+                    );
+                  }
                   return;
                 }
                 
@@ -596,8 +598,17 @@ class _PlaceholderMemberManagementState extends State<PlaceholderMemberManagemen
                   lunarBirthdayDay: hasLunarBirthday ? lunarDay : null,
                 );
                 
-                await _firestoreService.createPlaceholderMember(placeholder);
-                if (mounted) Navigator.pop(dialogContext);
+                try {
+                  await _firestoreService.createPlaceholderMember(placeholder);
+                  if (mounted) Navigator.pop(dialogContext);
+                } catch (e) {
+                  debugPrint('[PlaceholderMgmt] Error creating placeholder: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Error creating member: $e")),
+                    );
+                  }
+                }
               },
               child: const Text("Create"),
             ),

@@ -65,6 +65,7 @@ class _DetailModalState extends State<DetailModal> {
   Set<String> _manageableMembers = {}; // Members the current user can edit (as admin/owner)
   Set<String> _adminGroups = {}; // Groups where current user is owner or admin
   List<String> _religiousDates = []; // Pre-calculated religious dates for instant display
+  Map<String, String> _memberAliases = {}; // Personal nicknames: targetMemberId -> alias
 
   // Session-based expansion state memory PER DATE (static to persist across modal reopens)
   // Key: "yyyy-MM-dd", Value: expansion state (default true if not set)
@@ -112,6 +113,7 @@ class _DetailModalState extends State<DetailModal> {
     
     _loadUserDetails(); // Load any missing users (e.g., placeholders not in parent list)
     _loadPinnedMembers();
+    _loadMemberAliases();
 
     _loadGroupNames();
     _loadManageableMembers();
@@ -321,6 +323,24 @@ class _DetailModalState extends State<DetailModal> {
       setState(() {
         _pinnedMembers = List<String>.from(doc.data()?['pinnedMembers'] ?? []);
       });
+    }
+  }
+
+  Future<void> _loadMemberAliases() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(widget.currentUserId).get();
+      if (doc.exists && mounted) {
+        final raw = doc.data()?['memberAliases'];
+        if (raw is Map) {
+          setState(() {
+            _memberAliases = Map<String, String>.from(
+              raw.map((k, v) => MapEntry(k.toString(), v.toString())),
+            );
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[DetailModal] Could not load member aliases: $e');
     }
   }
 
@@ -627,12 +647,12 @@ class _DetailModalState extends State<DetailModal> {
                     );
                   },
                  leading: Icon(Icons.event, color: Theme.of(context).colorScheme.primary),
-                 title: Text(
-                   e.title,
-                   maxLines: 1,
-                   overflow: TextOverflow.ellipsis,
-                   style: const TextStyle(fontWeight: FontWeight.bold),
-                 ),
+                  title: Text(
+                    e.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                  subtitle: Column(
                    crossAxisAlignment: CrossAxisAlignment.start,
                    children: [
@@ -869,39 +889,42 @@ class _DetailModalState extends State<DetailModal> {
                     final isPinned = _pinnedMembers.contains(element.userId);
                     final isCurrentUser = element.userId == widget.currentUserId;
                     final isPlaceholder = element.userId.startsWith('placeholder_');
+                    final alias = _memberAliases[element.userId];
+                    final displayedName = (alias != null && alias.trim().isNotEmpty)
+                        ? "${alias.trim()} ($name)"
+                        : name;
 
                     final canEditPlaceholder = isPlaceholder && _adminGroups.contains(element.groupId);
 
-                    return GestureDetector(
+                    return ListTile(
                       onTap: () => _showUserProfileDialog(element, user),
-                      child: ListTile(
-                            contentPadding: const EdgeInsets.only(left: 16.0, right: 2.0),
-                            visualDensity: VisualDensity.compact,
-                            leading: isPlaceholder
-                            ? CircleAvatar(
-                                backgroundColor: Colors.grey[300],
-                                child: const Icon(Icons.person_outline, color: Colors.grey),
-                              )
-                            : UserAvatar(
-                                photoUrl: photoUrl,
-                                name: name,
-                                radius: 20,
-                              ),
+                      contentPadding: const EdgeInsets.only(left: 16.0, right: 2.0),
+                      visualDensity: VisualDensity.compact,
+                      leading: isPlaceholder
+                          ? CircleAvatar(
+                              backgroundColor: Colors.grey[300],
+                              child: const Icon(Icons.person_outline, color: Colors.grey),
+                            )
+                          : UserAvatar(
+                              photoUrl: photoUrl,
+                              name: alias != null && alias.trim().isNotEmpty ? alias.trim() : name,
+                              radius: 20,
+                            ),
                           title: Text(
-                            name,
-                            maxLines: 1,
+                            displayedName,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: element.nation == "No location selected"
                             ? Text(
                                 "No location selected",
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(color: Theme.of(context).hintColor, fontStyle: FontStyle.italic),
                               )
                             : Text(
                                 "${element.nation}${element.state != null && element.state!.isNotEmpty ? ', ${element.state}' : ''}",
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                           trailing: Builder(builder: (context) {
@@ -1194,9 +1217,8 @@ class _DetailModalState extends State<DetailModal> {
                             ],
                           );
                         }),
-                      ),  // Close GestureDetector
-                    );
-                  },
+                      );
+                    },
               );
             },
           ),
@@ -1221,20 +1243,24 @@ class _DetailModalState extends State<DetailModal> {
     if (isPlaceholder) {
       if (_adminGroups.contains(location.groupId)) {
         canEdit = true;
-      } else {
-        final groupDoc = await FirebaseFirestore.instance.collection('groups').doc(location.groupId).get();
-        if (groupDoc.exists) {
-          final groupData = groupDoc.data()!;
-          final ownerId = groupData['ownerId'];
-          final admins = List<String>.from(groupData['admins'] ?? []);
-          if (ownerId == widget.currentUserId || admins.contains(widget.currentUserId)) {
-            canEdit = true;
+      } else if (location.groupId != 'global') {
+        try {
+          final groupDoc = await FirebaseFirestore.instance.collection('groups').doc(location.groupId).get();
+          if (groupDoc.exists) {
+            final groupData = groupDoc.data()!;
+            final ownerId = groupData['ownerId'];
+            final admins = List<String>.from(groupData['admins'] ?? []);
+            if (ownerId == widget.currentUserId || admins.contains(widget.currentUserId)) {
+              canEdit = true;
+            }
           }
+        } catch (e) {
+          debugPrint('[DetailModal] Could not check group permissions for ${location.groupId}: $e');
         }
       }
     } else {
       if (location.userId == widget.currentUserId) {
-         canEdit = false; 
+         canEdit = false;
       } else if (_manageableMembers.contains(location.userId)) {
         canEdit = true;
       }
@@ -1242,18 +1268,44 @@ class _DetailModalState extends State<DetailModal> {
 
     if (!mounted) return;
 
+    // Safely parse birthday – placeholder members store DateTime, real users store Timestamp
+    DateTime? birthday;
+    final rawBirthday = userData?['birthday'];
+    if (rawBirthday is Timestamp) {
+      birthday = rawBirthday.toDate();
+    } else if (rawBirthday is DateTime) {
+      birthday = rawBirthday;
+    }
+
+    final memberId = location.userId;
+    final alias = _memberAliases[memberId];
+
     showDialog(
       context: context,
-      builder: (context) => UserProfileDialog(
+      builder: (dialogCtx) => UserProfileDialog(
         displayName: name,
         photoUrl: photoUrl,
         isPlaceholder: isPlaceholder,
         canEdit: canEdit,
         defaultLocation: userData?['defaultLocation'],
-        birthday: userData?['birthday'] != null ? (userData!['birthday'] as Timestamp).toDate() : null,
+        birthday: birthday,
         hasLunarBirthday: userData?['hasLunarBirthday'] ?? false,
         lunarBirthdayMonth: userData?['lunarBirthdayMonth'],
         lunarBirthdayDay: userData?['lunarBirthdayDay'],
+        memberId: memberId,
+        currentUserId: widget.currentUserId,
+        alias: alias,
+        onAliasChanged: (newAlias) {
+          if (mounted) {
+            setState(() {
+              if (newAlias != null) {
+                _memberAliases[memberId] = newAlias;
+              } else {
+                _memberAliases.remove(memberId);
+              }
+            });
+          }
+        },
         onEdit: () {
           if (!_checkCanWrite()) return;
           showDialog(
@@ -1262,9 +1314,9 @@ class _DetailModalState extends State<DetailModal> {
               memberId: location.userId,
               memberDetails: userData ?? {},
               groupId: location.groupId,
-              isPlaceholder: isPlaceholder, // Pass isPlaceholder flag
+              isPlaceholder: isPlaceholder,
               onSaved: () {
-                _loadUserDetails(force: true); // Force refresh data so updated name displays immediately
+                _loadUserDetails(force: true);
               },
             ),
           );

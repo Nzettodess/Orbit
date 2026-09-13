@@ -96,6 +96,11 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   // Offline status for persistent banner
   bool _isOffline = false;
 
+  // Firebase Web SDK bug workaround: Chrome throttles network when tab is hidden,
+  // causing Firestore watch-change aggregator assertion failures. Track hidden state
+  // so we can re-establish all dead streams on resume.
+  bool _wasHidden = false;
+
   @override
   void initState() {
     super.initState();
@@ -642,11 +647,31 @@ class _HomeWithLoginState extends State<HomeWithLogin>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     debugPrint('App Lifecycle State Changed: $state');
-    
+
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _wasHidden = true;
+    }
+
     if (state == AppLifecycleState.resumed) {
       if (_user != null) {
         debugPrint('App Resumed - Triggering background birthday checks...');
         _checkBirthdayNotifications(_user!.uid);
+
+        // Firebase Web SDK bug: Firestore streams die when tab is hidden due to
+        // Chrome throttling. Re-subscribe all streams to recover from dead state.
+        // NOTE: We call _loadData() (not _cancelAllSubscriptions()) to avoid
+        // invalidating the shared broadcast stream that other open dialogs
+        // (e.g. GroupManagementDialog) may still be listening to.
+        if (_wasHidden) {
+          _wasHidden = false;
+          debugPrint('[Home] Tab was hidden - re-establishing all Firestore streams...');
+          _profileSubscription?.cancel();
+          _profileSubscription = null;
+          _loadUserProfile();
+          _loadData(); // internally cancels and re-subscribes _groupsSubscription + data listeners
+        }
       }
     }
   }

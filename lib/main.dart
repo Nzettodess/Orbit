@@ -103,26 +103,30 @@ class _MyAppState extends State<MyApp> {
             
             if (!mounted) return;
             
-            setState(() {
-              // Update theme mode
-              if (mode != null) {
-                switch (mode) {
-                  case 'light':
-                    _themeMode = ThemeMode.light;
-                    break;
-                  case 'dark':
-                    _themeMode = ThemeMode.dark;
-                    break;
-                  default:
-                    _themeMode = ThemeMode.system;
-                }
+            ThemeMode newThemeMode = _themeMode;
+            if (mode != null) {
+              switch (mode) {
+                case 'light':
+                  newThemeMode = ThemeMode.light;
+                  break;
+                case 'dark':
+                  newThemeMode = ThemeMode.dark;
+                  break;
+                default:
+                  newThemeMode = ThemeMode.system;
               }
-              
-              // Update text scale factor (clamped between 0.8 and 1.5)
-              if (textScale != null) {
-                _textScaleFactor = textScale.clamp(0.8, 1.5);
-              }
-            });
+            }
+            
+            final double newScale = textScale != null ? textScale.clamp(0.8, 1.5) : _textScaleFactor;
+            
+            // Only rebuild MaterialApp if theme or scale actually changed.
+            // Avoid tearing down the widget tree on unrelated user document changes (like nicknames).
+            if (newThemeMode != _themeMode || newScale != _textScaleFactor) {
+              setState(() {
+                _themeMode = newThemeMode;
+                _textScaleFactor = newScale;
+              });
+            }
           }
         }, onError: (e) => print('[Main] Error listening to user: $e'));
       } else {
