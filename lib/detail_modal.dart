@@ -613,13 +613,19 @@ class _DetailModalState extends State<DetailModal> {
                return ListTile(
                  contentPadding: const EdgeInsets.only(left: 16.0, right: 2.0),
                  visualDensity: VisualDensity.compact,
-                 onTap: () {
-                   showEventDetailDialog(
+                  onTap: () {
+                    final userDoc = widget.allUsers.firstWhere(
+                      (u) => u['uid'] == widget.currentUserId,
+                      orElse: () => <String, dynamic>{},
+                    );
+                    final userHome = (userDoc['defaultLocation'] as String?) ?? '';
+                    showEventDetailDialog(
                       context, 
                       e, 
                       groupName: _groupNames[e.groupId],
+                      userHomeAirport: AirportHelper.findBestAirport(userHome),
                     );
-                 },
+                  },
                  leading: Icon(Icons.event, color: Theme.of(context).colorScheme.primary),
                  title: Text(
                    e.title,

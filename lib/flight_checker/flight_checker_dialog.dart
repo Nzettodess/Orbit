@@ -64,9 +64,12 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       tripType = 'roundtrip';
     }
 
+    final resolvedOrigin = AirportHelper.findBestAirport(widget.initialOrigin);
+    final resolvedDest = AirportHelper.findBestAirport(widget.initialDestination);
+
     _currentParams = FlightSearchParams(
-      origin: widget.initialOrigin ?? '',
-      destination: widget.initialDestination ?? '',
+      origin: resolvedOrigin.isNotEmpty ? resolvedOrigin : (widget.initialOrigin ?? ''),
+      destination: resolvedDest.isNotEmpty ? resolvedDest : (widget.initialDestination ?? ''),
       departureDate: depStr,
       returnDate: retStr,
       tripType: tripType,
@@ -75,14 +78,12 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
     _isSearchExpanded = true;
 
     if (widget.autoSearch &&
-        (widget.initialOrigin ?? '').isNotEmpty &&
-        (widget.initialDestination ?? '').isNotEmpty) {
-      if (AirportHelper.isSameLocation(widget.initialOrigin, widget.initialDestination)) {
-        _errorMessage = 'Origin and destination cannot be the same airport.';
-      } else {
+        _currentParams.origin.isNotEmpty &&
+        _currentParams.destination.isNotEmpty) {
+      if (!AirportHelper.isSameLocation(_currentParams.origin, _currentParams.destination)) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _performSearch(_currentParams));
       }
-    } else if ((widget.initialOrigin ?? '').isEmpty) {
+    } else if (_currentParams.origin.isEmpty) {
       _resolveDefaultHomeOrigin();
     }
   }
@@ -99,7 +100,6 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           final isSame = AirportHelper.isSameLocation(homeAirport, _currentParams.destination);
           setState(() {
             _currentParams = _currentParams.copyWith(origin: homeAirport);
-            if (isSame) _errorMessage = 'Origin and destination cannot be the same airport.';
           });
           if (widget.autoSearch && _currentParams.destination.isNotEmpty && !isSame) {
             _performSearch(_currentParams);
@@ -179,18 +179,12 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
       for (int i = 0; i < params.multiCityLegs!.length; i++) {
         final leg = params.multiCityLegs![i];
         if (AirportHelper.isSameLocation(leg.origin, leg.destination)) {
-          setState(() {
-            _currentParams = params;
-            _errorMessage = 'Trip ${i + 1}: Origin and destination cannot be the same.';
-          });
+          setState(() => _currentParams = params);
           return;
         }
       }
     } else if (AirportHelper.isSameLocation(params.origin, params.destination)) {
-      setState(() {
-        _currentParams = params;
-        _errorMessage = 'Origin and destination cannot be the same airport.';
-      });
+      setState(() => _currentParams = params);
       return;
     }
 

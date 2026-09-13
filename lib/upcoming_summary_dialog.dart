@@ -677,11 +677,17 @@ class _UpcomingSummaryDialogState extends State<UpcomingSummaryDialog> {
 
   /// Show event detail dialog with edit button
   void _showEventDetail(GroupEvent event) {
+    final userDoc = widget.allUsers.firstWhere(
+      (u) => u['uid'] == widget.currentUserId,
+      orElse: () => <String, dynamic>{},
+    );
+    final userHome = (userDoc['defaultLocation'] as String?) ?? '';
     showEventDetailDialog(
       context,
       event,
       groupName: widget.groupNames[event.groupId],
       showDate: true,
+      userHomeAirport: AirportHelper.findBestAirport(userHome),
       onEdit: () {
         if (!_checkCanWrite()) return;
         Navigator.pop(context); // Close event detail

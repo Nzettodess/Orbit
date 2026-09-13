@@ -285,7 +285,7 @@ void main() {
   });
 
   group('Flight Same-Location Search Validation Tests', () {
-    testWidgets('Prevents search and displays error message when origin and destination are the same', (tester) async {
+    testWidgets('Prevents search and displays error banner when origin and destination are the same', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -299,7 +299,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Origin and destination cannot be the same airport.'), findsOneWidget);
+      // Error banner is displayed under the From and To fields
+      expect(find.text('Origin and destination cannot be the same airport'), findsOneWidget);
+      // "Find Flights" button is visible and search was prevented
+      expect(find.text('Find Flights'), findsOneWidget);
+      // Error icon is shown
+      expect(find.byIcon(Icons.error_outline_rounded), findsWidgets);
     });
   });
 }

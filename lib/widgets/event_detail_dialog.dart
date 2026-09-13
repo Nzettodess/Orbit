@@ -149,6 +149,9 @@ class EventDetailDialog extends StatelessWidget {
                           return '';
                         }(),
                         builder: (context, snapshot) {
+                          if (userHomeAirport == null && snapshot.connectionState == ConnectionState.waiting) {
+                            return const SizedBox.shrink();
+                          }
                           final now = DateTime.now();
                           final today = DateTime(now.year, now.month, now.day);
                           final eventDay = DateTime(event.date.year, event.date.month, event.date.day);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
+import '../utils/airport_data.dart';
 import 'airport_autocomplete_field.dart';
 
 /// Data holder for an editable multi-city leg in the form
@@ -76,6 +77,9 @@ class FlightMultiCityInputList extends StatelessWidget {
   Widget _buildLegCard(BuildContext context, int index, Color fieldBg, Color borderColor) {
     final leg = legs[index];
     final dateStr = DateFormat('EEE, d MMM yyyy').format(leg.date);
+    final isLegSame = leg.originController.text.trim().isNotEmpty &&
+        leg.destController.text.trim().isNotEmpty &&
+        AirportHelper.isSameLocation(leg.originController.text.trim(), leg.destController.text.trim());
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -126,6 +130,7 @@ class FlightMultiCityInputList extends StatelessWidget {
             icon: Icons.flight_takeoff_rounded,
             bg: fieldBg,
             isDark: isDark,
+            hasError: isLegSame,
           ),
           const SizedBox(height: 6),
           Center(
@@ -151,7 +156,21 @@ class FlightMultiCityInputList extends StatelessWidget {
             icon: Icons.flight_land_rounded,
             bg: fieldBg,
             isDark: isDark,
+            hasError: isLegSame,
           ),
+          if (isLegSame) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: const [
+                Icon(Icons.error_outline_rounded, size: 13, color: AppColors.iosRed),
+                SizedBox(width: 4),
+                Text(
+                  'Origin and destination cannot be the same',
+                  style: TextStyle(fontSize: 11, color: AppColors.iosRed, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 10),
           InkWell(
             onTap: () => onPickDate(index),

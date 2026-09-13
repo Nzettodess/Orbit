@@ -70,6 +70,13 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
               date: DateTime.tryParse(l.date) ?? DateTime.now().add(const Duration(days: 14)),
             )).toList()
         : [EditableTripLeg(origin: from.isNotEmpty ? from : p.origin, destination: to.isNotEmpty ? to : p.destination, date: _departureDate)];
+
+    _originController.addListener(_onLocationChanged);
+    _destinationController.addListener(_onLocationChanged);
+  }
+
+  void _onLocationChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -89,6 +96,8 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
 
   @override
   void dispose() {
+    _originController.removeListener(_onLocationChanged);
+    _destinationController.removeListener(_onLocationChanged);
     _originController.dispose();
     _destinationController.dispose();
     for (final l in _multiCityLegs) {
@@ -134,8 +143,8 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
 
   void _handleSwapMultiCityLocations(int index) {
     final leg = _multiCityLegs[index];
+    final temp = leg.originController.text;
     setState(() {
-      final temp = leg.originController.text;
       leg.originController.text = leg.destController.text;
       leg.destController.text = temp;
     });
@@ -147,9 +156,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
       _tripType = key;
       if (key == 'roundtrip') {
         _returnDate ??= _departureDate.add(const Duration(days: 7));
-        if (_returnDate!.isBefore(_departureDate)) {
-          _returnDate = _departureDate.add(const Duration(days: 7));
-        }
+        if (_returnDate!.isBefore(_departureDate)) _returnDate = _departureDate.add(const Duration(days: 7));
       } else if (key == 'multicity' && _multiCityLegs.isNotEmpty) {
         if (_multiCityLegs[0].originController.text.isEmpty && _originController.text.isNotEmpty) {
           _multiCityLegs[0].originController.text = _originController.text;
@@ -163,8 +170,8 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
   }
 
   void _swapLocations() {
+    final temp = _originController.text;
     setState(() {
-      final temp = _originController.text;
       _originController.text = _destinationController.text;
       _destinationController.text = temp;
     });
@@ -172,43 +179,29 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
 
   Future<void> _pickDate({required bool isReturn}) async {
     final now = DateTime.now();
-    final initial = isReturn
-        ? (_returnDate ?? _departureDate.add(const Duration(days: 7)))
-        : _departureDate;
+    final initial = isReturn ? (_returnDate ?? _departureDate.add(const Duration(days: 7))) : _departureDate;
     final first = isReturn ? _departureDate : now;
-
     final picked = await showDatePicker(
       context: context,
       initialDate: initial.isBefore(first) ? first : initial,
       firstDate: first,
       lastDate: now.add(const Duration(days: 365)),
     );
-
     if (picked != null) {
       setState(() {
         if (isReturn) {
           _returnDate = picked;
         } else {
           _departureDate = picked;
-          if (_returnDate != null && _returnDate!.isBefore(_departureDate)) {
-            _returnDate = _departureDate.add(const Duration(days: 7));
-          }
+          if (_returnDate != null && _returnDate!.isBefore(_departureDate)) _returnDate = _departureDate.add(const Duration(days: 7));
         }
       });
     }
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
+  void _showError(String msg) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700, behavior: SnackBarBehavior.floating));
 
   void _submit() {
     final depStr = DateFormat('yyyy-MM-dd').format(_departureDate);
@@ -303,8 +296,10 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
           LayoutBuilder(
             builder: (context, constraints) {
               final textScale = MediaQuery.textScalerOf(context).scale(1.0);
-              final isCompact = constraints.maxWidth < 380 ||
-                  (constraints.maxWidth < 460 && textScale > 1.15);
+              final isCompact = constraints.maxWidth < 380 || (constraints.maxWidth < 460 && textScale > 1.15);
+              final hasSameError = _originController.text.trim().isNotEmpty &&
+                  _destinationController.text.trim().isNotEmpty &&
+                  AirportHelper.isSameLocation(_originController.text.trim(), _destinationController.text.trim());
 
               final fromField = AirportAutocompleteField(
                 controller: _originController,
@@ -313,6 +308,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
                 icon: Icons.flight_takeoff_rounded,
                 bg: fieldBg,
                 isDark: isDark,
+                hasError: hasSameError,
               );
 
               final toField = AirportAutocompleteField(
@@ -322,10 +318,30 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
                 icon: Icons.flight_land_rounded,
                 bg: fieldBg,
                 isDark: isDark,
+                hasError: hasSameError,
               );
+
+              final errorBanner = hasSameError
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 5, left: 2),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.error_outline_rounded, size: 13, color: AppColors.iosRed),
+                          SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Origin and destination cannot be the same airport',
+                              style: TextStyle(fontSize: 11, color: AppColors.iosRed, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink();
 
               if (isCompact) {
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     fromField,
                     const SizedBox(height: 6),
@@ -335,16 +351,12 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
                         borderRadius: BorderRadius.circular(16),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: fieldBg,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.iosBlue.withValues(alpha: 0.3)),
-                          ),
-                          child: Row(
+                          decoration: BoxDecoration(color: fieldBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.iosBlue.withValues(alpha: 0.3))),
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.swap_vert_rounded, size: 15, color: AppColors.iosBlue),
-                              const SizedBox(width: 4),
+                              SizedBox(width: 4),
                               Text('Swap', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.iosBlue)),
                             ],
                           ),
@@ -353,20 +365,22 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
                     ),
                     const SizedBox(height: 6),
                     toField,
+                    errorBanner,
                   ],
                 );
               }
 
-              return Row(
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: fromField),
-                  IconButton(
-                    icon: const Icon(Icons.swap_horiz_rounded),
-                    tooltip: 'Swap locations',
-                    onPressed: _swapLocations,
-                    color: AppColors.iosBlue,
+                  Row(
+                    children: [
+                      Expanded(child: fromField),
+                      IconButton(icon: const Icon(Icons.swap_horiz_rounded), tooltip: 'Swap locations', onPressed: _swapLocations, color: AppColors.iosBlue),
+                      Expanded(child: toField),
+                    ],
                   ),
-                  Expanded(child: toField),
+                  errorBanner,
                 ],
               );
             },
@@ -466,20 +480,11 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
         // Search Button
         ElevatedButton.icon(
           onPressed: widget.isLoading ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.iosBlue,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            elevation: 0,
-          ),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.iosBlue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), elevation: 0),
           icon: widget.isLoading
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.search_rounded, size: 18),
-          label: Text(
-            widget.isLoading ? 'Searching flights…' : 'Find Flights',
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-          ),
+          label: Text(widget.isLoading ? 'Searching flights…' : 'Find Flights', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
         ),
       ],
     );

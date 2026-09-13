@@ -10,6 +10,7 @@ class AirportAutocompleteField extends StatelessWidget {
   final IconData icon;
   final Color bg;
   final bool isDark;
+  final bool hasError;
 
   const AirportAutocompleteField({
     super.key,
@@ -19,10 +20,15 @@ class AirportAutocompleteField extends StatelessWidget {
     required this.icon,
     required this.bg,
     required this.isDark,
+    this.hasError = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final borderSide = hasError
+        ? const BorderSide(color: AppColors.iosRed, width: 1.5)
+        : BorderSide.none;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -31,7 +37,9 @@ class AirportAutocompleteField extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
+            color: hasError
+                ? AppColors.iosRed
+                : (isDark ? AppColors.darkSecondary : AppColors.lightSecondary),
           ),
         ),
         const SizedBox(height: 4),
@@ -67,14 +75,27 @@ class AirportAutocompleteField extends StatelessWidget {
                   fontSize: 13,
                   color: isDark ? AppColors.darkPlaceholder : AppColors.lightPlaceholder,
                 ),
-                prefixIcon: Icon(icon, size: 18, color: AppColors.iosBlue),
+                prefixIcon: Icon(icon, size: 18, color: hasError ? AppColors.iosRed : AppColors.iosBlue),
                 filled: true,
-                fillColor: bg,
+                fillColor: hasError
+                    ? AppColors.iosRed.withValues(alpha: isDark ? 0.08 : 0.04)
+                    : bg,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+                  borderSide: borderSide,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: borderSide,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: hasError ? AppColors.iosRed : AppColors.iosBlue,
+                    width: hasError ? 1.8 : 1.5,
+                  ),
                 ),
               ),
               style: const TextStyle(fontSize: 14),
