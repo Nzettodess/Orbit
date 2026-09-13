@@ -93,7 +93,7 @@ void main() {
   ];
 
   group('FlightMultiTripSummaryBanner Tests', () {
-    testWidgets('renders total fare, leg count badge, and summary pills', (tester) async {
+    testWidgets('renders total fare, leg count badge, and summary line', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -111,12 +111,10 @@ void main() {
         ),
       );
 
-      expect(find.text('Multi-Trip Itinerary'), findsOneWidget);
+      expect(find.text('Estimated Multi-Trip Total: '), findsOneWidget);
       expect(find.text('3 Trips'), findsOneWidget);
-      expect(find.text('Total from MYR 2200'), findsOneWidget);
-      expect(find.text('Trip 1: KUL → SIN (MYR 150)'), findsOneWidget);
-      expect(find.text('Trip 2: SIN → NRT (MYR 850)'), findsOneWidget);
-      expect(find.text('Trip 3: HND → KUL (MYR 1200)'), findsOneWidget);
+      expect(find.text('MYR 2200'), findsOneWidget);
+      expect(find.text('Trip 1: KUL → SIN (MYR 150) + Trip 2: SIN → NRT (MYR 850) + Trip 3: HND → KUL (MYR 1200)'), findsOneWidget);
     });
 
     testWidgets('FlightMultiTripSummaryBanner on iPhone SE width (320px) wraps without overflow', (tester) async {
@@ -146,9 +144,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Multi-Trip Itinerary'), findsOneWidget);
+      expect(find.text('Estimated Multi-Trip Total: '), findsOneWidget);
       expect(find.text('3 Trips'), findsOneWidget);
-      expect(find.text('Total from MYR 5491'), findsOneWidget);
+      expect(find.text('MYR 5491'), findsOneWidget);
     });
   });
 
