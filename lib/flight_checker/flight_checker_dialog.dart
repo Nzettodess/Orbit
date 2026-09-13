@@ -342,6 +342,8 @@ class _FlightCheckerDialogState extends State<FlightCheckerDialog> {
           totalCount: totalFoundCount,
           visibleCount: totalVisibleCount,
           isDark: isDark,
+          isAllExpanded: _isDepartingExpanded || _isReturningExpanded,
+          onToggleAllExpanded: isRoundTrip ? _toggleAllLegs : null,
         ),
         const SizedBox(height: 10),
         if (totalVisibleCount == 0)

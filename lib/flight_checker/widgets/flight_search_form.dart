@@ -78,11 +78,6 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
               destination: initialDest.isNotEmpty ? initialDest : widget.initialParams.destination,
               date: _departureDate,
             ),
-            EditableTripLeg(
-              origin: initialDest.isNotEmpty ? initialDest : widget.initialParams.destination,
-              destination: initialOrigin.isNotEmpty ? initialOrigin : widget.initialParams.origin,
-              date: _returnDate ?? _departureDate.add(const Duration(days: 7)),
-            ),
           ];
   }
 
@@ -109,7 +104,7 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
   }
 
   void _handleRemoveMultiCityLeg(int index) {
-    if (_multiCityLegs.length <= 2) return;
+    if (_multiCityLegs.length <= 1) return;
     setState(() => _multiCityLegs.removeAt(index).dispose());
   }
 
@@ -148,6 +143,13 @@ class _FlightSearchFormState extends State<FlightSearchForm> {
         _returnDate ??= _departureDate.add(const Duration(days: 7));
         if (_returnDate!.isBefore(_departureDate)) {
           _returnDate = _departureDate.add(const Duration(days: 7));
+        }
+      } else if (key == 'multicity' && _multiCityLegs.isNotEmpty) {
+        if (_multiCityLegs[0].originController.text.isEmpty && _originController.text.isNotEmpty) {
+          _multiCityLegs[0].originController.text = _originController.text;
+        }
+        if (_multiCityLegs[0].destController.text.isEmpty && _destinationController.text.isNotEmpty) {
+          _multiCityLegs[0].destController.text = _destinationController.text;
         }
       }
     });

@@ -5,6 +5,8 @@ import 'package:whereabouts/flight_checker/models/flight_info.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_card.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_leg_section_header.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_leg_tab_bar.dart';
+import 'package:whereabouts/flight_checker/utils/flight_filter_helper.dart';
+import 'package:whereabouts/flight_checker/widgets/flight_filter_bar.dart';
 import 'package:whereabouts/flight_checker/widgets/flight_results_header_bar.dart';
 
 void main() {
@@ -137,22 +139,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Return'), findsNothing);
 
-      // Tap Multi-Trip and verify Trip 1, Trip 2, and add flight button appear
+      // Tap Multi-Trip and verify Trip 1 and Add Flight (Trip 2) appear
       await tester.tap(multiTripTab);
       await tester.pumpAndSettle();
       expect(find.text('Trip 1'), findsOneWidget);
+
+      final addBtn2 = find.text('Add Flight (Trip 2)');
+      expect(addBtn2, findsOneWidget);
+
+      // Scroll and tap Add Flight and verify Trip 2 is added
+      await tester.ensureVisible(addBtn2);
+      await tester.pumpAndSettle();
+      await tester.tap(addBtn2);
+      await tester.pumpAndSettle();
       expect(find.text('Trip 2'), findsOneWidget);
-
-      final addBtn3 = find.text('Add Flight (Trip 3)');
-      expect(addBtn3, findsOneWidget);
-
-      // Scroll and tap Add Flight and verify Trip 3 is added
-      await tester.ensureVisible(addBtn3);
-      await tester.pumpAndSettle();
-      await tester.tap(addBtn3);
-      await tester.pumpAndSettle();
-      expect(find.text('Trip 3'), findsOneWidget);
-      expect(find.text('Add Flight (Trip 4)'), findsOneWidget);
+      expect(find.text('Add Flight (Trip 3)'), findsOneWidget);
     });
   });
 
@@ -325,8 +326,7 @@ void main() {
       expect(toggled, isTrue);
     });
 
-    testWidgets('FlightResultsHeaderBar renders Found count, Collapse button, and triggers callbacks', (tester) async {
-      bool toggleClicked = false;
+    testWidgets('FlightResultsHeaderBar renders Found count and triggers Google Flights callback', (tester) async {
       bool googleFlightsClicked = false;
 
       await tester.pumpWidget(
@@ -336,7 +336,6 @@ void main() {
               totalFoundCount: 24,
               isRoundTrip: true,
               isAllExpanded: true,
-              onToggleAllExpanded: () => toggleClicked = true,
               onOpenGoogleFlights: () => googleFlightsClicked = true,
               isDark: false,
             ),
@@ -345,16 +344,39 @@ void main() {
       );
 
       expect(find.text('Found 24 Flights'), findsOneWidget);
-      expect(find.text('Collapse'), findsOneWidget);
       expect(find.text('Open in Google Flights'), findsOneWidget);
-
-      await tester.tap(find.text('Collapse'));
-      await tester.pumpAndSettle();
-      expect(toggleClicked, isTrue);
 
       await tester.tap(find.text('Open in Google Flights'));
       await tester.pumpAndSettle();
       expect(googleFlightsClicked, isTrue);
+    });
+
+    testWidgets('FlightFilterBar renders Showing count and Collapse/Expand button on same row', (tester) async {
+      bool toggleClicked = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FlightFilterBar(
+              criteria: const FlightFilterCriteria(),
+              onChanged: (_) {},
+              availableAirlines: const ['AirAsia', 'MAS'],
+              totalCount: 30,
+              visibleCount: 30,
+              isDark: false,
+              isAllExpanded: true,
+              onToggleAllExpanded: () => toggleClicked = true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Showing 30 of 30'), findsOneWidget);
+      expect(find.text('Collapse'), findsOneWidget);
+
+      await tester.tap(find.text('Collapse'));
+      await tester.pumpAndSettle();
+      expect(toggleClicked, isTrue);
     });
 
     testWidgets('FlightLegSection animates SizeTransition correctly on collapse and expand', (tester) async {

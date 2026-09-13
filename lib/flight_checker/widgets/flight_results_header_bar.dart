@@ -26,103 +26,34 @@ class FlightResultsHeaderBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 420;
-        final hasMultiLegs = isRoundTrip || isMultiTrip;
-
-        final toggleButton = hasMultiLegs
-            ? InkWell(
-                onTap: onToggleAllExpanded,
-                borderRadius: BorderRadius.circular(6),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isAllExpanded
-                            ? Icons.unfold_less_rounded
-                            : Icons.unfold_more_rounded,
-                        size: 13,
-                        color: AppColors.iosBlue,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        isAllExpanded ? 'Collapse' : 'Expand',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.iosBlue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : null;
-
-        final googleFlightsBtn = TextButton.icon(
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        Text(
+          'Found $totalFoundCount Flights',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+          ),
+        ),
+        TextButton.icon(
           onPressed: onOpenGoogleFlights,
           icon: const Icon(Icons.open_in_new_rounded, size: 14),
           label: const Text(
             'Open in Google Flights',
             style: TextStyle(fontSize: 12),
           ),
-        );
-
-        if (isCompact) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Found $totalFoundCount Flights',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
-                    ),
-                  ),
-                  if (toggleButton != null) toggleButton,
-                ],
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: googleFlightsBtn,
-              ),
-            ],
-          );
-        }
-
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Text(
-                    'Found $totalFoundCount Flights',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (toggleButton != null) ...[
-                    const SizedBox(width: 8),
-                    toggleButton,
-                  ],
-                ],
-              ),
-            ),
-            googleFlightsBtn,
-          ],
-        );
-      },
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -148,7 +79,7 @@ class FlightMultiTripSummaryBanner extends StatelessWidget {
     final hasTotal = totalFare > 0;
     final formattedTotal = hasTotal
         ? '$currency ${totalFare.toStringAsFixed(0)}'
-        : 'See individual legs';
+        : 'See individual trips';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -165,17 +96,22 @@ class FlightMultiTripSummaryBanner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
             children: [
-              Row(
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 4,
                 children: [
                   Icon(
                     Icons.connecting_airports_rounded,
                     size: 18,
                     color: isDark ? AppColors.iosBlueLight : AppColors.iosBlue,
                   ),
-                  const SizedBox(width: 8),
                   Text(
                     'Multi-Trip Itinerary',
                     style: TextStyle(
@@ -184,7 +120,6 @@ class FlightMultiTripSummaryBanner extends StatelessWidget {
                       color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
                     ),
                   ),
-                  const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(
@@ -192,7 +127,7 @@ class FlightMultiTripSummaryBanner extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      '${legSummaries.length} Legs',
+                      '${legSummaries.length} ${legSummaries.length == 1 ? 'Trip' : 'Trips'}',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,

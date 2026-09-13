@@ -14,6 +14,8 @@ class FlightFilterBar extends StatelessWidget {
   final int totalCount;
   final int visibleCount;
   final bool isDark;
+  final bool? isAllExpanded;
+  final VoidCallback? onToggleAllExpanded;
 
   const FlightFilterBar({
     super.key,
@@ -24,6 +26,8 @@ class FlightFilterBar extends StatelessWidget {
     required this.totalCount,
     required this.visibleCount,
     required this.isDark,
+    this.isAllExpanded,
+    this.onToggleAllExpanded,
   });
 
   @override
@@ -60,51 +64,81 @@ class FlightFilterBar extends StatelessWidget {
         ),
         const SizedBox(height: 8),
 
-        // 2. Stops Segments + Showing X of Y count
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
-          runSpacing: 6,
-          children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildFilterChip(
-                    label: 'All Stops',
-                    isSelected: criteria.stopsFilter == FlightStopsFilter.all,
-                    onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.all)),
-                    chipBg: chipBg,
-                    borderColor: borderColor,
-                  ),
-                  const SizedBox(width: 6),
-                  _buildFilterChip(
-                    label: 'Nonstop Only',
-                    isSelected: criteria.stopsFilter == FlightStopsFilter.nonstopOnly,
-                    onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.nonstopOnly)),
-                    chipBg: chipBg,
-                    borderColor: borderColor,
-                  ),
-                  const SizedBox(width: 6),
-                  _buildFilterChip(
-                    label: '≤ 1 Stop',
-                    isSelected: criteria.stopsFilter == FlightStopsFilter.maxOneStop,
-                    onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.maxOneStop)),
-                    chipBg: chipBg,
-                    borderColor: borderColor,
-                  ),
-                ],
+        // 2. Stops Segments
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildFilterChip(
+                label: 'All Stops',
+                isSelected: criteria.stopsFilter == FlightStopsFilter.all,
+                onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.all)),
+                chipBg: chipBg,
+                borderColor: borderColor,
               ),
-            ),
+              const SizedBox(width: 6),
+              _buildFilterChip(
+                label: 'Nonstop Only',
+                isSelected: criteria.stopsFilter == FlightStopsFilter.nonstopOnly,
+                onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.nonstopOnly)),
+                chipBg: chipBg,
+                borderColor: borderColor,
+              ),
+              const SizedBox(width: 6),
+              _buildFilterChip(
+                label: '≤ 1 Stop',
+                isSelected: criteria.stopsFilter == FlightStopsFilter.maxOneStop,
+                onTap: () => onChanged(criteria.copyWith(stopsFilter: FlightStopsFilter.maxOneStop)),
+                chipBg: chipBg,
+                borderColor: borderColor,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 3. Showing X of Y count + Collapse/Expand button
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
             Text(
               'Showing $visibleCount of $totalCount',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 11.5,
                 color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary,
               ),
             ),
+            if (onToggleAllExpanded != null)
+              InkWell(
+                onTap: onToggleAllExpanded,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isAllExpanded == true
+                            ? Icons.unfold_less_rounded
+                            : Icons.unfold_more_rounded,
+                        size: 13,
+                        color: AppColors.iosBlue,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        isAllExpanded == true ? 'Collapse' : 'Expand',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.iosBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ],

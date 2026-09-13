@@ -144,29 +144,33 @@ class _FlightCardState extends State<FlightCard> {
                                 ],
                               ),
                               const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                children: [
-                                  if (widget.isBest)
-                                    _buildTopBadge(
-                                      text: 'Best',
-                                      icon: Icons.thumb_up_alt_rounded,
-                                      color: AppColors.iosBlue,
-                                    ),
-                                  if (widget.isLowestFare)
-                                    _buildTopBadge(
-                                      text: 'Lowest Fare',
-                                      icon: Icons.bolt_rounded,
-                                      color: AppColors.iosGreen,
-                                    ),
-                                  if (hasLongLayover)
-                                    _buildTopBadge(
-                                      text: 'Long wait time',
-                                      icon: Icons.warning_amber_rounded,
-                                      color: AppColors.iosRed,
-                                    ),
-                                ],
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Wrap(
+                                  alignment: WrapAlignment.end,
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
+                                    if (widget.isBest)
+                                      _buildTopBadge(
+                                        text: 'Best',
+                                        icon: Icons.thumb_up_alt_rounded,
+                                        color: AppColors.iosBlue,
+                                      ),
+                                    if (widget.isLowestFare)
+                                      _buildTopBadge(
+                                        text: 'Lowest Fare',
+                                        icon: Icons.bolt_rounded,
+                                        color: AppColors.iosGreen,
+                                      ),
+                                    if (hasLongLayover)
+                                      _buildTopBadge(
+                                        text: 'Long wait time',
+                                        icon: Icons.warning_amber_rounded,
+                                        color: AppColors.iosRed,
+                                      ),
+                                  ],
+                                ),
                               ),
                             ],
                           );

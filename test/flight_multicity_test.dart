@@ -111,11 +111,43 @@ void main() {
       );
 
       expect(find.text('Multi-Trip Itinerary'), findsOneWidget);
-      expect(find.text('3 Legs'), findsOneWidget);
+      expect(find.text('3 Trips'), findsOneWidget);
       expect(find.text('Total from MYR 2200'), findsOneWidget);
       expect(find.text('Trip 1: KUL → SIN (MYR 150)'), findsOneWidget);
       expect(find.text('Trip 2: SIN → NRT (MYR 850)'), findsOneWidget);
       expect(find.text('Trip 3: HND → KUL (MYR 1200)'), findsOneWidget);
+    });
+
+    testWidgets('FlightMultiTripSummaryBanner on iPhone SE width (320px) wraps without overflow', (tester) async {
+      tester.view.physicalSize = const Size(320, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: FlightMultiTripSummaryBanner(
+                totalFare: 5491,
+                currency: 'MYR',
+                legSummaries: [
+                  'Trip 1: PEN → MUC (MYR 1837)',
+                  'Trip 2: MUC → BKK (MYR 1499)',
+                  'Trip 3: BKK → PEK (MYR 2155)',
+                ],
+                isDark: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Multi-Trip Itinerary'), findsOneWidget);
+      expect(find.text('3 Trips'), findsOneWidget);
+      expect(find.text('Total from MYR 5491'), findsOneWidget);
     });
   });
 
@@ -190,7 +222,6 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('Found 15 Flights'), findsOneWidget);
-      expect(find.text('Collapse'), findsOneWidget);
       expect(find.text('Open in Google Flights'), findsOneWidget);
     });
 

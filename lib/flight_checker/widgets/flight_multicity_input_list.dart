@@ -108,7 +108,7 @@ class FlightMultiCityInputList extends StatelessWidget {
                   ],
                 ),
               ),
-              if (legs.length > 2)
+              if (legs.length > 1)
                 IconButton(
                   onPressed: () => onRemoveLeg(index),
                   icon: const Icon(Icons.remove_circle_outline_rounded, size: 18, color: AppColors.iosRed),

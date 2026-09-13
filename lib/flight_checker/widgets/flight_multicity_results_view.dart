@@ -110,6 +110,8 @@ class FlightMultiCityResultsView extends StatelessWidget {
           totalCount: totalFoundCount,
           visibleCount: totalVisibleCount,
           isDark: isDark,
+          isAllExpanded: isAllExpanded,
+          onToggleAllExpanded: onToggleAllLegs,
         ),
         const SizedBox(height: 10),
         if (totalVisibleCount == 0)
